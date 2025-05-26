@@ -1,6 +1,8 @@
 /*
- * FreeRTOS Kernel V10.3.1
- * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * FreeRTOS Kernel V11.1.0
+ * Copyright (C) 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * SPDX-License-Identifier: MIT
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -19,17 +21,16 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * http://www.FreeRTOS.org
- * http://aws.amazon.com/freertos
+ * https://www.FreeRTOS.org
+ * https://github.com/FreeRTOS
  *
- * 1 tab == 4 spaces!
  */
 
 /*
  * Purpose: Lowest level routines for all ColdFire processors.
  *
  * Notes:
- * 
+ *
  * ulPortSetIPL() and mcf5xxx_wr_cacr() copied with permission from FreeScale
  * supplied source files.
  */
@@ -43,22 +44,22 @@
 
 .macro portSAVE_CONTEXT
 
-	lea.l		(-60, %sp), %sp
-	movem.l		%d0-%fp, (%sp)
-	move.l		pxCurrentTCB, %a0
-	move.l		%sp, (%a0)
+    lea.l       (-60, %sp), %sp
+    movem.l     %d0-%fp, (%sp)
+    move.l      pxCurrentTCB, %a0
+    move.l      %sp, (%a0)
 
-	.endm
+    .endm
 
 .macro portRESTORE_CONTEXT
 
-	move.l		pxCurrentTCB, %a0
-	move.l		(%a0), %sp
-	movem.l		(%sp), %d0-%fp
-	lea.l		%sp@(60), %sp
-	rte
+    move.l      pxCurrentTCB, %a0
+    move.l      (%a0), %sp
+    movem.l     (%sp), %d0-%fp
+    lea.l       %sp@(60), %sp
+    rte
 
-	.endm
+    .endm
 
 /********************************************************************/
 /*
@@ -105,16 +106,14 @@ mcf5xxx_wr_cacr:
 
 /* Yield interrupt. */
 __cs3_isr_interrupt_80:
-	portSAVE_CONTEXT
-	jsr vPortYieldHandler
-	portRESTORE_CONTEXT
+    portSAVE_CONTEXT
+    jsr vPortYieldHandler
+    portRESTORE_CONTEXT
 
 /********************************************************************/
 
 
 vPortStartFirstTask:
-	portRESTORE_CONTEXT
+    portRESTORE_CONTEXT
 
     .end
-
-

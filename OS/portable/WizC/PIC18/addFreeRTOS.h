@@ -1,6 +1,8 @@
 /*
- * FreeRTOS Kernel V10.3.1
- * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * FreeRTOS Kernel V11.1.0
+ * Copyright (C) 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * SPDX-License-Identifier: MIT
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -19,10 +21,9 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * http://www.FreeRTOS.org
- * http://aws.amazon.com/freertos
+ * https://www.FreeRTOS.org
+ * https://github.com/FreeRTOS
  *
- * 1 tab == 4 spaces!
  */
 
 /*
@@ -41,7 +42,7 @@ Changes from V4.0.1
 #ifndef WIZC_FREERTOS_H
 #define WIZC_FREERTOS_H
 
-#pragma	noheap
+#pragma noheap
 #pragma wizcpp expandnl   on
 #pragma wizcpp searchpath "$__PATHNAME__/libFreeRTOS/Include/"
 #pragma wizcpp uselib     "$__PATHNAME__/libFreeRTOS/Modules/Croutine.c"
@@ -50,4 +51,4 @@ Changes from V4.0.1
 #pragma wizcpp uselib     "$__PATHNAME__/libFreeRTOS/Modules/List.c"
 #pragma wizcpp uselib     "$__PATHNAME__/libFreeRTOS/Modules/Port.c"
 
-#endif	/* WIZC_FREERTOS_H */
+#endif  /* WIZC_FREERTOS_H */
