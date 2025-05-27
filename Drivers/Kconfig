@@ -1,0 +1,6 @@
+menu "DEVICE"
+source "../OpenIBBOs/Drivers/Devices/dev_uart/Kconfig"
+config CHOICE_ITEM2
+        bool
+        prompt "choice2"
+endmenu

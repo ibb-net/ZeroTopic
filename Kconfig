@@ -1,3 +1,8 @@
+source "../OpenIBBOs/Drivers/Kconfig"
+source "../OpenIBBOs/OS/Kconfig"
+
+menu "SDK"
+
 config KCONFIG_DEMO_ITEM1
     bool
     prompt "demonstate item1 for bool learning"
@@ -75,3 +80,4 @@ config MY_CONFIG3
         prompt "my config3"
         depends on MY_CONFIG2
 
+endmenu

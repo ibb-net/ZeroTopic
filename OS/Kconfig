@@ -1,3 +1,4 @@
+menu "OS"
 config KCONFIG_DEMO_ITEM1
     bool
     prompt "demonstate item1 for bool learning"
@@ -75,3 +76,4 @@ config MY_CONFIG3
         prompt "my config3"
         depends on MY_CONFIG2
 
+endmenu

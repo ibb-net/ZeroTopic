@@ -1,0 +1,58 @@
+menu "UART Configuration"
+
+config UART1_ENABLE
+    bool "Enable UART1 support"
+    default y
+    help
+        Enable support for UART1. This includes GPIO, DMA, and other configurations.
+
+config UART1_BAUDRATE
+    int "UART1 Baudrate"
+    default 115200
+    depends on UART1_ENABLE
+    help
+        Set the baudrate for UART1 communication.
+
+config UART1_IDLE_TIMEOUT
+    int "UART1 Idle Timeout /ms"
+    default 3
+    depends on UART1_ENABLE
+    help
+        Set the idle timeout for UART1 in seconds.
+
+config UART1_BUFFER_SIZE
+    int "UART1 Buffer Size /bytes"
+    default 256
+    depends on UART1_ENABLE
+    help
+        Set the buffer size for UART1 communication.
+
+config UART1_BUFFER_NUM
+    int "UART1 Buffer Number"
+    default 4
+    depends on UART1_ENABLE
+    help
+        Set the number of buffers for UART1 communication.
+
+choice
+    prompt "UART0 RX/TX Pin Configuration"
+    depends on UART1_ENABLE
+    default UART0_PIN_OPTION1
+
+config UART0_PIN_OPTION1
+    bool "RX PB7 / TX PB6"
+    help
+        Configure UART0 to use RX on PB7 and TX on PB6.
+
+config UART0_PIN_OPTION2
+    bool "RX PB14 / TX PB15"
+    help
+        Configure UART0 to use RX on PB14 and TX on PB15.
+
+config UART0_PIN_OPTION3
+    bool "RX PA10 / TX PA9"
+    help
+        Configure UART0 to use RX on PA10 and TX on PA9.
+endchoice
+
+endmenu

@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.c": "c",
-        "gd32h757z_start.h": "c"
+        "gd32h757z_start.h": "c",
+        "bsp_uart.h": "c"
     }
 }
