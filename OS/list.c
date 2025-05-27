@@ -210,7 +210,37 @@ void vListInsert( List_t * const pxList,
     traceRETURN_vListInsert();
 }
 /*-----------------------------------------------------------*/
+// Notice 这个是后加入进来的
+void vListInsertBefore(  ListItem_t * const cur_item ,
+    ListItem_t * const pxNewListItem )
+{
+    List_t * const pxList = cur_item->pxContainer;
 
+    // traceENTER_vListInsertBefore( cur_item, pxNewListItem );
+
+    /* Only effective when configASSERT() is also defined, these tests may catch
+     * the list data structures being overwritten in memory.  They will not catch
+     * data errors caused by incorrect configuration or use of FreeRTOS. */
+    listTEST_LIST_INTEGRITY( pxList );
+    listTEST_LIST_ITEM_INTEGRITY( pxNewListItem );
+
+    pxNewListItem->pxNext = cur_item;
+    pxNewListItem->pxPrevious = cur_item->pxPrevious;
+
+    /* Only used during decision coverage testing. */
+    mtCOVERAGE_TEST_DELAY();
+
+    cur_item->pxPrevious->pxNext = pxNewListItem;
+    cur_item->pxPrevious = pxNewListItem;
+
+    /* Remember which list the item is in. */
+    pxNewListItem->pxContainer = pxList;
+
+    ( pxList->uxNumberOfItems ) = ( UBaseType_t ) ( pxList->uxNumberOfItems + 1U );
+
+    // traceRETURN_vListInsertBefore();
+
+}
 
 UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove )
 {

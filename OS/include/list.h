@@ -501,7 +501,9 @@ void vListInsertEnd( List_t * const pxList,
  * \ingroup LinkedList
  */
 UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTION;
-
+// Notice 这个是后加入进来的
+void vListInsertBefore(  ListItem_t * const cur_item ,
+    ListItem_t * const pxNewListItem );
 /* *INDENT-OFF* */
 #ifdef __cplusplus
     }

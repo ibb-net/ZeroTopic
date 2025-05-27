@@ -52,7 +52,13 @@ int __sGetStageCounter(STARTUP_STAGE_ENUM stage) {
     // Return the total count of items in the specified stage
     return count;
 }
-
+/*
+ * @brief  Initialize the system register map.
+ *
+ * This function initializes the system register map by setting the base address
+ * and count of items in the map. It also populates the stage lists and counts
+ * for each startup stage, and prints the details of each item in the map.
+ */
 void SystemRegisterInit(void) {
 #if defined(__CC_ARM) || (defined(__ARMCC_VERSION) && __ARMCC_VERSION >= 6000000)
     __SystemRegisterMap.base  = (SysregisterStruct *)(&SystemRegisterMap$$Base);
@@ -70,51 +76,39 @@ void SystemRegisterInit(void) {
     StarupItemStruct *SysStartupBase = (StarupItemStruct *)__SystemRegisterMap.base;
     printf("SystemRegisterMap :\r\n");
     printf("    Base %p\r\n", __SystemRegisterMap.base);
-    printf("    count %d\r\b", __SystemRegisterMap.count);
+    printf("    count %d\r\n", __SystemRegisterMap.count);
     /* Update Ebery Stage Counter */
     for (size_t i = 0; i < STARUP_STAGE_MAX; i++) {
         vListInitialise(&(__SystemRegisterMap.statge_list[i]));
         for (size_t j = 0; j < __SystemRegisterMap.count; j++) {
             if (SysStartupBase[j].stage == i) {
-                ListItem_t *item    = listGET_HEAD_ENTRY(&(__SystemRegisterMap.statge_list[i]));
                 ListItem_t *newItem = (ListItem_t *)pvPortMalloc(sizeof(ListItem_t));  // Allocate memory for the new item
                 if (newItem == NULL) {
                     // Handle memory allocation failure
                     printf("Failed to allocate memory for ListItem_t\n");
                     continue;
                 }
-
-                // Initialize the new item and set its value to the current startup item
-                vListInitialiseItem(newItem);
                 listSET_LIST_ITEM_VALUE(newItem, (TickType_t)&SysStartupBase[j]);
+                ListItem_t *first_item = listGET_HEAD_ENTRY(&(__SystemRegisterMap.statge_list[i]));
 
-                // Traverse the list to find the correct position based on priority
-                /* if (listLIST_IS_EMPTY(&(__SystemRegisterMap.statge_list[i]))) {
-                    vListInsert(&(__SystemRegisterMap.statge_list[i]), newItem);  // Insert the new item into the list
-                } else  */{
-                    ListItem_t *first_item = listGET_HEAD_ENTRY(&(__SystemRegisterMap.statge_list[i]));
-
-                    while (first_item != listGET_END_MARKER(&(__SystemRegisterMap.statge_list[i]))) {
-                        StarupItemStruct *itemStruct = (StarupItemStruct *)listGET_LIST_ITEM_VALUE(first_item);
-                        if (SysStartupBase[j].priority < itemStruct->priority) {
-                            vListInsert(&(__SystemRegisterMap.statge_list[i]), newItem);  // Insert the new item into the list
-                            break;
-                        }
-                        first_item = first_item->pxNext;
+                while (first_item != listGET_END_MARKER(&(__SystemRegisterMap.statge_list[i]))) {
+                    StarupItemStruct *itemStruct = (StarupItemStruct *)listGET_LIST_ITEM_VALUE(first_item);
+                    if (SysStartupBase[j].priority < itemStruct->priority) {
+                        vListInsertBefore((ListItem_t *const)first_item, newItem);  // Insert the new item into the list
+                        break;
                     }
+                    first_item = first_item->pxNext;
+                }
 
-                    // If the new item was not inserted, append it to the end of the list
-                    if (first_item == listGET_END_MARKER(&(__SystemRegisterMap.statge_list[i]))) {
-                        vListInsertEnd(&(__SystemRegisterMap.statge_list[i]), newItem);
-                    }
+                // If the new item was not inserted, append it to the end of the list
+                if (first_item == listGET_END_MARKER(&(__SystemRegisterMap.statge_list[i]))) {
+                    vListInsertEnd(&(__SystemRegisterMap.statge_list[i]), newItem);
                 }
             }
         }
-
         // Update the count of items in the current stage
         __SystemRegisterMap.statge_count[i] = listCURRENT_LIST_LENGTH(&(__SystemRegisterMap.statge_list[i]));
         printf("Stage[%d] count %d\r\n", i, __SystemRegisterMap.statge_count[i]);
-
         // Print the items in the current stage
         ListItem_t *item = listGET_HEAD_ENTRY(&(__SystemRegisterMap.statge_list[i]));
         for (size_t j = 0; j < __SystemRegisterMap.statge_count[i]; j++) {
@@ -124,9 +118,9 @@ void SystemRegisterInit(void) {
         }
     }
 }
-#if (DEV_XXXXX_ENABLE==1)
+#if (DEV_XXXXX_ENABLE == 0)
 SYSTEM_REGISTER_INIT(MCUInitStage, 110, a1_MCUInitStage10, MCUInitStage10);
-#endif
+
 SYSTEM_REGISTER_INIT(MCUInitStage, 211, a1_MCUInitStage11, MCUInitStage11);
 SYSTEM_REGISTER_INIT(MCUInitStage, 212, a1_MCUInitStage12, MCUInitStage12);
 SYSTEM_REGISTER_INIT(MCUInitStage, 213, a1_MCUInitStage13, MCUInitStage13);
@@ -135,9 +129,9 @@ SYSTEM_REGISTER_INIT(MCUPreInitStage, 0, MCUPreInitStage0, SystemRegisterInit);
 SYSTEM_REGISTER_INIT(MCUPreInitStage, 1, MCUPreInitStage1, SystemRegisterInit);
 SYSTEM_REGISTER_INIT(MCUPreInitStage, 2, MCUPreInitStage2, SystemRegisterInit);
 SYSTEM_REGISTER_INIT(MCUPreInitStage, 3, MCUPreInitStage3, SystemRegisterInit);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 0, ServerPerInitStage0, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 0, ServerPerInitStage0_0, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 1, ServerPerInitStage1, ServerPerInitStage);
+SYSTEM_REGISTER_INIT(ServerPerInitStage, 5, ServerPerInitStage5_0, ServerPerInitStage);
+SYSTEM_REGISTER_INIT(ServerPerInitStage, 4, ServerPerInitStage4_0, ServerPerInitStage);
+SYSTEM_REGISTER_INIT(ServerPerInitStage, 3, ServerPerInitStage3_0, ServerPerInitStage);
 SYSTEM_REGISTER_INIT(ServerPerInitStage, 2, ServerPerInitStage2, ServerPerInitStage);
 SYSTEM_REGISTER_INIT(ServerPerInitStage, 0, ServerPerInitStage0_0_0, ServerPerInitStage);
 SYSTEM_REGISTER_INIT(ServerPerInitStage, 3, ServerPerInitStage3, ServerPerInitStage);
@@ -182,3 +176,4 @@ SYSTEM_REGISTER_INIT(ServerInitStage, 0, ServerInitStage0, dec.......);
 SYSTEM_REGISTER_INIT(AppInitStage, 0, AppInitStage0, dec.......);
 SYSTEM_REGISTER_INIT(AppInitStage, 1, AppInitStage01, dec.......);
 SYSTEM_REGISTER_INIT(AppInitStage, 2, AppInitStage02, dec.......);
+#endif
