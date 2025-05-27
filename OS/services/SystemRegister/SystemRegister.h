@@ -25,7 +25,6 @@ typedef struct
     List_t statge_list[STARUP_STAGE_MAX];
 } SysregisterStruct;
 
-
 typedef struct {
     STARTUP_STAGE_ENUM stage;  // The stage of the startup process where this item is executed.
     uint8_t priority;          // The priority of this item within the same startup stage (0 is highest,lower values indicate higher priority).
@@ -58,17 +57,19 @@ typedef struct {
 #endif
 #endif
 
-#define SYSTEM_REGISTER_INIT(_stage, pri, _name, _desc)  \
-    const char Register##_name[]       = #_name;             \
-    const char Register##_name##desc[] = #_desc;             \
-    SYS_REGISTER_MAP_USED const StarupItemStruct                 \
+#define SYSTEM_REGISTER_INIT(_stage, pri, _name, _desc)               \
+    const char Register##_name[]       = #_name;                      \
+    const char Register##_name##desc[] = #_desc;                      \
+    SYS_REGISTER_MAP_USED const StarupItemStruct                      \
         SysRegisterMap##_name REGISTER_SECTION("SystemRegisterMap") = \
-            {                                                \
-                .stage    = _stage,                           \
-                .priority = pri,                             \
-                .name     = Register##_name,                 \
-                .desc     = Register##_name##desc,           \
-                .func     = NULL};
+            {                                                         \
+                .stage    = _stage,                                   \
+                .priority = pri,                                      \
+                .name     = Register##_name,                          \
+                .desc     = Register##_name##desc,                    \
+                .func     = _name};
 
 void SystemRegisterInit(void);
+// SystemRegisterRun
+void SystemRegisterRun(STARTUP_STAGE_ENUM stage);
 #endif

@@ -118,62 +118,91 @@ void SystemRegisterInit(void) {
         }
     }
 }
+void SystemRegisterRun(STARTUP_STAGE_ENUM stage) {
+    List_t *stage_list = &(__SystemRegisterMap.statge_list[stage]);
+    ListItem_t *item   = listGET_HEAD_ENTRY(stage_list);
+    printf("SystemRegisterRun Stage %d\r\n", stage);
+    for (size_t i = 0; i < __SystemRegisterMap.statge_count[stage]; i++) {
+        StarupItemStruct *itemStruct = (StarupItemStruct *)listGET_LIST_ITEM_VALUE(item);
+        printf("\tRun Item[%d] %s : %s\r\n", i, itemStruct->name, itemStruct->desc);
+        if (itemStruct->func) {
+            itemStruct->func();  // Call the function associated with the item
+        } else {
+            printf("\t\tItem[%d] %s : %s has no function\r\n", i, itemStruct->name, itemStruct->desc);
+        }
+        item = item->pxNext;
+    }
+}
+
 #if (DEV_XXXXX_ENABLE == 0)
+
+void a1_MCUInitStage10(void) {
+    printf("a1_MCUInitStage10 run\r\n");
+}
+void a1_MCUInitStage11(void) {
+    printf("a1_MCUInitStage11 run\r\n");
+}
+void a1_MCUInitStage12(void) {
+    printf("a1_MCUInitStage12 run\r\n");
+}
+void a1_MCUInitStage13(void) {
+    printf("a1_MCUInitStage13 run\r\n");
+}
 SYSTEM_REGISTER_INIT(MCUInitStage, 110, a1_MCUInitStage10, MCUInitStage10);
 
 SYSTEM_REGISTER_INIT(MCUInitStage, 211, a1_MCUInitStage11, MCUInitStage11);
 SYSTEM_REGISTER_INIT(MCUInitStage, 212, a1_MCUInitStage12, MCUInitStage12);
 SYSTEM_REGISTER_INIT(MCUInitStage, 213, a1_MCUInitStage13, MCUInitStage13);
 
-SYSTEM_REGISTER_INIT(MCUPreInitStage, 0, MCUPreInitStage0, SystemRegisterInit);
-SYSTEM_REGISTER_INIT(MCUPreInitStage, 1, MCUPreInitStage1, SystemRegisterInit);
-SYSTEM_REGISTER_INIT(MCUPreInitStage, 2, MCUPreInitStage2, SystemRegisterInit);
-SYSTEM_REGISTER_INIT(MCUPreInitStage, 3, MCUPreInitStage3, SystemRegisterInit);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 5, ServerPerInitStage5_0, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 4, ServerPerInitStage4_0, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 3, ServerPerInitStage3_0, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 2, ServerPerInitStage2, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 0, ServerPerInitStage0_0_0, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 3, ServerPerInitStage3, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 4, ServerPerInitStage4, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 5, ServerPerInitStage5, ServerPerInitStage);
-SYSTEM_REGISTER_INIT(ServerPerInitStage, 6, ServerPerInitStage6, ServerPerInitStage);
+// SYSTEM_REGISTER_INIT(MCUPreInitStage, 0, MCUPreInitStage0, SystemRegisterInit);
+// SYSTEM_REGISTER_INIT(MCUPreInitStage, 1, MCUPreInitStage1, SystemRegisterInit);
+// SYSTEM_REGISTER_INIT(MCUPreInitStage, 2, MCUPreInitStage2, SystemRegisterInit);
+// SYSTEM_REGISTER_INIT(MCUPreInitStage, 3, MCUPreInitStage3, SystemRegisterInit);
+// SYSTEM_REGISTER_INIT(ServerPerInitStage, 5, ServerPerInitStage5_0, ServerPerInitStage);
+// SYSTEM_REGISTER_INIT(ServerPerInitStage, 4, ServerPerInitStage4_0, ServerPerInitStage);
+// SYSTEM_REGISTER_INIT(ServerPerInitStage, 3, ServerPerInitStage3_0, ServerPerInitStage);
+// SYSTEM_REGISTER_INIT(ServerPerInitStage, 2, ServerPerInitStage2, ServerPerInitStage);
+// SYSTEM_REGISTER_INIT(ServerPerInitStage, 0, ServerPerInitStage0_0_0, ServerPerInitStage);
+// SYSTEM_REGISTER_INIT(ServerPerInitStage, 3, ServerPerInitStage3, ServerPerInitStage);
+// SYSTEM_REGISTER_INIT(ServerPerInitStage, 4, ServerPerInitStage4, ServerPerInitStage);
+// SYSTEM_REGISTER_INIT(ServerPerInitStage, 5, ServerPerInitStage5, ServerPerInitStage);
+// SYSTEM_REGISTER_INIT(ServerPerInitStage, 6, ServerPerInitStage6, ServerPerInitStage);
 
-SYSTEM_REGISTER_INIT(MCUInitStage, 4, MCUInitStage4, MCUInitStage4);
-SYSTEM_REGISTER_INIT(MCUInitStage, 5, MCUInitStage5, MCUInitStage5);
-SYSTEM_REGISTER_INIT(MCUInitStage, 6, MCUInitStage6, MCUInitStage6);
-SYSTEM_REGISTER_INIT(MCUInitStage, 7, MCUInitStage7, MCUInitStage7);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 4, MCUInitStage4, MCUInitStage4);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 5, MCUInitStage5, MCUInitStage5);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 6, MCUInitStage6, MCUInitStage6);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 7, MCUInitStage7, MCUInitStage7);
 
-SYSTEM_REGISTER_INIT(MCUInitStage, 0, MCUInitStage0, MCUInitStage0);
-SYSTEM_REGISTER_INIT(MCUInitStage, 1, MCUInitStage1, MCUInitStage1);
-SYSTEM_REGISTER_INIT(MCUInitStage, 2, MCUInitStage2, MCUInitStage2);
-SYSTEM_REGISTER_INIT(MCUInitStage, 3, MCUInitStage3, MCUInitStage3);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 0, MCUInitStage0, MCUInitStage0);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 1, MCUInitStage1, MCUInitStage1);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 2, MCUInitStage2, MCUInitStage2);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 3, MCUInitStage3, MCUInitStage3);
 
-SYSTEM_REGISTER_INIT(MCUInitStage, 8, MCUInitStage8, MCUInitStage8);
-SYSTEM_REGISTER_INIT(MCUInitStage, 9, MCUInitStage9, MCUInitStage9);
-SYSTEM_REGISTER_INIT(MCUInitStage, 10, MCUInitStage10, MCUInitStage10);
-SYSTEM_REGISTER_INIT(MCUInitStage, 3, a1_MCUInitStage3, MCUInitStage3);
-SYSTEM_REGISTER_INIT(MCUInitStage, 4, a1_MCUInitStage4, MCUInitStage4);
-SYSTEM_REGISTER_INIT(MCUInitStage, 5, a1_MCUInitStage5, MCUInitStage5);
-SYSTEM_REGISTER_INIT(MCUInitStage, 6, a1_MCUInitStage6, MCUInitStage6);
-SYSTEM_REGISTER_INIT(MCUInitStage, 0, a1_MCUInitStage0, MCUInitStage0);
-SYSTEM_REGISTER_INIT(MCUInitStage, 1, a1_MCUInitStage1, MCUInitStage1);
-SYSTEM_REGISTER_INIT(MCUInitStage, 2, a1_MCUInitStage2, MCUInitStage2);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 8, MCUInitStage8, MCUInitStage8);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 9, MCUInitStage9, MCUInitStage9);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 10, MCUInitStage10, MCUInitStage10);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 3, a1_MCUInitStage3, MCUInitStage3);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 4, a1_MCUInitStage4, MCUInitStage4);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 5, a1_MCUInitStage5, MCUInitStage5);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 6, a1_MCUInitStage6, MCUInitStage6);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 0, a1_MCUInitStage0, MCUInitStage0);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 1, a1_MCUInitStage1, MCUInitStage1);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 2, a1_MCUInitStage2, MCUInitStage2);
 
-SYSTEM_REGISTER_INIT(MCUInitStage, 7, a1_MCUInitStage7, MCUInitStage7);
-SYSTEM_REGISTER_INIT(MCUInitStage, 8, a1_MCUInitStage8, MCUInitStage8);
-SYSTEM_REGISTER_INIT(MCUInitStage, 9, a1_MCUInitStage9, MCUInitStage9);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 7, a1_MCUInitStage7, MCUInitStage7);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 8, a1_MCUInitStage8, MCUInitStage8);
+// SYSTEM_REGISTER_INIT(MCUInitStage, 9, a1_MCUInitStage9, MCUInitStage9);
 
-SYSTEM_REGISTER_INIT(BoardInitStage, 0, BoardInitStage0, dec.......);
-SYSTEM_REGISTER_INIT(BoardInitStage, 1, BoardInitStage1, dec.......);
-SYSTEM_REGISTER_INIT(BoardInitStage, 2, BoardInitStage2, dec.......);
-SYSTEM_REGISTER_INIT(BoardInitStage, 3, BoardInitStage3, dec.......);
+// SYSTEM_REGISTER_INIT(BoardInitStage, 0, BoardInitStage0, dec.......);
+// SYSTEM_REGISTER_INIT(BoardInitStage, 1, BoardInitStage1, dec.......);
+// SYSTEM_REGISTER_INIT(BoardInitStage, 2, BoardInitStage2, dec.......);
+// SYSTEM_REGISTER_INIT(BoardInitStage, 3, BoardInitStage3, dec.......);
 
-SYSTEM_REGISTER_INIT(ServerInitStage, 1, ServerInitStage1, dec.......);
-SYSTEM_REGISTER_INIT(ServerInitStage, 2, ServerInitStage2, dec.......);
-SYSTEM_REGISTER_INIT(ServerInitStage, 0, ServerInitStage0, dec.......);
+// SYSTEM_REGISTER_INIT(ServerInitStage, 1, ServerInitStage1, dec.......);
+// SYSTEM_REGISTER_INIT(ServerInitStage, 2, ServerInitStage2, dec.......);
+// SYSTEM_REGISTER_INIT(ServerInitStage, 0, ServerInitStage0, dec.......);
 
-SYSTEM_REGISTER_INIT(AppInitStage, 0, AppInitStage0, dec.......);
-SYSTEM_REGISTER_INIT(AppInitStage, 1, AppInitStage01, dec.......);
-SYSTEM_REGISTER_INIT(AppInitStage, 2, AppInitStage02, dec.......);
+// SYSTEM_REGISTER_INIT(AppInitStage, 0, AppInitStage0, dec.......);
+// SYSTEM_REGISTER_INIT(AppInitStage, 1, AppInitStage01, dec.......);
+// SYSTEM_REGISTER_INIT(AppInitStage, 2, AppInitStage02, dec.......);
 #endif
