@@ -1,0 +1,77 @@
+config KCONFIG_DEMO_ITEM1
+    bool
+    prompt "demonstate item1 for bool learning"
+
+config KCONFIG_DEMO_ITEM2
+    string
+    prompt "demonstate item2 for string learning"
+
+config KCONFIG_DEMO_ITEM3
+    hex
+    prompt "demonstate item3 for hex learning"
+
+menuconfig KCONFIG_DEMO_MENUCONFIG1
+    bool
+    prompt "menuconfig learning"
+
+if KCONFIG_DEMO_MENUCONFIG1
+
+config MENUCONFIG_SUBITEM1
+    bool
+    prompt "menuconfig subitem1"
+
+config MENUCONFIG_SUBITEM2
+    bool
+    prompt "menuconfig subitem2"
+
+endif
+
+menu "menu learning"
+
+config MENU_SUBITEM1
+        bool
+        prompt "subitem1"
+
+config MENU_SUBITEM2
+        bool
+        prompt "subitem2"
+
+config MENU_SUBITEM3
+        bool
+        prompt "subitem3"
+
+endmenu
+
+
+
+choice 
+        bool
+        prompt "choice learning"
+
+config CHOICE_ITEM1
+        bool
+        prompt "choice1"
+
+config CHOICE_ITEM2
+        bool
+        prompt "choice2"
+
+config CHOICE_ITEM3
+        bool
+        prompt "choice3"
+endchoice
+
+
+config MY_CONFIG1
+        bool
+        prompt "my config1"
+
+config MY_CONFIG2
+        bool
+        prompt "my config2" if MY_CONFIG1
+
+config MY_CONFIG3
+        bool
+        prompt "my config3"
+        depends on MY_CONFIG2
+
