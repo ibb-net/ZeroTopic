@@ -8,8 +8,7 @@
  *
  */
 
-#include "SystemRegister/SystemRegister.h"
-
+#include "register/register.h"
 #include "stdio.h"
 #include "string.h"
 

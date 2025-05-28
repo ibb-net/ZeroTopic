@@ -3,6 +3,13 @@
         "*.c": "c",
         "gd32h757z_start.h": "c",
         "bsp_uart.h": "c",
-        "dev_uart.h": "c"
+        "dev_uart.h": "c",
+        "semphr.h": "c",
+        "vfb.h": "c",
+        "list.h": "c",
+        "bit": "cpp",
+        "compare": "cpp",
+        "limits": "cpp",
+        "new": "cpp"
     }
 }
