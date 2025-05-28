@@ -42,7 +42,7 @@ static List_t *__vfb_list_get_head(uint16_t event) {
     }
     vListInitialise(&new_event_item->queue_list);
     new_event_item->event = event;
-    
+
     ListItem_t *item = (ListItem_t *)pvPortMalloc(sizeof(ListItem_t));
     if (item == NULL) {
         printf("Failed to malloc memory for ListItem_t");
@@ -122,9 +122,9 @@ QueueHandle_t vfb_subscribe(uint16_t queue_num, uint16_t *event_list, uint16_t e
         printf("queue_handle is NULL");
         return NULL;
     }
-    printf("Task %s Queue %p created, queue_num: %u\r\n", taskName, queue_handle,queue_num);
+    printf("Task %s Queue %p created, queue_num: %u\r\n", taskName, queue_handle, queue_num);
     if (xSemaphoreTake(__vfb_info.xFDSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
-        for (uint16_t i = 0; i < event_num; i++) {  // TODO 当event为空时会有问题,需要改为do while
+        for (uint16_t i = 0; i < event_num; i++) {
             List_t *queue_list = __vfb_list_get_head(event_list[i]);
             if (queue_list == NULL) {
                 printf("Failed to get queue list for event %u\r\n", event_list[i]);
@@ -162,8 +162,8 @@ uint8_t vfb_send(uint16_t event, int64_t data, uint16_t length, void *payload) {
     }
     printf("Event %u, registered queue count: %u\r\n", event, listCURRENT_LIST_LENGTH(event_list));
     if (xSemaphoreTake(__vfb_info.xFDSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
+        ListItem_t *item = listGET_HEAD_ENTRY(event_list);
         for (uint16_t i = 0; i < listCURRENT_LIST_LENGTH(event_list); i++) {
-            ListItem_t *item = listGET_HEAD_ENTRY(event_list);
             if (item == listGET_END_MARKER(event_list)) {
                 printf("No queue found for event %u", event);
                 xSemaphoreGive(__vfb_info.xFDSemaphore);
@@ -175,13 +175,14 @@ uint8_t vfb_send(uint16_t event, int64_t data, uint16_t length, void *payload) {
                 xSemaphoreGive(__vfb_info.xFDSemaphore);
                 return FD_FAIL;
             }
-            printf("Task %s sending message to queue %p for event %u, data: %ld, length: %u\r\n", 
+            printf("Task %s sending message to queue %p for event %u, data: %ld, length: %u\r\n",
                    pcTaskGetName(xTaskGetCurrentTaskHandle()), queue_handle, event, data, length);
             if (xQueueSend(queue_handle, &tmp_msg, pdMS_TO_TICKS(100)) != pdPASS) {
                 printf("Failed to send message to queue for event %u", event);
                 xSemaphoreGive(__vfb_info.xFDSemaphore);
                 return FD_FAIL;
             }
+            item = listGET_NEXT(item);
         }
         printf("Task %s sent message for event %u, data: %ld, length: %u\r\n", pcTaskGetName(xTaskGetCurrentTaskHandle()), event, data, length);
         xSemaphoreGive(__vfb_info.xFDSemaphore);
