@@ -1,12 +1,11 @@
 
 #ifndef __VFB_SERVER_H__
 #define __VFB_SERVER_H__
-#include "vfb_config.h"
 #include "FreeRTOS.h"
 #include "list.h"
 #include "queue.h"
 #include "semphr.h"
-
+#include "vfb_config.h"
 
 #define QUEUE_LENGTH 10
 #define QUEUE_ITEM_SIZE sizeof(char)
@@ -29,21 +28,34 @@
 #endif
 #endif
 
-#define VBF_I printf
-#define VBF_E printf
-#define VBF_W printf
+#define VFB_I printf
+#define VFB_E printf
+#define VFB_W printf
+#define VFB_D printf
+#define VFB_SUBSCRIBE(num, list) vfb_subscribe(num, list, sizeof(list) / sizeof(vfb_event_t))
+
+typedef uint16_t vfb_event_t;
+typedef union PACKED {
+    uint8_t *buffer;
+    struct {
+        vfb_event_t event;  // EVENT_LIST
+        uint16_t use_cnt;
+        uint32_t data;  // Data associated with the event
+        uint16_t length;
+        uintptr_t *payload_offset;  // Pointer to the payload data, offset from the start of the struct
+    } head;
+
+} vfb_buffer_union;
+typedef vfb_buffer_union *vfb_buffer_union_t;
+typedef struct
+{
+    vfb_buffer_union *frame;
+} vfb_message;
+typedef vfb_message *vfb_message_t;
 
 typedef struct
 {
-    uint16_t event;  // EVENT_LIST
-    uint32_t data;
-    uint16_t length;
-    void *payload;
-} PACKED vfb_message;
-
-typedef struct
-{
-    uint32_t event;  // EVENT_LIST
+    vfb_event_t event;  // EVENT_LIST
     List_t queue_list;  // List of QueueHandle_t queue_handle
 } EventList_t;
 
@@ -54,39 +66,32 @@ typedef struct {
 } vfb_info_struct;
 typedef vfb_info_struct *vfb_info_t;
 
+typedef struct {
+    /* task paraeters */
+    char name[16];  // Task name
+    void *pvParameters;
+    /* Receive Event */
+    uint16_t queue_num;  // Number of queues to subscribe
+    vfb_event_t *event_list;
+    uint16_t event_num;
+    /* Startup waitfor event */
+    vfb_event_t *startup_wait_event_list;
+    uint16_t startup_wait_event_num;
+    TickType_t xTicksToWait;
 
-#if 0
-#define VFB_HEAD_SIZE (sizeof(uint32_t) + sizeof(int64_t) + sizeof(uint16_t))
-#define VFB_TOTOL_SIZE(payload_size) (VFB_HEAD_SIZE + payload_size)
-#define VFB_PAYLOAD_MAX_SIZE NORMAL_PAYLOAD_MAX_SIZE
-#define VFB_PAYLOAD_4K_MAX_SIZE LARGE_PAYLOAD_MAX_SIZE
-#pragma pack(1)
+    /* Recv VFB Handle Callback */
+    void (*rcv_msg_cb)(void *);
+    void (*rcv_timeout_cb)(void);
 
-typedef vfb_message *vfb_message_t;
-typedef vfb_message vfb_msg;
-typedef vfb_message *vfb_msg_t;
-typedef struct
-{
-    uint32_t event;  // EVENT_LIST
-    int64_t data;
-    uint16_t length;
-    uint8_t payload[VFB_PAYLOAD_MAX_SIZE];
-} PACKED vfb_message_buffer;
-typedef vfb_message_buffer *vfb_message_buffer_t;
-typedef struct
-{
-    uint32_t event;  // EVENT_LIST
-    int64_t data;
-    uint16_t length;
-    uint8_t payload[VFB_PAYLOAD_4K_MAX_SIZE];
-} PACKED vfb_message_4k_buffer;
-typedef vfb_message_4k_buffer *vfb_message_4k_buffer_t;
-
-#pragma pack()
-
-#endif
+} VFBTaskStruct;
 
 void vfb_server_init(void);
-QueueHandle_t vfb_subscribe(uint16_t queue_num, uint16_t *event_list, uint16_t event_num);
-uint8_t vfb_send(uint16_t event, int64_t data, uint16_t length, void *payload) ;
+
+QueueHandle_t vfb_subscribe(uint16_t queue_num, vfb_event_t *event_list, uint16_t event_num);
+void VFB_MsgReceive(QueueHandle_t xQueue,
+                    TickType_t xTicksToWait,
+                    void (*rcv_msg_cb)(void *),
+                    void (*rcv_timeout_cb)(void));
+uint8_t vfb_send(vfb_event_t event, uint32_t data, uint16_t length, void *payload);
+void VFBTaskFrame(void *pvParameters);
 #endif  // __VFB_SERVER_H__
