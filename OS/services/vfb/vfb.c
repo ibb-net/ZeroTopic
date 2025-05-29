@@ -395,7 +395,7 @@ void VFB_MsgReceive(QueueHandle_t xQueue,
                     void (*rcv_timeout_cb)(void)) {
     vfb_message tmp_msg;
     for (;;) {
-        if (xQueueReceive(xQueue, &tmp_msg, portMAX_DELAY) == pdTRUE) {
+        if (xQueueReceive(xQueue, &tmp_msg, xTicksToWait) == pdTRUE) {
             vfb_message_t msg = &tmp_msg;
             if (rcv_msg_cb != NULL) {
                 rcv_msg_cb(msg);
