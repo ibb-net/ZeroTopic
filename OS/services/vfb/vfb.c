@@ -18,6 +18,7 @@ static vfb_info_struct __vfb_info;
 
 static List_t *__vfb_list_get_head(vfb_event_t event);
 static int __vfb_list_add_queue(List_t *queue_list, QueueHandle_t queue_handle);
+ListItem_t *__vfb_list_find_queue(List_t *queue_list, QueueHandle_t queue_handle);
 
 /**
  * @brief Get the head of the event list
@@ -59,10 +60,33 @@ static List_t *__vfb_list_get_head(vfb_event_t event) {
     __vfb_info.event_num++;
     return &new_event_item->queue_list;
 }
+ListItem_t *__vfb_list_find_queue(List_t *queue_list, QueueHandle_t queue_handle) {
+    if (queue_list == NULL || queue_handle == NULL) {
+        VFB_E("Queue list or queue handle is NULL");
+        return NULL;
+    }
+    ListItem_t *item = listGET_HEAD_ENTRY(queue_list);
+    for (uint16_t i = 0; i < listCURRENT_LIST_LENGTH(queue_list); i++) {
+        if (item == listGET_END_MARKER(queue_list)) {
+            return NULL;  // Queue list is empty
+        }
+        if ((QueueHandle_t)listGET_LIST_ITEM_VALUE(item) == queue_handle) {
+            return item;
+        }
+        item = item->pxNext;
+    }
+    return NULL;
+}
 static int __vfb_list_add_queue(List_t *queue_list, QueueHandle_t queue_handle) {
     if (queue_list == NULL || queue_handle == NULL) {
         VFB_E("Queue list or queue handle is NULL");
         return -1;
+    }
+    // Check if the queue already exists in the list
+    ListItem_t *existing_item = __vfb_list_find_queue(queue_list, queue_handle);
+    if (existing_item != NULL) {
+        VFB_D("Queue %p already exists in the list", queue_handle);
+        return 0;  // Queue already exists, no need to add again
     }
     ListItem_t *item = (ListItem_t *)pvPortMalloc(sizeof(ListItem_t));
     if (item == NULL) {
@@ -107,7 +131,7 @@ void vfg_server_info(void) {
     printf("  Event List Head: %p\n", (void *)&(__vfb_info.event_list));
 }
 // 注册event
-QueueHandle_t vfb_subscribe(uint16_t queue_num, vfb_event_t *event_list, uint16_t event_num) {
+QueueHandle_t vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, uint16_t event_num) {
     uint16_t valiad_counter  = 0;
     uint16_t invalid_counter = 0;
     /* 获取Task的信息 */
@@ -365,8 +389,6 @@ uint8_t vfb_publish_data(uint32_t event, int64_t data) {
 //     return FD_FAIL;
 // }
 
-
-
 void VFB_MsgReceive(QueueHandle_t xQueue,
                     TickType_t xTicksToWait,
                     void (*rcv_msg_cb)(void *),
@@ -401,7 +423,7 @@ void VFB_MsgReceive(QueueHandle_t xQueue,
 }
 
 void VFBTaskFrame(void *pvParameters) {
-    VFBTaskStruct * task_cfg = (VFBTaskStruct *)pvParameters;
+    VFBTaskStruct *task_cfg = (VFBTaskStruct *)pvParameters;
     if (task_cfg == NULL) {
         VFB_E("Task configuration is NULL");
         return;
@@ -410,11 +432,10 @@ void VFBTaskFrame(void *pvParameters) {
     printf("Task Parameters: pvParameters = %p, queue_num = %u, event_num = %u, xTicksToWait = %d\r\n",
            task_cfg->pvParameters, task_cfg->queue_num, task_cfg->event_num, task_cfg->xTicksToWait);
     QueueHandle_t queue_handle = NULL;
-    queue_handle = vfb_subscribe(task_cfg->queue_num, task_cfg->event_list, task_cfg->event_num);
+    queue_handle               = vfb_subscribe(task_cfg->queue_num, task_cfg->event_list, task_cfg->event_num);
     if (queue_handle == NULL) {
         VFB_E("Failed to subscribe to event queue");
         return;
     }
     VFB_MsgReceive(queue_handle, task_cfg->xTicksToWait, task_cfg->rcv_msg_cb, task_cfg->rcv_timeout_cb);
 }
-

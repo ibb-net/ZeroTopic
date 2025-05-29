@@ -67,27 +67,21 @@ typedef struct {
 typedef vfb_info_struct *vfb_info_t;
 
 typedef struct {
-    /* task paraeters */
-    char name[16];  // Task name
+    const char *name;
     void *pvParameters;
-    /* Receive Event */
-    uint16_t queue_num;  // Number of queues to subscribe
-    vfb_event_t *event_list;
-    uint16_t event_num;
-    /* Startup waitfor event */
-    vfb_event_t *startup_wait_event_list;
-    uint16_t startup_wait_event_num;
+    uint8_t queue_num;
+    const vfb_event_t *event_list;
+    uint8_t event_num;
+    const vfb_event_t *startup_wait_event_list;
+    uint8_t startup_wait_event_num;
     TickType_t xTicksToWait;
-
-    /* Recv VFB Handle Callback */
-    void (*rcv_msg_cb)(void *);
+    void (*rcv_msg_cb)(void *msg);
     void (*rcv_timeout_cb)(void);
-
 } VFBTaskStruct;
 
 void vfb_server_init(void);
 
-QueueHandle_t vfb_subscribe(uint16_t queue_num, vfb_event_t *event_list, uint16_t event_num);
+QueueHandle_t vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, uint16_t event_num);
 void VFB_MsgReceive(QueueHandle_t xQueue,
                     TickType_t xTicksToWait,
                     void (*rcv_msg_cb)(void *),
