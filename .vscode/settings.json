@@ -10,6 +10,13 @@
         "bit": "cpp",
         "compare": "cpp",
         "limits": "cpp",
-        "new": "cpp"
+        "new": "cpp",
+        "shell.h": "c",
+        "shell_cfg.h": "c",
+        "ulog_def.h": "c",
+        "ulog.h": "c",
+        "ulog_cfg.h": "c",
+        "stdarg.h": "c",
+        "pthread.h": "c"
     }
 }

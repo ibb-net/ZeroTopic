@@ -5,4 +5,5 @@
 void com_usart_init(void);
 int fputc(int ch, FILE *f);
 int __io_putchar(int ch) ;
+int debug_putbuffer(const char *buffer, size_t len);
 #endif // __DEV_UART_H__
