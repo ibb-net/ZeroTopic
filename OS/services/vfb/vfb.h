@@ -68,6 +68,7 @@ typedef vfb_info_struct *vfb_info_t;
 
 typedef struct {
     const char *name;
+    UBaseType_t uxPriority;
     void *pvParameters;
     uint8_t queue_num;
     const vfb_event_t *event_list;
