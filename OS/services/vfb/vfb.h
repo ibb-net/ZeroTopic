@@ -76,6 +76,7 @@ typedef struct {
     const vfb_event_t *startup_wait_event_list;
     uint8_t startup_wait_event_num;
     TickType_t xTicksToWait;
+    void (*init_msg_cb)(void *msg);
     void (*rcv_msg_cb)(void *msg);
     void (*rcv_timeout_cb)(void);
 } VFBTaskStruct;
@@ -88,5 +89,6 @@ void VFB_MsgReceive(QueueHandle_t xQueue,
                     void (*rcv_msg_cb)(void *),
                     void (*rcv_timeout_cb)(void));
 uint8_t vfb_send(vfb_event_t event, uint32_t data, uint16_t length, void *payload);
+uint8_t vfb_publish(vfb_event_t event);
 void VFBTaskFrame(void *pvParameters);
 #endif  // __VFB_SERVER_H__

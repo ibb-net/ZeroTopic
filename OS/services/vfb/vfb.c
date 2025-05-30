@@ -246,6 +246,9 @@ uint8_t vfb_send(vfb_event_t event, uint32_t data, uint16_t length, void *payloa
     }
 }
 
+uint8_t vfb_publish(vfb_event_t event) {
+    return vfb_send(event, 0, 0, NULL);
+}
 #if 0
 /**
  * @brief
@@ -428,7 +431,7 @@ void VFBTaskFrame(void *pvParameters) {
         VFB_E("Task configuration is NULL");
         return;
     }
-    printf("VFB Task %s started\r\n", task_cfg->name);
+    printf("Create Task %s started\r\n", task_cfg->name);
     printf("Task Parameters: pvParameters = %p, queue_num = %u, event_num = %u, xTicksToWait = %d\r\n",
            task_cfg->pvParameters, task_cfg->queue_num, task_cfg->event_num, task_cfg->xTicksToWait);
     QueueHandle_t queue_handle = NULL;
@@ -436,6 +439,9 @@ void VFBTaskFrame(void *pvParameters) {
     if (queue_handle == NULL) {
         VFB_E("Failed to subscribe to event queue");
         return;
+    }
+    if(task_cfg->init_msg_cb != NULL) {
+        task_cfg->init_msg_cb(NULL);  // Call the initialization callback if provided
     }
     VFB_MsgReceive(queue_handle, task_cfg->xTicksToWait, task_cfg->rcv_msg_cb, task_cfg->rcv_timeout_cb);
 }
