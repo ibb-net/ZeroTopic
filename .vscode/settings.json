@@ -17,6 +17,13 @@
         "ulog.h": "c",
         "ulog_cfg.h": "c",
         "stdarg.h": "c",
-        "pthread.h": "c"
+        "pthread.h": "c",
+        "dev_timer_decoder_cfg.h": "c",
+        "gd32h7xx.h": "c",
+        "os_server.h": "c",
+        "kconfig": "cpp",
+        "timer_decoder.h": "c",
+        "stdio.h": "c",
+        "config.h": "c"
     }
 }

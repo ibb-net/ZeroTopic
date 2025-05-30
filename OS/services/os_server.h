@@ -8,5 +8,6 @@
 #include "vfb/vfb_config.h"
 #include "vfb/vfb.h"
 #include "register/register.h"
+#include "register/register_sdk_cfg.h"
 
 #endif  

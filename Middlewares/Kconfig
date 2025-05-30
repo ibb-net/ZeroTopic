@@ -1,0 +1,6 @@
+
+
+menu "Middlewares SDK"
+source "../OpenIBBOs/Middlewares/User/timer_decoder/Kconfig"
+
+endmenu

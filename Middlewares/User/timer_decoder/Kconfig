@@ -1,0 +1,20 @@
+
+
+config TIMER_DECODER_EN
+    bool "Enable Timer Decoder/正交译码器功能使能"
+    default n
+    help
+        Enable support for the timer decoder functionality. This includes
+config TIMER_DECODER_CH0_EN
+    bool "Enable Timer Decoder Channel 0/正交译码器通道0使能"
+    default y
+    depends on TIMER_DECODER_EN
+    help
+        Enable support for Timer Decoder Channel 1. This includes GPIO, timer configurations, and other related settings.
+config ENCODER_CH0_TIMER
+    depends on TIMER_DECODER_CH0_EN
+    default "TIMER22"
+    string
+    prompt "TimerX TIMTER1-6,22-23,30-31,50-51/选择正交译码器通道0使用的定时器"
+
+  
