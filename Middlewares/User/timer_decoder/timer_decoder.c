@@ -10,13 +10,6 @@
 #include "elog.h"
 #define TAG "ENCODER"
 
-const uint32_t ENCONDER_TIMER_LIST[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
-	ENCODER_CH0_TIMER,
-#if (CONFIG_TIMER_DECODER_CHANNEL_MAX > 1)
-	ENCODER_CH1_TIMER,
-#endif
-};
-
 typedef struct
 {
 	uint32_t timer_rcu;
@@ -67,12 +60,11 @@ typedef struct
 	uint64_t start_cnt;			   // 旋转开始计数值
 	uint8_t direction;			   // 旋转方向 0:正向 1:反向
 	uint32_t tmp_cnt;			   // 当一次读取不足 4个计数值时，临时存储的计数值
-	// uint32_t tmp_pluse_cnt;	  // 当前周期有效变化
-	uint32_t active_duration; // 通道激活持续时间
-	uint32_t active_timeout;  // 通道激活超时时间
-	uint32_t pluse_gain;	  // 旋转速度产生的增益
-	uint32_t duration_gain;	  // 旋转时间产生的增益
-	uint32_t pluse_cnt;		  // 旋转单次触发的个数
+	uint32_t active_duration;	   // 通道激活持续时间
+	uint32_t active_timeout;	   // 通道激活超时时间
+	uint32_t pluse_gain;		   // 旋转速度产生的增益
+	uint32_t duration_gain;		   // 旋转时间产生的增益
+	uint32_t pluse_cnt;			   // 旋转单次触发的个数
 } TypdefEncoderStruct;
 TypdefEncoderStruct encoder_struct[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {0};
 static void __decoder_handle(void);
@@ -114,31 +106,6 @@ void device_timer_encoder_init(void)
 		encoder_struct[i].channel = i;									// 设置通道号
 		encoder_struct[i].channel_ctr = 0;								// 初始化通道状态为停止
 	}
-
-	// timer_deinit(ENCODER_CH0_TIMER);
-
-	/* TIMER2 configuration */
-	// timer_initpara.prescaler = 0;
-	// timer_initpara.alignedmode = TIMER_COUNTER_EDGE;
-	// timer_initpara.counterdirection = TIMER_COUNTER_UP;
-	// timer_initpara.period = 65535;
-	// timer_initpara.clockdivision = TIMER_CKDIV_DIV1;
-	// timer_initpara.repetitioncounter = 0;
-	// timer_init(ENCODER_CH0_TIMER, &timer_initpara);
-
-	// TIMER_IC_POLARITY_RISING：信号不反相
-	// TIMER_IC_POLARITY_FALLING:信号反相
-	// timer_quadrature_decoder_mode_config函数的参数ic0polarity对应CI0FE0，ic1polarity对应CI1FE1
-	// timer_quadrature_decoder_mode_config(ENCODER_CH0_TIMER, TIMER_QUAD_DECODER_MODE2, TIMER_IC_POLARITY_RISING, TIMER_IC_POLARITY_RISING);
-
-	/* auto-reload preload enable */
-	// timer_auto_reload_shadow_enable(ENCODER_CH0_TIMER);
-
-	// 设置初始计数值为0x50，用于判断计数个数和计数方向
-	// timer_counter_value_config(ENCODER_CH0_TIMER, DEFAULT_TIMER_VALUE);
-
-	/* TIMER2 counter enable */
-	// timer_enable(ENCODER_CH0_TIMER);
 }
 SYSTEM_REGISTER_INIT(BoardInitStage, MCUPre_TIMER_ENCODER_INIT, device_timer_encoder_init, device_timer_encoder_init);
 
@@ -198,13 +165,12 @@ static void __encoder_timer_clear(TypdefEncoderStruct *encoder)
 	encoder->start_cnt = 0;													   // 重置旋转开始计数值
 	encoder->direction = 0;													   // 重置旋转方向
 	encoder->tmp_cnt = 0;													   // 重置临时计数值
-	// encoder->tmp_pluse_cnt = 0;									   // 重置当前周期有效变化
-	encoder->active_duration = 0;								   // 重置激活持续时间
-	encoder->active_timeout = 0;								   // 重置激活超时时间
-	encoder->pluse_gain = CONFIG_ENCODER_PULSE_GAIN_DEFAULT;	   // 重置旋转速度增益
-	encoder->duration_gain = CONFIG_ENCODER_DURATION_GAIN_DEFAULT; // 重置旋转时间增益
-	encoder->pluse_cnt = CONFIG_ENCODER_ONE_PULSE_CNT;			   // 重置旋转单次触发的个数
-																   // elog_i(TAG, "Encoder channel %d Clear", encoder->channel);
+	encoder->active_duration = 0;											   // 重置激活持续时间
+	encoder->active_timeout = 0;											   // 重置激活超时时间
+	encoder->pluse_gain = CONFIG_ENCODER_PULSE_GAIN_DEFAULT;				   // 重置旋转速度增益
+	encoder->duration_gain = CONFIG_ENCODER_DURATION_GAIN_DEFAULT;			   // 重置旋转时间增益
+	encoder->pluse_cnt = CONFIG_ENCODER_ONE_PULSE_CNT;						   // 重置旋转单次触发的个数
+																			   // elog_i(TAG, "Encoder channel %d Clear", encoder->channel);
 }
 
 static void ENCODER_TIMER_INIT_HANDLE(void *msg)
@@ -212,7 +178,7 @@ static void ENCODER_TIMER_INIT_HANDLE(void *msg)
 	elog_i(TAG, "ENCODER_TIMER_INIT_HANDLE\r\n");
 	// 发布事件，表示计时器已准备就绪
 	vfb_publish(ENCODER_TIMER_READY);
-	vfb_publish(ENCODER_TIMER_START);
+	vfb_send(ENCODER_TIMER_START, DECODER_CHANNEL0, 0, NULL); // 启动计时器
 }
 // 接收消息的回调函数
 static void ENCODER_TIMER_RCV_HANDLE(void *msg)
@@ -223,15 +189,36 @@ static void ENCODER_TIMER_RCV_HANDLE(void *msg)
 	switch (tmp_msg->frame->head.event)
 	{
 	case ENCODER_TIMER_START:
-		elog_i(TAG, "ENCODER_TIMER_START");
-		encoder_struct[0].channel_ctr = 1;
-		encoder_struct[0].last_encoder_counter = timer_counter_read(ENCODER_CH0_TIMER);
-		break;
+	{
+		DecoderChannelEnum channel = (DecoderChannelEnum)tmp_msg->frame->head.data;
+		if (channel >= CONFIG_TIMER_DECODER_CHANNEL_MAX)
+		{
+			elog_e(TAG, "ENCODER_TIMER_START: Invalid channel %d", channel);
+			return; // 无效通道
+		}
+		elog_i(TAG, "ENCODER_TIMER_START %d", channel);
+		encoder_struct[channel].channel_ctr = 1;																 // 启用通道
+		encoder_struct[channel].last_encoder_counter = timer_counter_read(encoder_struct[channel].timer_handle); // 读取当前计时器值
+	}
+	break;
 	case ENCODER_TIMER_STOP:
-		elog_i(TAG, "ENCODER_TIMER_STOP");
-		encoder_struct[0].channel_ctr = 0;
-		encoder_struct[0].last_encoder_counter = timer_counter_read(ENCODER_CH0_TIMER);
-		break;
+	{
+		DecoderChannelEnum channel = (DecoderChannelEnum)tmp_msg->frame->head.data;
+		if (channel >= CONFIG_TIMER_DECODER_CHANNEL_MAX)
+		{
+			elog_e(TAG, "ENCODER_TIMER_STOP: Invalid channel %d", channel);
+			return; // 无效通道
+		}
+		if (encoder_struct[channel].channel_ctr == 0)
+		{
+			elog_w(TAG, "ENCODER_TIMER_STOP: Channel %d is already stopped", channel);
+			return; // 通道已停止
+		}
+		elog_i(TAG, "ENCODER_TIMER_STOP %d", channel);
+		encoder_struct[channel].channel_ctr = 0;																 // 停止通道
+		encoder_struct[channel].last_encoder_counter = timer_counter_read(encoder_struct[channel].timer_handle); // 读取当前计时器值
+	}
+	break;
 
 	default:
 		printf("TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
@@ -343,11 +330,15 @@ static void __decoder_handle(void)
 			{
 				encoder->phy_value = MIN_PHY_VALUE; // 限制物理值最小值
 			}
-			vfb_send(ENCODER_TIMER_GET_PHY, (uint32_t)encoder->phy_value, 0, NULL); // 发布物理值事件
-			printf("\r %ld\r\n", encoder->phy_value);								// 输出物理值
-																					// printf("\r Physical Value: %ld,Pluses %d Gain: %ld, Duration: %lu ms, Pulse Count: %d\r\n",
-																					// 	   encoder->phy_value, tmp_pluse_cnt, tmp_gain, encoder->active_duration, encoder->pluse_cnt);
-#endif																				// 0
+			VFBMsgDecoderStruct msg_decoder = {
+				.channel = i,					 // 通道号
+				.phy_value = encoder->phy_value, // 物理值
+			};
+			vfb_send(ENCODER_TIMER_GET_PHY, 0, sizeof(VFBMsgDecoderStruct), (void *)&msg_decoder); // 发送物理值消息
+																								   // printf("\r %ld\r\n", encoder->phy_value);								// 输出物理值
+						 																		   // printf("\r Physical Value: %ld,Pluses %d Gain: %ld, Duration: %lu ms, Pulse Count: %d\r\n",
+																								   // 	   encoder->phy_value, tmp_pluse_cnt, tmp_gain, encoder->active_duration, encoder->pluse_cnt);
+#endif																							   // 0
 		}
 		else
 		{

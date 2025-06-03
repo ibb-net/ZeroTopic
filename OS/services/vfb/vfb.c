@@ -196,7 +196,8 @@ uint8_t vfb_send(vfb_event_t event, uint32_t data, uint16_t length, void *payloa
     tmp_msg.frame->head.length  = length;
 
     if (length > 0 && payload != NULL) {
-        memcpy(tmp_msg.frame->head.payload_offset, payload, length);
+        memcpy(&(tmp_msg.frame->head.payload_offset), payload, length);
+
     } else {
         tmp_msg.frame->head.payload_offset = NULL;
     }

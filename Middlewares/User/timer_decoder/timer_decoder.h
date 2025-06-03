@@ -1,7 +1,14 @@
 #ifndef __TIMER_DECODER_H__
 #define __TIMER_DECODER_H__
 
-#include "timer_decoder_cfg.h"
+//#include "timer_decoder_cfg.h"
+typedef enum
+{
+    DECODER_CHANNEL0 = 0, 
+    DECODER_CHANNEL1 = 1, // 通道号 0:CH0 1:CH1
+    DECODER_CHANNEL_MAX
+
+} DecoderChannelEnum;
 typedef enum
 {
     DECODER_DIRECTION_FORWARD = 0, // 正向旋转
@@ -22,6 +29,7 @@ typedef struct
     uint8_t channel; // 通道号 0:CH0 1:CH1
     uint32_t phy_value; // 物理值
 } VFBMsgDecoderStruct;
+
 
 
 
