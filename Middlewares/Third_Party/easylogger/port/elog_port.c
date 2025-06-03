@@ -25,20 +25,23 @@
  * Function: Portable interface for each platform.
  * Created on: 2015-04-28
  */
- 
-#include <elog.h>
-#include "dev_uart/dev_uart.h"
 
+#include <elog.h>
+#include <string.h>
+#include "dev_uart/dev_uart.h"
+#include "FreeRTOS.h"
+#include "task.h"
 /**
  * EasyLogger port initialize
  *
  * @return result
  */
-ElogErrCode elog_port_init(void) {
+ElogErrCode elog_port_init(void)
+{
     ElogErrCode result = ELOG_NO_ERR;
 
     /* add your code here */
-    
+
     return result;
 }
 
@@ -46,10 +49,10 @@ ElogErrCode elog_port_init(void) {
  * EasyLogger port deinitialize
  *
  */
-void elog_port_deinit(void) {
+void elog_port_deinit(void)
+{
 
     /* add your code here */
-
 }
 
 /**
@@ -58,29 +61,29 @@ void elog_port_deinit(void) {
  * @param log output of log
  * @param size log size
  */
-void elog_port_output(const char *log, size_t size) {
-    
-    /* add your code here */
-     debug_putbuffer(log, size);
+void elog_port_output(const char *log, size_t size)
+{
 
+    /* add your code here */
+    debug_putbuffer(log, size);
 }
 
 /**
  * output lock
  */
-void elog_port_output_lock(void) {
-    
+void elog_port_output_lock(void)
+{
+
     /* add your code here */
-    
 }
 
 /**
  * output unlock
  */
-void elog_port_output_unlock(void) {
-    
+void elog_port_output_unlock(void)
+{
+
     /* add your code here */
-    
 }
 
 /**
@@ -88,10 +91,20 @@ void elog_port_output_unlock(void) {
  *
  * @return current time
  */
-const char *elog_port_get_time(void) {
-    
+char time_buffer[32];
+const char *elog_port_get_time(void)
+{
+
     /* add your code here */
-    return "00:00:00"; 
+    uint32_t ticks = xTaskGetTickCount();
+    uint32_t seconds = ticks / configTICK_RATE_HZ;
+    memset((void *)time_buffer, 0, sizeof(time_buffer)); // Clear the time_buffer
+    // 时间格式为HH:MM:SS.ms
+    snprintf(time_buffer, sizeof(time_buffer), "%02lu:%02lu:%02lu.%03lu",
+             (seconds / 3600) % 24, (seconds / 60) % 60, seconds % 60, (ticks % configTICK_RATE_HZ) * 1000 / configTICK_RATE_HZ);
+    return (const char *)time_buffer;
+
+    // return "00:00:00";
 }
 
 /**
@@ -99,11 +112,11 @@ const char *elog_port_get_time(void) {
  *
  * @return current process name
  */
-const char *elog_port_get_p_info(void) {
-    
+const char *elog_port_get_p_info(void)
+{
+
     /* add your code here */
     return "ProcessName";
-    
 }
 
 /**
@@ -111,9 +124,9 @@ const char *elog_port_get_p_info(void) {
  *
  * @return current thread name
  */
-const char *elog_port_get_t_info(void) {
-    
+const char *elog_port_get_t_info(void)
+{
+
     /* add your code here */
     return "ThreadName";
-    
 }

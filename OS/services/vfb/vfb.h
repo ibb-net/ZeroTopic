@@ -42,8 +42,8 @@
 #define MSG_GET_USE_CNT(msg) (((vfb_message_t)msg)->frame->head.use_cnt)
 
 typedef uint16_t vfb_event_t;
-typedef union PACKED {
-    uint8_t *buffer;
+typedef union  {
+    uintptr_t *buffer;
     struct {
         vfb_event_t event;  // EVENT_LIST
         uint16_t use_cnt;
