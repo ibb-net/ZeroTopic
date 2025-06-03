@@ -34,11 +34,12 @@
 #define VFB_D printf
 #define VFB_SUBSCRIBE(num, list) vfb_subscribe(num, list, sizeof(list) / sizeof(vfb_event_t))
 
-#define MSG_GET_EVENT(msg) ((msg)->frame->head.event)
-#define MSG_GET_DATA(msg) ((msg)->frame->head.data)
-#define MSG_GET_LENGTH(msg) ((msg)->frame->head.length)
-#define MSG_GET_PAYLOAD(msg) (&((msg)->frame->head.payload_offset))
-#define MSG_GET_USE_CNT(msg) ((msg)->frame->head.use_cnt)
+//TODO 改为指针偏移
+#define MSG_GET_EVENT(msg) (((vfb_message_t)msg)->frame->head.event)
+#define MSG_GET_DATA(msg) (((vfb_message_t)msg)->frame->head.data)
+#define MSG_GET_LENGTH(msg) (((vfb_message_t)msg)->frame->head.length)
+#define MSG_GET_PAYLOAD(msg) (&(((vfb_message_t)msg)->frame->head.payload_offset))
+#define MSG_GET_USE_CNT(msg) (((vfb_message_t)msg)->frame->head.use_cnt)
 
 typedef uint16_t vfb_event_t;
 typedef union PACKED {
