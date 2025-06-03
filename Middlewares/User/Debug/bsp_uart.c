@@ -1,6 +1,7 @@
 #include "dev_uart/bsp_uart.h"
 #include "config.h"
 #include "string.h"
+
 /* server */
 void dev_pin_init(dev_gpio_handle_t gpio_handle);              // TODO 需要放在GPIO的文件中
 void dev_dma_request(void *dev_handel, EnumDevType dev_type);  // TODO 需要放在DMA的文件中

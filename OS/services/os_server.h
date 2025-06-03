@@ -7,6 +7,7 @@
 #include "semphr.h"
 #include "vfb/vfb_config.h"
 #include "vfb/vfb.h"
+
 #include "sdk_event.h"
 #include "sdk_task_priority.h"
 
