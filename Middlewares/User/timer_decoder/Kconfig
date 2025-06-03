@@ -1,20 +1,282 @@
-
-
 config TIMER_DECODER_EN
     bool "Enable Timer Decoder/正交译码器功能使能"
     default n
     help
         Enable support for the timer decoder functionality. This includes
+
+
+config TIMER_DECODER_CHANNEL_MAX
+    int "Number of Timer Decoder Channels/正交译码器通道数量"
+    default 1
+    range 1 2
+    help
+        Set the number of timer decoder channels to be used. This can be set to 1 or 2.    
 config TIMER_DECODER_CH0_EN
     bool "Enable Timer Decoder Channel 0/正交译码器通道0使能"
     default y
     depends on TIMER_DECODER_EN
     help
         Enable support for Timer Decoder Channel 1. This includes GPIO, timer configurations, and other related settings.
-config ENCODER_CH0_TIMER
-    depends on TIMER_DECODER_CH0_EN
-    default "TIMER22"
-    string
-    prompt "TimerX TIMTER1-6,22-23,30-31,50-51/选择正交译码器通道0使用的定时器"
 
-  
+choice
+    prompt "Select Timer for Encoder Channel 0/选择正交译码器通道0使用的定时器"
+    depends on TIMER_DECODER_CH0_EN
+    default ENCODER_CH0_TIMER_0
+
+config ENCODER_CH0_TIMER_0
+    bool "Timer 0"
+
+config ENCODER_CH0_TIMER_1
+    bool "Timer 1"
+
+config ENCODER_CH0_TIMER_2
+    bool "Timer 2"
+
+config ENCODER_CH0_TIMER_3
+    bool "Timer 3"
+
+config ENCODER_CH0_TIMER_4
+    bool "Timer 4"
+
+config ENCODER_CH0_TIMER_5
+    bool "Timer 5"
+
+config ENCODER_CH0_TIMER_6
+    bool "Timer 6"
+
+config ENCODER_CH0_TIMER_7
+    bool "Timer 7"
+
+config ENCODER_CH0_TIMER_14
+    bool "Timer 14"
+
+config ENCODER_CH0_TIMER_15
+    bool "Timer 15"
+
+config ENCODER_CH0_TIMER_16
+    bool "Timer 16"
+
+config ENCODER_CH0_TIMER_22
+    bool "Timer 22"
+
+config ENCODER_CH0_TIMER_23
+    bool "Timer 23"
+
+config ENCODER_CH0_TIMER_30
+    bool "Timer 30"
+
+config ENCODER_CH0_TIMER_31
+    bool "Timer 31"
+
+config ENCODER_CH0_TIMER_40
+    bool "Timer 40"
+
+config ENCODER_CH0_TIMER_41
+    bool "Timer 41"
+
+config ENCODER_CH0_TIMER_42
+    bool "Timer 42"
+
+config ENCODER_CH0_TIMER_43
+    bool "Timer 43"
+
+config ENCODER_CH0_TIMER_44
+    bool "Timer 44"
+
+config ENCODER_CH0_TIMER_50
+    bool "Timer 50"
+
+config ENCODER_CH0_TIMER_51
+    bool "Timer 51"
+
+endchoice
+
+config ENCODER_CH0_TIMER
+    int
+    depends on TIMER_DECODER_CH0_EN
+    default TIMER0 if ENCODER_CH0_TIMER_0
+    default TIMER1 if ENCODER_CH0_TIMER_1
+    default TIMER2 if ENCODER_CH0_TIMER_2
+    default TIMER3 if ENCODER_CH0_TIMER_3
+    default TIMER4 if ENCODER_CH0_TIMER_4
+    default TIMER5 if ENCODER_CH0_TIMER_5
+    default TIMER6 if ENCODER_CH0_TIMER_6
+    default TIMER7 if ENCODER_CH0_TIMER_7
+    default TIMER14 if ENCODER_CH0_TIMER_14
+    default TIMER15 if ENCODER_CH0_TIMER_15
+    default TIMER16 if ENCODER_CH0_TIMER_16
+    default TIMER22 if ENCODER_CH0_TIMER_22
+    default TIMER23 if ENCODER_CH0_TIMER_23
+    default TIMER30 if ENCODER_CH0_TIMER_30
+    default TIMER31 if ENCODER_CH0_TIMER_31
+    default TIMER40 if ENCODER_CH0_TIMER_40
+    default TIMER41 if ENCODER_CH0_TIMER_41
+    default TIMER42 if ENCODER_CH0_TIMER_42
+    default TIMER43 if ENCODER_CH0_TIMER_43
+    default TIMER44 if ENCODER_CH0_TIMER_44
+    default TIMER50 if ENCODER_CH0_TIMER_50
+    default TIMER51 if ENCODER_CH0_TIMER_51
+
+    config ENCODER_CH0_TIMER_RCU
+    int
+    depends on TIMER_DECODER_CH0_EN
+    default RCU_TIMER0 if ENCODER_CH0_TIMER_0
+    default RCU_TIMER1 if ENCODER_CH0_TIMER_1
+    default RCU_TIMER2 if ENCODER_CH0_TIMER_2
+    default RCU_TIMER3 if ENCODER_CH0_TIMER_3
+    default RCU_TIMER4 if ENCODER_CH0_TIMER_4
+    default RCU_TIMER5 if ENCODER_CH0_TIMER_5
+    default RCU_TIMER6 if ENCODER_CH0_TIMER_6
+    default RCU_TIMER7 if ENCODER_CH0_TIMER_7
+    default RCU_TIMER14 if ENCODER_CH0_TIMER_14
+    default RCU_TIMER15 if ENCODER_CH0_TIMER_15
+    default RCU_TIMER16 if ENCODER_CH0_TIMER_16
+    default RCU_TIMER22 if ENCODER_CH0_TIMER_22
+    default RCU_TIMER23 if ENCODER_CH0_TIMER_23
+    default RCU_TIMER30 if ENCODER_CH0_TIMER_30
+    default RCU_TIMER31 if ENCODER_CH0_TIMER_31
+    default RCU_TIMER40 if ENCODER_CH0_TIMER_40
+    default RCU_TIMER41 if ENCODER_CH0_TIMER_41
+    default RCU_TIMER42 if ENCODER_CH0_TIMER_42
+    default RCU_TIMER43 if ENCODER_CH0_TIMER_43
+    default RCU_TIMER44 if ENCODER_CH0_TIMER_44
+    default RCU_TIMER50 if ENCODER_CH0_TIMER_50
+    default RCU_TIMER51 if ENCODER_CH0_TIMER_51
+
+    config TIMER_DECODER_CH1_EN
+    bool "Enable Timer Decoder Channel 0/正交译码器通道0使能"
+    default y
+    depends on TIMER_DECODER_EN
+    help
+        Enable support for Timer Decoder Channel 1. This includes GPIO, timer configurations, and other related settings.
+
+choice
+    prompt "Select Timer for Encoder Channel 0/选择正交译码器通道0使用的定时器"
+    depends on TIMER_DECODER_CH1_EN
+    default ENCODER_CH1_TIMER_0
+
+config ENCODER_CH1_TIMER_0
+    bool "Timer 0"
+
+config ENCODER_CH1_TIMER_1
+    bool "Timer 1"
+
+config ENCODER_CH1_TIMER_2
+    bool "Timer 2"
+
+config ENCODER_CH1_TIMER_3
+    bool "Timer 3"
+
+config ENCODER_CH1_TIMER_4
+    bool "Timer 4"
+
+config ENCODER_CH1_TIMER_5
+    bool "Timer 5"
+
+config ENCODER_CH1_TIMER_6
+    bool "Timer 6"
+
+config ENCODER_CH1_TIMER_7
+    bool "Timer 7"
+
+config ENCODER_CH1_TIMER_14
+    bool "Timer 14"
+
+config ENCODER_CH1_TIMER_15
+    bool "Timer 15"
+
+config ENCODER_CH1_TIMER_16
+    bool "Timer 16"
+
+config ENCODER_CH1_TIMER_22
+    bool "Timer 22"
+
+config ENCODER_CH1_TIMER_23
+    bool "Timer 23"
+
+config ENCODER_CH1_TIMER_30
+    bool "Timer 30"
+
+config ENCODER_CH1_TIMER_31
+    bool "Timer 31"
+
+config ENCODER_CH1_TIMER_40
+    bool "Timer 40"
+
+config ENCODER_CH1_TIMER_41
+    bool "Timer 41"
+
+config ENCODER_CH1_TIMER_42
+    bool "Timer 42"
+
+config ENCODER_CH1_TIMER_43
+    bool "Timer 43"
+
+config ENCODER_CH1_TIMER_44
+    bool "Timer 44"
+
+config ENCODER_CH1_TIMER_50
+    bool "Timer 50"
+
+config ENCODER_CH1_TIMER_51
+    bool "Timer 51"
+
+endchoice
+
+config ENCODER_CH1_TIMER
+    int
+    depends on TIMER_DECODER_CH1_EN
+    default TIMER0 if ENCODER_CH1_TIMER_0
+    default TIMER1 if ENCODER_CH1_TIMER_1
+    default TIMER2 if ENCODER_CH1_TIMER_2
+    default TIMER3 if ENCODER_CH1_TIMER_3
+    default TIMER4 if ENCODER_CH1_TIMER_4
+    default TIMER5 if ENCODER_CH1_TIMER_5
+    default TIMER6 if ENCODER_CH1_TIMER_6
+    default TIMER7 if ENCODER_CH1_TIMER_7
+    default TIMER14 if ENCODER_CH1_TIMER_14
+    default TIMER15 if ENCODER_CH1_TIMER_15
+    default TIMER16 if ENCODER_CH1_TIMER_16
+    default TIMER22 if ENCODER_CH1_TIMER_22
+    default TIMER23 if ENCODER_CH1_TIMER_23
+    default TIMER30 if ENCODER_CH1_TIMER_30
+    default TIMER31 if ENCODER_CH1_TIMER_31
+    default TIMER40 if ENCODER_CH1_TIMER_40
+    default TIMER41 if ENCODER_CH1_TIMER_41
+    default TIMER42 if ENCODER_CH1_TIMER_42
+    default TIMER43 if ENCODER_CH1_TIMER_43
+    default TIMER44 if ENCODER_CH1_TIMER_44
+    default TIMER50 if ENCODER_CH1_TIMER_50
+    default TIMER51 if ENCODER_CH1_TIMER_51
+
+config ENCODER_CH1_TIMER_RCU
+    int
+    depends on TIMER_DECODER_CH1_EN
+    default RCU_TIMER0 if ENCODER_CH1_TIMER_0
+    default RCU_TIMER1 if ENCODER_CH1_TIMER_1
+    default RCU_TIMER2 if ENCODER_CH1_TIMER_2
+    default RCU_TIMER3 if ENCODER_CH1_TIMER_3
+    default RCU_TIMER4 if ENCODER_CH1_TIMER_4
+    default RCU_TIMER5 if ENCODER_CH1_TIMER_5
+    default RCU_TIMER6 if ENCODER_CH1_TIMER_6
+    default RCU_TIMER7 if ENCODER_CH1_TIMER_7
+    default RCU_TIMER14 if ENCODER_CH1_TIMER_14
+    default RCU_TIMER15 if ENCODER_CH1_TIMER_15
+    default RCU_TIMER16 if ENCODER_CH1_TIMER_16
+    default RCU_TIMER22 if ENCODER_CH1_TIMER_22
+    default RCU_TIMER23 if ENCODER_CH1_TIMER_23
+    default RCU_TIMER30 if ENCODER_CH1_TIMER_30
+    default RCU_TIMER31 if ENCODER_CH1_TIMER_31
+    default RCU_TIMER40 if ENCODER_CH1_TIMER_40
+    default RCU_TIMER41 if ENCODER_CH1_TIMER_41
+    default RCU_TIMER42 if ENCODER_CH1_TIMER_42
+    default RCU_TIMER43 if ENCODER_CH1_TIMER_43
+    default RCU_TIMER44 if ENCODER_CH1_TIMER_44
+    default RCU_TIMER50 if ENCODER_CH1_TIMER_50
+    default RCU_TIMER51 if ENCODER_CH1_TIMER_51
+
+
+
+        
+
+
