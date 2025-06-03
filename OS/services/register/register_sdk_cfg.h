@@ -13,14 +13,21 @@
 /* MCUPreInitStage Startup  */
 typedef enum{
     MCUPreDEBUG_UART_INIT = 0,     // Debug UART initialization
+    
+    MCUPreDebugRegisterPriority,
     MCUPre_TIMER_ENCODER_INIT,      // Timer encoder initialization
+    MCUPreDemoRegisterPriority,
+
     MCU_PRE_INIT_STAGE_PROCESS_MAX,  // Maximum value for MCUPreInitStage
 
 } MCUPreInitStageProcessEnum;
 
 /* ServerPerInitStage Startup */
 typedef enum{
+    ServerPreDebugRegisterPriority,
+    ServerPreDemoRegisterPriority,
     SERVER_PER_INIT_STAGE_PROCESS_MAX , // Maximum value for ServerPerInitStage
+   
 } ServerPerInitStageProcessEnum;
 
 /* MCUInitStage Startup */

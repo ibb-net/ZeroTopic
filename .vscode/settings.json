@@ -24,6 +24,9 @@
         "kconfig": "cpp",
         "timer_decoder.h": "c",
         "stdio.h": "c",
-        "config.h": "c"
+        "config.h": "c",
+        "register.h": "c",
+        "ex_list_dma.h": "c",
+        "elog.h": "c"
     }
 }

@@ -16,6 +16,12 @@ typedef enum
     ENCODER_TIMER_GET_PHY,
     ENCODER_TIMER_SET_PHY,
     ENCODER_TIMER_SET_MODE,
+    DebugStartReady,
+    DebugStart,
+	DebugStop,
+	DebugSet,
+	DebugGet,
+    
 
     SDK_EVENT_LIST_APP_START = 2000, // 应用事件起始编号
 } SDK_EVENT_LIST;

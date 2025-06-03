@@ -8,6 +8,7 @@
 #include "vfb/vfb_config.h"
 #include "vfb/vfb.h"
 #include "sdk_event.h"
+#include "sdk_task_priority.h"
 
 #include "register/register.h"
 #include "register/register_sdk_cfg.h"
