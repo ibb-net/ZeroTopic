@@ -31,16 +31,6 @@ typedef struct
 	DevPinHandleStruct tx_gpio_cfg;
 	DevPinHandleStruct rx_gpio_cfg;
 	DevUartHandleStruct uart_cfg;
-
-	/* DMA */
-	uint32_t rx_dma_rcu;
-	uint32_t rx_dma_base_addr;
-	uint32_t rx_dma_channel;
-	uint32_t rx_dma_request;
-	uint32_t tx_dma_rcu;
-	uint32_t tx_dma_base_addr;
-	uint32_t tx_dma_channel;
-	uint32_t tx_dma_request;
 	/* Buffer */
 	uint32_t buffer_size;
 	uint32_t buffer_num;
@@ -68,23 +58,25 @@ const TypdefDebugBSPCfg DebugBspCfg[DebugChannelMax] = {
 			.pin = DEBUG_RX_GPIO_PIN,
 		},
 		.uart_cfg = {
-			.device_name = "DEBUG_UART", .base = DEBUG_UART_BASE, .baudrate = DEBUG_UART_BAUDRATE, .idle_timeout = DEBUG_UART_IDLE_TIMEOUT,
+			.device_name = "DEBUG_UART",
+			.base = DEBUG_UART_BASE,
+			.baudrate = DEBUG_UART_BAUDRATE,
+			.idle_timeout = DEBUG_UART_IDLE_TIMEOUT,
 			.rx_isr_cb = __DebugRXISRHandle, // RX ISR callback function
 			.tx_isr_cb = NULL,				 // TX ISR callback function
 			.error_isr_cb = NULL,			 // Error ISR callback function
-
+			/* DMA */
+			.tx_dma_rcu = DEBUG_TX_DMA_BASE_ADDR,
+			.tx_dma_base_addr = DEBUG_TX_DMA_BASE_ADDR,
+			.tx_dma_channel = DEBUG_TX_DMA_CHANNEL,
+			.tx_dma_request = DEBUG_TX_DMA_REQUEST,
+			.tx_dma_isr_cb = NULL, // TX DMA ISR callback function
+			.rx_dma_rcu = DEBUG_RX_DMA_BASE_ADDR,
+			.rx_dma_base_addr = DEBUG_RX_DMA_BASE_ADDR,
+			.rx_dma_channel = DEBUG_RX_DMA_CHANNEL,
+			.rx_dma_request = DEBUG_RX_DMA_REQUEST,
+			.rx_dma_isr_cb = NULL, // RX DMA ISR callback function	
 		},
-
-		.rx_dma_rcu = DEBUG_RX_DMA_BASE_ADDR,
-		.rx_dma_base_addr = DEBUG_RX_DMA_BASE_ADDR,
-		.rx_dma_channel = DEBUG_RX_DMA_CHANNEL,
-		.rx_dma_request = DEBUG_RX_DMA_REQUEST,
-		.rx_dma_request = DEBUG_RX_DMA_REQUEST,
-		.tx_dma_rcu = DEBUG_TX_DMA_BASE_ADDR,
-		.tx_dma_base_addr = DEBUG_TX_DMA_BASE_ADDR,
-		.tx_dma_channel = DEBUG_TX_DMA_CHANNEL,
-		.tx_dma_request = DEBUG_TX_DMA_REQUEST,
-		.tx_dma_request = DEBUG_TX_DMA_REQUEST,
 		.buffer_size = DEBUG_UART_BUFFER_SIZE,
 		.buffer_num = DEBUG_UART_BUFFER_NUM,
 	},
@@ -256,9 +248,22 @@ static void DebugRcvHandle(void *msg)
 }
 
 // 超时处理的回调函数
+uint8_t dma_buffer[128] = "Hello, Debug!";
 static void DebugCycHandle(void)
 {
-	//
+	static uint32_t cycle_count = 0;	
+	static uint32_t counter = 0;	
+	if(cycle_count++ % 10 == 0)
+	{
+		memset(dma_buffer, 0, sizeof(dma_buffer));
+		sprintf((char *)dma_buffer, "DebugCycHandle cycle count: %d\r\n", counter);
+		DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)dma_buffer, 128);
+		counter++;
+	}
+	else
+	{
+		elog_d(TAG, "DebugCycHandle cycle count: %d", cycle_count);
+	}
 }
 static void __DebugRXISRHandle(void *arg)
 {

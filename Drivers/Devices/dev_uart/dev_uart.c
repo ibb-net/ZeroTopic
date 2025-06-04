@@ -199,7 +199,41 @@ void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle)
     }
 }
 
+void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *data, size_t len)
+{
+    if (ptrDevUartHandle == NULL || data == NULL || len == 0)
+    {
+        printf("Invalid parameters for DevUartDMASend\r\n");
+        return;
+    }
+    DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
+    rcu_periph_clock_enable(RCU_DMA0);
+    rcu_periph_clock_enable(RCU_DMA1);
+    rcu_periph_clock_enable(RCU_DMAMUX);
+    dma_single_data_parameter_struct dma_init_struct;
+    SCB_CleanDCache_by_Addr((uint32_t *)data, len);
+    dma_deinit(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
+    dma_init_struct.request = ptrDevUartHandle->tx_dma_request;
+    dma_init_struct.direction           = DMA_MEMORY_TO_PERIPH;
+    dma_init_struct.memory0_addr      = (uint32_t)data;
+    dma_init_struct.memory_inc          = DMA_MEMORY_INCREASE_ENABLE;
+    dma_init_struct.periph_memory_width = DMA_PERIPH_WIDTH_8BIT;
+    dma_init_struct.number            = len;
+    dma_init_struct.periph_addr     = (uint32_t)(&USART_TDATA(ptrDevUartHandle->base));
+    dma_init_struct.periph_inc          = DMA_PERIPH_INCREASE_DISABLE;
+    dma_init_struct.priority            = DMA_PRIORITY_ULTRA_HIGH;
+    dma_single_data_mode_init(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel, &dma_init_struct);
+    dma_circulation_disable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
+    // dma_interrupt_enable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel, DMA_CHXCTL_FTFIE);
+    dma_channel_enable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
+    usart_dma_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_DMA_ENABLE);
+    if (status && status->uart_handle->tx_isr_cb)
+    {
+        // Call the TX ISR callback function
+        status->uart_handle->tx_isr_cb((void *)status->uart_handle);
+    }
 
+}
 
 void USART0_IRQHandler(void)
 {
