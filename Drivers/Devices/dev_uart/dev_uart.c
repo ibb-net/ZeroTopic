@@ -210,6 +210,8 @@ void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *
     rcu_periph_clock_enable(RCU_DMA0);
     rcu_periph_clock_enable(RCU_DMA1);
     rcu_periph_clock_enable(RCU_DMAMUX);
+    nvic_irq_enable(DMA1_Channel0_IRQn, 2, 1);
+
     dma_single_data_parameter_struct dma_init_struct;
     SCB_CleanDCache_by_Addr((uint32_t *)data, len);
     dma_deinit(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
@@ -224,7 +226,7 @@ void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *
     dma_init_struct.priority            = DMA_PRIORITY_ULTRA_HIGH;
     dma_single_data_mode_init(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel, &dma_init_struct);
     dma_circulation_disable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
-    // dma_interrupt_enable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel, DMA_CHXCTL_FTFIE);
+    dma_interrupt_enable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel, DMA_CHXCTL_FTFIE);
     dma_channel_enable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
     usart_dma_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_DMA_ENABLE);
     if (status && status->uart_handle->tx_isr_cb)
@@ -250,5 +252,13 @@ void USART0_IRQHandler(void)
             // Call the RX ISR callback function
             status->uart_handle->rx_isr_cb((void *)status->uart_handle);
         }
+    }
+}
+
+void DMA1_Channel0_IRQHandler(void) {
+    if (RESET != dma_interrupt_flag_get(DMA1, DMA_CH0, DMA_INT_FLAG_FTF)) {
+        dma_interrupt_flag_clear(DMA1, DMA_CH0, DMA_INT_FLAG_FTF);
+        // g_transfer_complete = SET;
+        printf("DMA1 Channel 0 Transfer Complete\r\n");
     }
 }
