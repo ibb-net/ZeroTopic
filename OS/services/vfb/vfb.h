@@ -34,7 +34,7 @@
 #define VFB_D printf
 #define VFB_SUBSCRIBE(num, list) vfb_subscribe(num, list, sizeof(list) / sizeof(vfb_event_t))
 
-//TODO 改为指针偏移
+// TODO 改为指针偏移
 #define MSG_GET_EVENT(msg) (((vfb_message_t)msg)->frame->head.event)
 #define MSG_GET_DATA(msg) (((vfb_message_t)msg)->frame->head.data)
 #define MSG_GET_LENGTH(msg) (((vfb_message_t)msg)->frame->head.length)
@@ -42,7 +42,7 @@
 #define MSG_GET_USE_CNT(msg) (((vfb_message_t)msg)->frame->head.use_cnt)
 
 typedef uint16_t vfb_event_t;
-typedef union  {
+typedef union {
     uintptr_t *buffer;
     struct {
         vfb_event_t event;  // EVENT_LIST
@@ -75,7 +75,7 @@ typedef vfb_info_struct *vfb_info_t;
 
 typedef struct {
     const char *name;
-    UBaseType_t uxPriority;//not used
+    UBaseType_t uxPriority;  // not used
     void *pvParameters;
     uint8_t queue_num;
     const vfb_event_t *event_list;
@@ -95,7 +95,7 @@ void VFB_MsgReceive(QueueHandle_t xQueue,
                     TickType_t xTicksToWait,
                     void (*rcv_msg_cb)(void *),
                     void (*rcv_timeout_cb)(void));
-uint8_t vfb_send(vfb_event_t event, uint32_t data, uint16_t length, void *payload);
+uint8_t vfb_send(vfb_event_t event, uint32_t data, void *payload, uint16_t length);
 uint8_t vfb_publish(vfb_event_t event);
 void VFBTaskFrame(void *pvParameters);
 #endif  // __VFB_SERVER_H__

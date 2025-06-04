@@ -281,7 +281,7 @@ static void DMAInitHandle(void *msg)
 	elog_set_filter_tag_lvl(TAG, DMALogLvl);
 
 	vfb_publish(DMAStartReady);
-	vfb_send(DMAStart, 0, 0, NULL);
+	vfb_send(DMAStart, 0, NULL,0 );
 }
 // 接收消息的回调函数
 static void DMARcvHandle(void *msg)

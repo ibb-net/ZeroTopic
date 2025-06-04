@@ -21,6 +21,7 @@ typedef enum
 	DebugStop,
 	DebugSet,
 	DebugGet,
+    DebugPrint,
     
 
     SDK_EVENT_LIST_APP_START = 2000, // 应用事件起始编号

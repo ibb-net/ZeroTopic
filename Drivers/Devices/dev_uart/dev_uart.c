@@ -1,112 +1,125 @@
-#include "gd32h7xx.h"
-#include <stdio.h>
 #include "dev_uart/dev_uart.h"
+
+#include <stdio.h>
+
 #include "dev_basic.h"
 #include "dev_pin.h"
+#include "gd32h7xx.h"
 
-typedef struct
-{
+typedef struct {
     uint32_t base;
-    uint8_t is_initialized;                 // Flag to check if the USART is initialized
-    uint8_t is_opened;                      // Flag to check if the USART is opened
-    uint8_t is_started;                     // Flag to check if the USART is started
-    const DevUartHandleStruct *uart_handle; // Pointer to the UART handle
+    uint8_t is_initialized;
+    uint8_t is_opened;
+    uint8_t is_started;
+    const DevUartHandleStruct *uart_handle;  // Pointer to the UART handle
+    void *handle;
 } DevUartStatusStruct;
 
 static DevUartStatusStruct *__DevUartGetStatus(uint32_t base);
-DevUartStatusStruct dev_uart_status[] = {
-    {
-        .base = USART0,
-        .is_initialized = 0, // USART0 is not initialized
-    },
-    {
-        .base = USART1,
-        .is_initialized = 0, // USART1 is not initialized
-    },
-    {
-        .base = USART2,
-        .is_initialized = 0, // USART2 is not initialized
-    },
-    {
-        .base = UART3,
-        .is_initialized = 0, // UART3 is not initialized
-    },
-    {
-        .base = UART4,
-        .is_initialized = 0, // UART4 is not initialized
-    },
-    {
-        .base = USART5,
-        .is_initialized = 0, // USART5 is not initialized
-    },
-    {
-        .base = UART6,
-        .is_initialized = 0, // UART6 is not initialized
-    },
-    {
-        .base = UART7,
-        .is_initialized = 0, // UART7 is not initialized
-    }
+DevUartStatusStruct dev_uart_status[] = {{
+                                             .base           = USART0,
+                                             .is_initialized = 0,
+                                             .is_opened      = 0,
+                                             .is_started     = 0,
+                                             .handle         = NULL,
+                                         },
+                                         {
+                                             .base           = USART1,
+                                             .is_initialized = 0,
+                                             .is_opened      = 0,
+                                             .is_started     = 0,
+                                             .handle         = NULL,
+
+                                         },
+                                         {
+                                             .base           = USART2,
+                                             .is_initialized = 0,
+                                             .is_opened      = 0,
+                                             .is_started     = 0,
+                                             .handle         = NULL,
+                                         },
+                                         {
+                                             .base           = UART3,
+                                             .is_initialized = 0,
+                                             .is_opened      = 0,
+                                             .is_started     = 0,
+                                             .handle         = NULL,
+                                         },
+                                         {
+                                             .base           = UART4,
+                                             .is_initialized = 0,
+                                             .is_opened      = 0,
+                                             .is_started     = 0,
+                                             .handle         = NULL,
+                                         },
+                                         {
+                                             .base           = USART5,
+                                             .is_initialized = 0,
+                                             .is_opened      = 0,
+                                             .is_started     = 0,
+                                             .handle         = NULL,
+                                         },
+                                         {
+                                             .base           = UART6,
+                                             .is_initialized = 0,
+                                             .is_opened      = 0,
+                                             .is_started     = 0,
+                                             .handle         = NULL,
+                                         },
+                                         {
+                                             .base           = UART7,
+                                             .is_initialized = 0,
+                                             .is_opened      = 0,
+                                             .is_started     = 0,
+                                             .handle         = NULL,
+                                         }
 
 };
 
-/* retarget the C library printf function to the USART */
+/* retarget the C library printf function to the
+ * USART */
 
-int fputc(int ch, FILE *f)
-{
+int fputc(int ch, FILE *f) {
     static DevUartStatusStruct *status;
-    if (status == NULL)
-    {
+    if (status == NULL) {
         status = __DevUartGetStatus(USART0);
     }
-    if (!status || !status->is_initialized || !status->is_opened || !status->is_started)
-    {
-        return ch; // Error handling
+    if (!status || !status->is_initialized || !status->is_opened || !status->is_started) {
+        return ch;  // Error handling
     }
     usart_data_transmit(USART0, (uint8_t)ch);
-    while (RESET == usart_flag_get(USART0, USART_FLAG_TBE))
-        ;
+    while (RESET == usart_flag_get(USART0, USART_FLAG_TBE));
     return ch;
 }
-int __io_putchar(int ch)
-{
+int __io_putchar(int ch) {
     static DevUartStatusStruct *status;
-    if (status == NULL)
-    {
+    if (status == NULL) {
         status = __DevUartGetStatus(USART0);
     }
-    if (!status || !status->is_initialized || !status->is_opened || !status->is_started)
-    {
-        return ch; // Error handling
+    if (!status || !status->is_initialized || !status->is_opened || !status->is_started) {
+        return ch;  // Error handling
     }
-    usart_data_transmit(USART0, (uint8_t)ch);
-    while (RESET == usart_flag_get(USART0, USART_FLAG_TBE))
-        ;
+    // usart_data_transmit(USART0, (uint8_t)ch);
+    usart_data_transmit(status->base, (uint8_t)ch);//这里不能用dma
+    while (RESET == usart_flag_get(USART0, USART_FLAG_TBE));
     return ch;
 }
-int debug_putbuffer(const char *buffer, size_t len)
-{
-    for (size_t i = 0; i < len; i++)
-    {
+int debug_putbuffer(const char *buffer, size_t len) {
+    for (size_t i = 0; i < len; i++) {
         fputc(buffer[i], NULL);
     }
     return len;
 }
-DevUartStatusStruct *__DevUartGetStatus(uint32_t base)
-{
-    for (size_t i = 0; i < sizeof(dev_uart_status) / sizeof(dev_uart_status[0]); i++)
-    {
-        if (dev_uart_status[i].base == base)
-        {
+DevUartStatusStruct *__DevUartGetStatus(uint32_t base) {
+    for (size_t i = 0; i < sizeof(dev_uart_status) / sizeof(dev_uart_status[0]); i++) {
+        if (dev_uart_status[i].base == base) {
             return &dev_uart_status[i];
         }
     }
-    return NULL; // Not found
+    return NULL;  // Not found
 }
-void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle)
-{
-    static const struct
-    {
+void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
+    static const struct {
         uint32_t device;
         rcu_periph_enum rcu_clock;
     } dev_clock_map[] = {
@@ -120,11 +133,10 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle)
         {UART7, RCU_UART7},
 
     };
-    static const struct
-    {
+    static const struct {
         uint32_t device;
         rcu_periph_enum rcu_clock;
-        IRQn_Type irqn; 
+        IRQn_Type irqn;
 
     } dev_irqn_map[] = {
         {USART0, RCU_USART0, USART0_IRQn},
@@ -136,22 +148,19 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle)
         {UART6, RCU_UART6, UART6_IRQn},
         {UART7, RCU_UART7, UART7_IRQn},
     };
-        
 
     uint8_t is_found = 0;
-    for (size_t i = 0; i < sizeof(dev_clock_map) / sizeof(dev_clock_map[0]); i++)
-    {
-        if (dev_clock_map[i].device == ptrDevUartHandle->base)
-        {
+    for (size_t i = 0; i < sizeof(dev_clock_map) / sizeof(dev_clock_map[0]); i++) {
+        if (dev_clock_map[i].device == ptrDevUartHandle->base) {
             rcu_periph_clock_enable(dev_clock_map[i].rcu_clock);
-            nvic_irq_enable(dev_irqn_map[i].irqn, 2, 0); // TODO 需要配置終端優先級
+            nvic_irq_enable(dev_irqn_map[i].irqn, 2,
+                            0);  // TODO 需要配置終端優先級
             is_found = 1;
             break;
         }
     }
 
-    if (!is_found)
-    {
+    if (!is_found) {
         printf("uart base %x error!\r\n", ptrDevUartHandle->base);
         return;
     }
@@ -165,45 +174,43 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle)
     usart_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_ENABLE);
     usart_receiver_timeout_threshold_config(ptrDevUartHandle->base, ptrDevUartHandle->idle_timeout);
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
-    if (status)
-    {
-        status->is_initialized = 1;             // Mark as initialized
-        status->uart_handle = ptrDevUartHandle; // Store the handle
-    }
-    else
-    {
-        printf("Failed to find UART status for base %x\r\n", ptrDevUartHandle->base);
+    if (status) {
+        status->is_initialized = 1;                 // Mark as initialized
+        status->uart_handle    = ptrDevUartHandle;  // Store the handle
+    } else {
+        printf(
+            "Failed to find UART status for base "
+            "%x\r\n",
+            ptrDevUartHandle->base);
     }
 }
 
-void DevUartDeinit(const DevUartHandleStruct *ptrDevUartHandle)
-{
+void DevUartDeinit(const DevUartHandleStruct *ptrDevUartHandle) {
     usart_deinit(ptrDevUartHandle->base);
 }
 
-void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle)
-{
-    nvic_irq_enable(USART0_IRQn, 2, 0);//TODO
+void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle) {
+    nvic_irq_enable(USART0_IRQn, 2, 0);  // TODO
     usart_receiver_timeout_enable(ptrDevUartHandle->base);
     usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_RT);
     usart_enable(ptrDevUartHandle->base);
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
-    if (status)
-    {
-        status->is_opened = 1;  // Mark as opened
-        status->is_started = 1; // Mark as started
-    }
-    else
-    {
-        printf("Failed to find UART status for base %x\r\n", ptrDevUartHandle->base);
+    if (status) {
+        status->is_opened  = 1;  // Mark as opened
+        status->is_started = 1;  // Mark as started
+    } else {
+        printf(
+            "Failed to find UART status for base "
+            "%x\r\n",
+            ptrDevUartHandle->base);
     }
 }
 
-void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *data, size_t len)
-{
-    if (ptrDevUartHandle == NULL || data == NULL || len == 0)
-    {
-        printf("Invalid parameters for DevUartDMASend\r\n");
+void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *data, size_t len) {
+    if (ptrDevUartHandle == NULL || data == NULL || len == 0) {
+        printf(
+            "Invalid parameters for "
+            "DevUartDMASend\r\n");
         return;
     }
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
@@ -215,50 +222,50 @@ void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *
     dma_single_data_parameter_struct dma_init_struct;
     SCB_CleanDCache_by_Addr((uint32_t *)data, len);
     dma_deinit(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
-    dma_init_struct.request = ptrDevUartHandle->tx_dma_request;
+    dma_init_struct.request             = ptrDevUartHandle->tx_dma_request;
     dma_init_struct.direction           = DMA_MEMORY_TO_PERIPH;
-    dma_init_struct.memory0_addr      = (uint32_t)data;
+    dma_init_struct.memory0_addr        = (uint32_t)data;
     dma_init_struct.memory_inc          = DMA_MEMORY_INCREASE_ENABLE;
     dma_init_struct.periph_memory_width = DMA_PERIPH_WIDTH_8BIT;
-    dma_init_struct.number            = len;
-    dma_init_struct.periph_addr     = (uint32_t)(&USART_TDATA(ptrDevUartHandle->base));
+    dma_init_struct.number              = len;
+    dma_init_struct.periph_addr         = (uint32_t)(&USART_TDATA(ptrDevUartHandle->base));
     dma_init_struct.periph_inc          = DMA_PERIPH_INCREASE_DISABLE;
     dma_init_struct.priority            = DMA_PRIORITY_ULTRA_HIGH;
-    dma_single_data_mode_init(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel, &dma_init_struct);
+    dma_single_data_mode_init(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel,
+                              &dma_init_struct);
     dma_circulation_disable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
-    dma_interrupt_enable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel, DMA_CHXCTL_FTFIE);
+    dma_interrupt_enable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel,
+                         DMA_CHXCTL_FTFIE);
     dma_channel_enable(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
     usart_dma_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_DMA_ENABLE);
-    if (status && status->uart_handle->tx_isr_cb)
-    {
+    if (status && status->uart_handle->tx_isr_cb) {
         // Call the TX ISR callback function
         status->uart_handle->tx_isr_cb((void *)status->uart_handle);
     }
-
 }
 
-void USART0_IRQHandler(void)
-{
+void USART0_IRQHandler(void) {
     static DevUartStatusStruct *status;
-    if (status == NULL)
-    {
+    if (status == NULL) {
         status = __DevUartGetStatus(USART0);
     }
-    if (RESET != usart_interrupt_flag_get(USART0, USART_INT_FLAG_RT))
-    {
+    if (RESET != usart_interrupt_flag_get(USART0, USART_INT_FLAG_RT)) {
         usart_interrupt_flag_clear(USART0, USART_INT_FLAG_RT);
-        if (status && status->uart_handle->rx_isr_cb)
-        {
-            // Call the RX ISR callback function
+        if (status && status->uart_handle->rx_isr_cb) {
             status->uart_handle->rx_isr_cb((void *)status->uart_handle);
         }
     }
 }
 
 void DMA1_Channel0_IRQHandler(void) {
+    static DevUartStatusStruct *status;
+    if (status == NULL) {
+        status = __DevUartGetStatus(USART0);
+    }
     if (RESET != dma_interrupt_flag_get(DMA1, DMA_CH0, DMA_INT_FLAG_FTF)) {
         dma_interrupt_flag_clear(DMA1, DMA_CH0, DMA_INT_FLAG_FTF);
-        // g_transfer_complete = SET;
-        printf("DMA1 Channel 0 Transfer Complete\r\n");
+        if (status && status->uart_handle->tx_dma_isr_cb) {
+            status->uart_handle->tx_dma_isr_cb((void *)status->uart_handle);
+        }
     }
 }

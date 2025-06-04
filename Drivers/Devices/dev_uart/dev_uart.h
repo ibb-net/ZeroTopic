@@ -6,6 +6,7 @@
 typedef struct
 {
     char device_name[DEVICE_NAME_MAX];
+    uint32_t id;
     uint32_t base;
     uint32_t baudrate;
     uint32_t idle_timeout;

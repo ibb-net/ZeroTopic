@@ -175,7 +175,7 @@ QueueHandle_t vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, u
  * @param msg The message to send
  * @return uint8_t FD_PASS on success, FD_FAIL on failure
  */
-uint8_t vfb_send(vfb_event_t event, uint32_t data, uint16_t length, void *payload) {
+uint8_t vfb_send(vfb_event_t event, uint32_t data, void *payload,uint16_t length ) {
     if (length > 0 && payload == NULL) {
         VFB_E("Payload is NULL but length is %u for event %u", length, event);
         return FD_FAIL;
@@ -248,7 +248,7 @@ uint8_t vfb_send(vfb_event_t event, uint32_t data, uint16_t length, void *payloa
 }
 
 uint8_t vfb_publish(vfb_event_t event) {
-    return vfb_send(event, 0, 0, NULL);
+    return vfb_send(event, 0,NULL ,0);
 }
 #if 0
 /**

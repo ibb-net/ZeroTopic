@@ -1,0 +1,48 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.c": "c",
+			"gd32h757z_start.h": "c",
+			"bsp_uart.h": "c",
+			"dev_uart.h": "c",
+			"semphr.h": "c",
+			"vfb.h": "c",
+			"list.h": "c",
+			"bit": "cpp",
+			"compare": "cpp",
+			"limits": "cpp",
+			"new": "cpp",
+			"shell.h": "c",
+			"shell_cfg.h": "c",
+			"ulog_def.h": "c",
+			"ulog.h": "c",
+			"ulog_cfg.h": "c",
+			"stdarg.h": "c",
+			"pthread.h": "c",
+			"dev_timer_decoder_cfg.h": "c",
+			"gd32h7xx.h": "c",
+			"os_server.h": "c",
+			"kconfig": "cpp",
+			"timer_decoder.h": "c",
+			"stdio.h": "c",
+			"config.h": "c",
+			"register.h": "c",
+			"ex_list_dma.h": "c",
+			"elog.h": "c",
+			"debugcfg.h": "c",
+			"vfb_config.h": "c",
+			"sdk_event.h": "c",
+			"stdlib.h": "c",
+			"device.h": "c",
+			"gpio.h": "c",
+			"dev_pin.h": "c",
+			"dev_basic.h": "c",
+			"register_sdk_cfg.h": "c"
+		}
+	}
+}
