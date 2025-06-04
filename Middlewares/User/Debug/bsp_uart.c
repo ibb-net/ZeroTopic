@@ -3,7 +3,7 @@
 #include "string.h"
 
 /* server */
-void dev_pin_init(dev_gpio_handle_t gpio_handle);              // TODO 需要放在GPIO的文件中
+void DevPinInit(dev_gpio_handle_t gpio_handle);              // TODO 需要放在GPIO的文件中
 void dev_dma_request(void *dev_handel, EnumDevType dev_type);  // TODO 需要放在DMA的文件中
 /*!
     \brief      initialize the USART configuration of the com
@@ -64,8 +64,8 @@ void dev_uart_init(void) {
         /* Software Source */
         __dev_uart_source_init(&device_uart_handles[i]);
         /* GPIO */
-        dev_pin_init(&(device_uart_handles[i].tx_gpio_handle));
-        dev_pin_init(&(device_uart_handles[i].rx_gpio_handle));
+        DevPinInit(&(device_uart_handles[i].tx_gpio_handle));
+        DevPinInit(&(device_uart_handles[i].rx_gpio_handle));
         /* UART */
         __dev_uart_mcu_init(&device_uart_handles[i]);
         /* DMA */
@@ -112,7 +112,7 @@ void __dev_uart_source_init(bsp_uart_handle_t uart_handle) {
         return;
     }
 }
-void dev_pin_init(dev_gpio_handle_t gpio_handle) {
+void DevPinInit(dev_gpio_handle_t gpio_handle) {
     static const struct {
         uint32_t gpio_port;
         rcu_periph_enum rcu_clock;

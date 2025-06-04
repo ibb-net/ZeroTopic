@@ -30,6 +30,11 @@
         "elog.h": "c",
         "debugcfg.h": "c",
         "vfb_config.h": "c",
-        "sdk_event.h": "c"
+        "sdk_event.h": "c",
+        "stdlib.h": "c",
+        "device.h": "c",
+        "gpio.h": "c",
+        "dev_pin.h": "c",
+        "dev_basic.h": "c"
     }
 }

@@ -2,26 +2,23 @@
 #define __DEBUG_CFG_H__
 
 // TX GPIO 配置
-#define DEBUG_TX_GPIO_RCU        RCU_GPIOB
 #define DEBUG_TX_GPIO_PORT       GPIOB
-#define DEBUG_TX_GPIO_AF         GPIO_AF_7
-#define DEBUG_TX_GPIO_PIN        GPIO_PIN_6
+#define DEBUG_TX_GPIO_AF         GPIO_AF_4
+#define DEBUG_TX_GPIO_PIN        GPIO_PIN_14
 
 // RX GPIO 配置
-#define DEBUG_RX_GPIO_RCU        RCU_GPIOB
 #define DEBUG_RX_GPIO_PORT       GPIOB
-#define DEBUG_RX_GPIO_AF         GPIO_AF_7
-#define DEBUG_RX_GPIO_PIN        GPIO_PIN_7
+#define DEBUG_RX_GPIO_AF         GPIO_AF_4
+#define DEBUG_RX_GPIO_PIN        GPIO_PIN_15
 
 // UART 配置
-#define DEBUG_UART_RCU          RCU_USART0
 #define DEBUG_UART_BASE          USART0
 #define DEBUG_UART_BAUDRATE      115200
 #define DEBUG_UART_IDLE_TIMEOUT  100  // 单位：ms
 
 // RX DMA 配置
 #define DEBUG_RX_DMA_BASE_ADDR   DMA0
-#define DEBUG_RX_DMA_CHANNEL     DMA_CH4
+#define DEBUG_RX_DMA_CHANNEL     DMA_CH1
 #define DEBUG_RX_DMA_REQUEST     DMA_REQUEST_USART0_RX
 
 // TX DMA 配置
@@ -29,4 +26,7 @@
 #define DEBUG_TX_DMA_CHANNEL     DMA_CH7
 #define DEBUG_TX_DMA_REQUEST     DMA_REQUEST_USART0_TX
 
+//Buffer
+#define DEBUG_UART_BUFFER_SIZE   128
+#define DEBUG_UART_BUFFER_NUM    16
 #endif // __DEBUG_CFG_H__

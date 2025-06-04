@@ -1,67 +1,68 @@
 #include "gd32h7xx.h"
 #include <stdio.h>
 #include "dev_uart/dev_uart.h"
-/*!
-    \brief      initialize the USART configuration of the com
-    \param[in]  none
-    \param[out] none
-    \retval     none
-*/
-#define COMn 1U
-#define EVAL_COM USART0
-#define EVAL_COM_CLK RCU_USART0
+#include "dev_basic.h"
+#include "dev_pin.h"
 
-#define EVAL_COM_TX_PIN GPIO_PIN_14
-#define EVAL_COM_RX_PIN GPIO_PIN_15
-
-#define EVAL_COM_GPIO_PORT GPIOB
-#define EVAL_COM_GPIO_CLK RCU_GPIOB
-#define EVAL_COM_AF GPIO_AF_4
-
-static const rcu_periph_enum COM_CLK[COMn] = {EVAL_COM_CLK};
-
-static const uint32_t COM_TX_PIN[COMn] = {EVAL_COM_TX_PIN};
-
-static const uint32_t COM_RX_PIN[COMn] = {EVAL_COM_RX_PIN};
-
-void com_usart_init(void)
+typedef struct
 {
-    uint32_t COM_ID;
+    uint32_t base;
+    uint8_t is_initialized;                 // Flag to check if the USART is initialized
+    uint8_t is_opened;                      // Flag to check if the USART is opened
+    uint8_t is_started;                     // Flag to check if the USART is started
+    const DevUartHandleStruct *uart_handle; // Pointer to the UART handle
+} DevUartStatusStruct;
 
-    COM_ID = 0U;
+static DevUartStatusStruct *__DevUartGetStatus(uint32_t base);
+DevUartStatusStruct dev_uart_status[] = {
+    {
+        .base = USART0,
+        .is_initialized = 0, // USART0 is not initialized
+    },
+    {
+        .base = USART1,
+        .is_initialized = 0, // USART1 is not initialized
+    },
+    {
+        .base = USART2,
+        .is_initialized = 0, // USART2 is not initialized
+    },
+    {
+        .base = UART3,
+        .is_initialized = 0, // UART3 is not initialized
+    },
+    {
+        .base = UART4,
+        .is_initialized = 0, // UART4 is not initialized
+    },
+    {
+        .base = USART5,
+        .is_initialized = 0, // USART5 is not initialized
+    },
+    {
+        .base = UART6,
+        .is_initialized = 0, // UART6 is not initialized
+    },
+    {
+        .base = UART7,
+        .is_initialized = 0, // UART7 is not initialized
+    }
 
-    /* enable COM GPIO clock */
-    rcu_periph_clock_enable(EVAL_COM_GPIO_CLK);
+};
 
-    /* enable USART clock */
-    rcu_periph_clock_enable(COM_CLK[COM_ID]);
-
-    /* connect port to USARTx_Tx */
-    gpio_af_set(EVAL_COM_GPIO_PORT, EVAL_COM_AF, COM_TX_PIN[COM_ID]);
-
-    /* connect port to USARTx_Rx */
-    gpio_af_set(EVAL_COM_GPIO_PORT, EVAL_COM_AF, COM_RX_PIN[COM_ID]);
-
-    /* configure USART Tx as alternate function push-pull */
-    gpio_mode_set(EVAL_COM_GPIO_PORT, GPIO_MODE_AF, GPIO_PUPD_PULLUP, COM_TX_PIN[COM_ID]);
-    gpio_output_options_set(EVAL_COM_GPIO_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, COM_TX_PIN[COM_ID]);
-
-    /* configure USART Rx as alternate function push-pull */
-    gpio_mode_set(EVAL_COM_GPIO_PORT, GPIO_MODE_AF, GPIO_PUPD_PULLUP, COM_RX_PIN[COM_ID]);
-    gpio_output_options_set(EVAL_COM_GPIO_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, COM_RX_PIN[COM_ID]);
-
-    /* USART configure */
-    usart_deinit(USART0);
-    usart_baudrate_set(USART0, 115200U);
-    usart_receive_config(USART0, USART_RECEIVE_ENABLE);
-    usart_transmit_config(USART0, USART_TRANSMIT_ENABLE);
-
-    usart_enable(USART0);
-}
 /* retarget the C library printf function to the USART */
 
 int fputc(int ch, FILE *f)
 {
+    static DevUartStatusStruct *status;
+    if (status == NULL)
+    {
+        status = __DevUartGetStatus(USART0);
+    }
+    if (!status || !status->is_initialized || !status->is_opened || !status->is_started)
+    {
+        return ch; // Error handling
+    }
     usart_data_transmit(USART0, (uint8_t)ch);
     while (RESET == usart_flag_get(USART0, USART_FLAG_TBE))
         ;
@@ -69,6 +70,15 @@ int fputc(int ch, FILE *f)
 }
 int __io_putchar(int ch)
 {
+    static DevUartStatusStruct *status;
+    if (status == NULL)
+    {
+        status = __DevUartGetStatus(USART0);
+    }
+    if (!status || !status->is_initialized || !status->is_opened || !status->is_started)
+    {
+        return ch; // Error handling
+    }
     usart_data_transmit(USART0, (uint8_t)ch);
     while (RESET == usart_flag_get(USART0, USART_FLAG_TBE))
         ;
@@ -81,4 +91,130 @@ int debug_putbuffer(const char *buffer, size_t len)
         fputc(buffer[i], NULL);
     }
     return len;
+}
+DevUartStatusStruct *__DevUartGetStatus(uint32_t base)
+{
+    for (size_t i = 0; i < sizeof(dev_uart_status) / sizeof(dev_uart_status[0]); i++)
+    {
+        if (dev_uart_status[i].base == base)
+        {
+            return &dev_uart_status[i];
+        }
+    }
+    return NULL; // Not found
+}
+void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle)
+{
+    static const struct
+    {
+        uint32_t device;
+        rcu_periph_enum rcu_clock;
+    } dev_clock_map[] = {
+        {USART0, RCU_USART0},
+        {USART1, RCU_USART1},
+        {USART2, RCU_USART2},
+        {UART3, RCU_UART3},
+        {UART4, RCU_UART4},
+        {USART5, RCU_USART5},
+        {UART6, RCU_UART6},
+        {UART7, RCU_UART7},
+
+    };
+    static const struct
+    {
+        uint32_t device;
+        rcu_periph_enum rcu_clock;
+        IRQn_Type irqn; 
+
+    } dev_irqn_map[] = {
+        {USART0, RCU_USART0, USART0_IRQn},
+        {USART1, RCU_USART1, USART1_IRQn},
+        {USART2, RCU_USART2, USART2_IRQn},
+        {UART3, RCU_UART3, UART3_IRQn},
+        {UART4, RCU_UART4, UART4_IRQn},
+        {USART5, RCU_USART5, USART5_IRQn},
+        {UART6, RCU_UART6, UART6_IRQn},
+        {UART7, RCU_UART7, UART7_IRQn},
+    };
+        
+
+    uint8_t is_found = 0;
+    for (size_t i = 0; i < sizeof(dev_clock_map) / sizeof(dev_clock_map[0]); i++)
+    {
+        if (dev_clock_map[i].device == ptrDevUartHandle->base)
+        {
+            rcu_periph_clock_enable(dev_clock_map[i].rcu_clock);
+            nvic_irq_enable(dev_irqn_map[i].irqn, 2, 0); // TODO 需要配置終端優先級
+            is_found = 1;
+            break;
+        }
+    }
+
+    if (!is_found)
+    {
+        printf("uart base %x error!\r\n", ptrDevUartHandle->base);
+        return;
+    }
+
+    usart_deinit(ptrDevUartHandle->base);
+    usart_word_length_set(ptrDevUartHandle->base, USART_WL_8BIT);
+    usart_stop_bit_set(ptrDevUartHandle->base, USART_STB_1BIT);
+    usart_parity_config(ptrDevUartHandle->base, USART_PM_NONE);
+    usart_baudrate_set(ptrDevUartHandle->base, ptrDevUartHandle->baudrate);
+    usart_receive_config(ptrDevUartHandle->base, USART_RECEIVE_ENABLE);
+    usart_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_ENABLE);
+    usart_receiver_timeout_threshold_config(ptrDevUartHandle->base, ptrDevUartHandle->idle_timeout);
+    DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
+    if (status)
+    {
+        status->is_initialized = 1;             // Mark as initialized
+        status->uart_handle = ptrDevUartHandle; // Store the handle
+    }
+    else
+    {
+        printf("Failed to find UART status for base %x\r\n", ptrDevUartHandle->base);
+    }
+}
+
+void DevUartDeinit(const DevUartHandleStruct *ptrDevUartHandle)
+{
+    usart_deinit(ptrDevUartHandle->base);
+}
+
+void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle)
+{
+    nvic_irq_enable(USART0_IRQn, 2, 0);//TODO
+    usart_receiver_timeout_enable(ptrDevUartHandle->base);
+    usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_RT);
+    usart_enable(ptrDevUartHandle->base);
+    DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
+    if (status)
+    {
+        status->is_opened = 1;  // Mark as opened
+        status->is_started = 1; // Mark as started
+    }
+    else
+    {
+        printf("Failed to find UART status for base %x\r\n", ptrDevUartHandle->base);
+    }
+}
+
+
+
+void USART0_IRQHandler(void)
+{
+    static DevUartStatusStruct *status;
+    if (status == NULL)
+    {
+        status = __DevUartGetStatus(USART0);
+    }
+    if (RESET != usart_interrupt_flag_get(USART0, USART_INT_FLAG_RT))
+    {
+        usart_interrupt_flag_clear(USART0, USART_INT_FLAG_RT);
+        if (status && status->uart_handle->rx_isr_cb)
+        {
+            // Call the RX ISR callback function
+            status->uart_handle->rx_isr_cb((void *)status->uart_handle);
+        }
+    }
 }

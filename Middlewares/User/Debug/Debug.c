@@ -1,15 +1,21 @@
 
 #include "DebugCfg.h"
-#define CONFIG_TIMER_DECODER_EN 1
-#if CONFIG_TIMER_DECODER_EN
+#define CONFIG_DEBUG_EN 1
+#if CONFIG_DEBUG_EN
 #include "gd32h7xx.h"
 #include <stdio.h>
+/* Device */
+#include "Device.h"
+#include "dev_basic.h"
+#include "dev_uart.h"
+#include "dev_pin.h"
 // #include "Debug.h"
-
+// #include "Dma.h"
 #include "os_server.h"
 #include "list/ex_list_dma.h"
 #include "elog.h"
-#define TAG "ENCODER"
+
+#define TAG "DEBUG"
 #define DebugLogLvl ELOG_LVL_INFO
 
 #ifndef DebugChannelMax
@@ -22,20 +28,10 @@
 typedef struct
 {
 	/* TX GPIO*/
-	uint32_t tx_gpio_rcu;
-	uint32_t tx_gpio_port;
-	uint32_t tx_gpio_af;
-	uint32_t tx_gpio_pin;
-	/* RX GPIO*/
-	uint32_t rx_gpio_rcu;
-	uint32_t rx_gpio_port;
-	uint32_t rx_gpio_af;
-	uint32_t rx_gpio_pin;
-	/* Uart */
-	uint32_t uart_rcu;
-	uint32_t uart_base;
-	uint32_t baudrate;
-	uint32_t idle_timeout;
+	DevPinHandleStruct tx_gpio_cfg;
+	DevPinHandleStruct rx_gpio_cfg;
+	DevUartHandleStruct uart_cfg;
+
 	/* DMA */
 	uint32_t rx_dma_rcu;
 	uint32_t rx_dma_base_addr;
@@ -45,37 +41,59 @@ typedef struct
 	uint32_t tx_dma_base_addr;
 	uint32_t tx_dma_channel;
 	uint32_t tx_dma_request;
+	/* Buffer */
+	uint32_t buffer_size;
+	uint32_t buffer_num;
 
 } TypdefDebugBSPCfg;
 
-#if 1
+static void DebugCreateTaskHandle(void);
+static void DebugRcvHandle(void *msg);
+static void DebugCycHandle(void);
+static void DebugInitHandle(void *msg);
+static void __DebugRXISRHandle(void *arg);
+
 const TypdefDebugBSPCfg DebugBspCfg[DebugChannelMax] = {
 	{
-		.tx_gpio_rcu = DEBUG_TX_GPIO_RCU,
-		.tx_gpio_port = DEBUG_TX_GPIO_PORT,
-		.tx_gpio_af = DEBUG_TX_GPIO_AF,
-		.tx_gpio_pin = DEBUG_TX_GPIO_PIN,
-		.rx_gpio_rcu = DEBUG_RX_GPIO_RCU,
-		.rx_gpio_port = DEBUG_RX_GPIO_PORT,
-		.rx_gpio_af = DEBUG_RX_GPIO_AF,
-		.rx_gpio_pin = DEBUG_RX_GPIO_PIN,
-		.uart_rcu = DEBUG_UART_RCU,
-		.uart_base = DEBUG_UART_BASE,
-		.baudrate = DEBUG_UART_BAUDRATE,
-		.idle_timeout = DEBUG_UART_IDLE_TIMEOUT,
+		.tx_gpio_cfg = {
+			.device_name = "DEBUG_TX",
+			.base = DEBUG_TX_GPIO_PORT,
+			.af = DEBUG_TX_GPIO_AF,
+			.pin = DEBUG_TX_GPIO_PIN,
+		},
+		.rx_gpio_cfg = {
+			.device_name = "DEBUG_RX",
+			.base = DEBUG_RX_GPIO_PORT,
+			.af = DEBUG_RX_GPIO_AF,
+			.pin = DEBUG_RX_GPIO_PIN,
+		},
+		.uart_cfg = {
+			.device_name = "DEBUG_UART", .base = DEBUG_UART_BASE, .baudrate = DEBUG_UART_BAUDRATE, .idle_timeout = DEBUG_UART_IDLE_TIMEOUT,
+			.rx_isr_cb = __DebugRXISRHandle, // RX ISR callback function
+			.tx_isr_cb = NULL,				 // TX ISR callback function
+			.error_isr_cb = NULL,			 // Error ISR callback function
+
+		},
+
+		.rx_dma_rcu = DEBUG_RX_DMA_BASE_ADDR,
 		.rx_dma_base_addr = DEBUG_RX_DMA_BASE_ADDR,
 		.rx_dma_channel = DEBUG_RX_DMA_CHANNEL,
 		.rx_dma_request = DEBUG_RX_DMA_REQUEST,
+		.rx_dma_request = DEBUG_RX_DMA_REQUEST,
+		.tx_dma_rcu = DEBUG_TX_DMA_BASE_ADDR,
 		.tx_dma_base_addr = DEBUG_TX_DMA_BASE_ADDR,
 		.tx_dma_channel = DEBUG_TX_DMA_CHANNEL,
 		.tx_dma_request = DEBUG_TX_DMA_REQUEST,
+		.tx_dma_request = DEBUG_TX_DMA_REQUEST,
+		.buffer_size = DEBUG_UART_BUFFER_SIZE,
+		.buffer_num = DEBUG_UART_BUFFER_NUM,
 	},
 };
-#endif
+
 typedef struct
 {
 	uint32_t uart_base;
-
+	char device_name[DEVICE_NAME_MAX];
 	/* Lock */
 	SemaphoreHandle_t lock;
 	SemaphoreHandle_t lock_tx;
@@ -104,10 +122,6 @@ static const vfb_event_t DebugEventList[] = {
 	DebugGet
 
 };
-static void DebugCreateTaskHandle(void);
-static void DebugRcvHandle(void *msg);
-static void DebugCycHandle(void);
-static void DebugInitHandle(void *msg);
 
 static const VFBTaskStruct Debug_task_cfg = {
 	.name = "VFBTaskDebug", // Task name
@@ -132,29 +146,18 @@ void DebugDeviceInit(void)
 
 	for (size_t i = 0; i < DebugChannelMax; i++)
 	{
-		TypdefDebugStatus * uart_handle = &DebugStatus[i];
-		gpio_af_set(DebugBspCfg[i].tx_gpio_port, DebugBspCfg[i].tx_gpio_af, DebugBspCfg[i].tx_gpio_pin);
-		gpio_af_set(DebugBspCfg[i].rx_gpio_port, DebugBspCfg[i].rx_gpio_af, DebugBspCfg[i].rx_gpio_pin);
-		gpio_mode_set(DebugBspCfg[i].tx_gpio_port, GPIO_MODE_AF, GPIO_PUPD_PULLUP, DebugBspCfg[i].tx_gpio_pin);
-		gpio_mode_set(DebugBspCfg[i].rx_gpio_port, GPIO_MODE_AF, GPIO_PUPD_PULLUP, DebugBspCfg[i].rx_gpio_pin);
-		gpio_output_options_set(DebugBspCfg[i].tx_gpio_port, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, DebugBspCfg[i].tx_gpio_pin);
-		gpio_output_options_set(DebugBspCfg[i].rx_gpio_port, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, DebugBspCfg[i].rx_gpio_pin);
-		uart_handle->uart_base = DebugBspCfg[i].uart_base;
-		rcu_periph_clock_enable(DebugBspCfg[i].uart_rcu);
-		usart_deinit(uart_handle->uart_base);
-		usart_word_length_set(uart_handle->uart_base, USART_WL_8BIT);
-		usart_stop_bit_set(uart_handle->uart_base, USART_STB_1BIT);
-		usart_parity_config(uart_handle->uart_base, USART_PM_NONE);
-		usart_baudrate_set(uart_handle->uart_base, DebugBspCfg[i].baudrate);
-		usart_receive_config(uart_handle->uart_base, USART_RECEIVE_ENABLE);
-		usart_transmit_config(uart_handle->uart_base, USART_TRANSMIT_ENABLE);
+		TypdefDebugStatus *uart_handle = &DebugStatus[i];
+		DevPinInit(&(DebugBspCfg[i].tx_gpio_cfg));
+		DevPinInit(&(DebugBspCfg[i].rx_gpio_cfg));
+		DevUartInit(&(DebugBspCfg[i].uart_cfg));
+		DevUarStart(&(DebugBspCfg[i].uart_cfg)); // TODO 启动需要单独剥离出来
 
-		// usart_receiver_timeout_enable(uart_handle->uart_base);
-		// usart_interrupt_enable(uart_handle->uart_base, USART_INT_RT);
-		usart_receiver_timeout_threshold_config(uart_handle->uart_base, DebugBspCfg[i].idle_timeout);
-		usart_enable(uart_handle->uart_base); // TODO
-
-#if 0
+		uart_handle->uart_base = DebugBspCfg[i].uart_cfg.base;
+		uart_handle->buffer_size = DebugBspCfg[i].buffer_size;
+		uart_handle->buffer_num = DebugBspCfg[i].buffer_num;
+		memset(uart_handle->device_name, 0, sizeof(uart_handle->device_name));
+		snprintf(uart_handle->device_name, sizeof(uart_handle->device_name), "Debug%d", i);
+		size_t one_item_size = sizeof(uint8_t) * uart_handle->buffer_size;
 		uart_handle->rx_list_handle = xCreateListDMA(uart_handle->buffer_num, one_item_size);
 		uart_handle->tx_list_handle = xCreateListDMA(uart_handle->buffer_num, one_item_size);
 		uart_handle->lock_tx = xSemaphoreCreateBinary();
@@ -177,7 +180,9 @@ void DebugDeviceInit(void)
 			printf("create %s steambuf failed!\r\n", uart_handle->device_name);
 			return;
 		}
-#endif
+
+		printf("create %s ok!\r\n", uart_handle->device_name);
+
 #if 0
 		/* Create task */
 		BaseType_t ret;
@@ -199,7 +204,7 @@ void DebugDeviceInit(void)
 #endif
 	}
 }
-SYSTEM_REGISTER_INIT(BoardInitStage, MCUPreDebugRegisterPriority, DebugDeviceInit, DebugDeviceInit);
+SYSTEM_REGISTER_INIT(MCUPreInitStage, MCUPreDebugRegisterPriority, DebugDeviceInit, DebugDeviceInit);
 
 static void DebugCreateTaskHandle(void)
 {
@@ -254,6 +259,11 @@ static void DebugRcvHandle(void *msg)
 static void DebugCycHandle(void)
 {
 	//
+}
+static void __DebugRXISRHandle(void *arg)
+{
+
+	printf("RX ISR callback invoked with argument: %p\n", arg);
 }
 
 #endif

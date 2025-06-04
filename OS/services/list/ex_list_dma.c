@@ -15,7 +15,7 @@ list_dma_buffer_t xCreateListDMA(size_t item_num, size_t pre_item_size) {
     if (list_handle == NULL) {
         return NULL;
     }
-    size_t item_size = item_num * pre_item_size;
+    // size_t item_size = item_num * pre_item_size;
     list_handle->item_num      = item_num;
     list_handle->pre_item_size = pre_item_size;
     list_handle->lock          = xSemaphoreCreateBinary();
@@ -30,10 +30,10 @@ list_dma_buffer_t xCreateListDMA(size_t item_num, size_t pre_item_size) {
         ListItem_t *item = (ListItem_t *)pvPortMalloc(sizeof(ListItem_t));
         vListInitialiseItem(item);
         /* 将申请的buffer进行分段,并将地址保存在freelist中 */
-        void *buffer = pvPortMalloc(item_size);
+        void *buffer = pvPortMalloc(pre_item_size);
         if (buffer == NULL) {
             vPortFree(list_handle);
-            TRACE_ERROR("xCreateList buffer %d malloc failed %zu", i, item_size);
+            TRACE_ERROR("xCreateList buffer %d malloc failed %u\r\n", i, pre_item_size);
             return NULL;
         }
         listSET_LIST_ITEM_VALUE(item, (uint32_t)buffer);
