@@ -187,7 +187,7 @@ static void DebugCreateTaskHandle(void) {
 
     xTaskCreate(VFBTaskFrame, "VFBTaskDebug", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg, BspDebugTaskPriority, NULL);
 }
-SYSTEM_REGISTER_INIT(AppInitStage, ServerPreDebugRegisterPriority, DebugCreateTaskHandle, DebugCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(ServerPerInitStage, ServerPreDebugRegisterPriority, DebugCreateTaskHandle, DebugCreateTaskHandle init);
 
 static void DebugInitHandle(void *msg) {
     elog_i(TAG, "DebugInitHandle\r\n");
@@ -220,7 +220,7 @@ static void DebugRcvHandle(void *msg) {
             DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
             // wait for TX DMA complete lock_tx
             if (uart_handle->lock_tx != NULL) {
-                if (xSemaphoreTake(uart_handle->lock_tx, pdMS_TO_TICKS(100)) == pdFALSE) {
+                if (xSemaphoreTake(uart_handle->lock_tx, pdMS_TO_TICKS(300)) == pdFALSE) {
                     printf("[ERROR]DebugPrint: lock_tx timeout\r\n");
                 }
             } else {
@@ -228,7 +228,7 @@ static void DebugRcvHandle(void *msg) {
             }
         } break;
         case DebugRcv: {
-            elog_i(TAG, "Debug Com Recive :%s", (char *)MSG_GET_PAYLOAD(tmp_msg));
+            // elog_i(TAG, "Debug Com Recive :%s", (char *)MSG_GET_PAYLOAD(tmp_msg));
 
         } break;
         default:

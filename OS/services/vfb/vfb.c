@@ -279,7 +279,7 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
             VFB_W("No queue found for event %u, use count is 0", event);
             vPortFree(tmp_msg.frame);
         } else {
-            // VFB_D("Message sent for event %u, use count: %u", event, tmp_msg.frame->head.use_cnt);
+            VFB_W("Message sent for event %u, use count: %u\r\n", event, tmp_msg.frame->head.use_cnt);
         }
         __vfb_givelock(mode);
         return FD_PASS;
@@ -457,13 +457,13 @@ void VFB_MsgReceive(QueueHandle_t xQueue,
                 // vPortFree(msg);
             } else {
                 msg->frame->head.use_cnt--;
-                // VFB_D("Message use count decremented, current use count: %u\r\n", msg->frame->head.use_cnt);
+                VFB_E("Message use count decremented, current use count: %u\r\n", msg->frame->head.use_cnt);
             }
             if (msg->frame->head.use_cnt == 0) {
-                // VFB_D("Message use count is zero, freeing message\r\n");
+                VFB_E("Message use count is zero, freeing message\r\n");
                 vPortFree(msg->frame);
             } else {
-                // VFB_D("Message use count is %u, not freeing message\r\n", (msg->frame->head.use_cnt));
+                VFB_E("Message use count is %u, not freeing message\r\n", (msg->frame->head.use_cnt));
             }
             msg = NULL;  // Reset msg pointer to avoid dangling pointer issues
         } else {
@@ -480,9 +480,9 @@ void VFBTaskFrame(void *pvParameters) {
         VFB_E("Task configuration is NULL");
         return;
     }
-    printf("Create Task %s started\r\n", task_cfg->name);
-    printf("Task Parameters: pvParameters = %p, queue_num = %u, event_num = %u, xTicksToWait = %d\r\n",
-           task_cfg->pvParameters, task_cfg->queue_num, task_cfg->event_num, task_cfg->xTicksToWait);
+    //printf("Create Task %s started\r\n", task_cfg->name);
+    // printf("Task Parameters: pvParameters = %p, queue_num = %u, event_num = %u, xTicksToWait = %d\r\n",
+    //        task_cfg->pvParameters, task_cfg->queue_num, task_cfg->event_num, task_cfg->xTicksToWait);
     QueueHandle_t queue_handle = NULL;
     queue_handle               = vfb_subscribe(task_cfg->queue_num, task_cfg->event_list, task_cfg->event_num);
     if (queue_handle == NULL) {

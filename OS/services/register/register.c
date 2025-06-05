@@ -133,7 +133,7 @@ void SystemRegisterRun(STARTUP_STAGE_ENUM stage) {
     }
 }
 
-#if (DEV_XXXXX_ENABLE == 0)
+#if (DEV_XXXXX_ENABLE == 1)
 
 void a1_MCUInitStage10(void) {
     printf("a1_MCUInitStage10 run\r\n");

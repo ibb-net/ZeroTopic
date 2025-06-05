@@ -133,7 +133,6 @@ void device_timer_encoder_init(void) {
 }
 SYSTEM_REGISTER_INIT(BoardInitStage, MCUPre_TIMER_ENCODER_INIT, device_timer_encoder_init, device_timer_encoder_init);
 
-#define ENCODER_TIMER_TASK_PRIO (tskIDLE_PRIORITY + 1)
 
 // 函数声明
 static void ENCODER_TIMER_RCV_HANDLE(void *msg);
@@ -174,9 +173,9 @@ void ENCODER_TIMER_CREATE_HANDLE(void) {
         __encoder_timer_clear(&encoder_struct[i]);                  // 初始化每个通道的计时器
     }
 
-    xTaskCreate(VFBTaskFrame, "VFBTaskENCODE", configMINIMAL_STACK_SIZE, (void *)&ENCODER_TIMER_task_cfg, ENCODER_TIMER_TASK_PRIO, NULL);
+    xTaskCreate(VFBTaskFrame, "Encoder", configMINIMAL_STACK_SIZE, (void *)&ENCODER_TIMER_task_cfg, AppTimereEncoderTaskPriority, NULL);
 }
-SYSTEM_REGISTER_INIT(AppInitStage, 01, ENCODER_TIMER_CREATE_HANDLE, ENCODER_TIMER_CREATE_HANDLE init);
+SYSTEM_REGISTER_INIT(AppInitStage, AppTimerEncoderRegisterPriority, ENCODER_TIMER_CREATE_HANDLE, timer_encoder init);
 
 static void __encoder_timer_clear(TypdefEncoderStruct *encoder) {
     // encoder->phy_value = DEFAULT_TIMER_VALUE;								   // 重置物理值
