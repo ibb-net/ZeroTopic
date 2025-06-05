@@ -241,28 +241,9 @@ static void DebugRcvHandle(void *msg) {
 uint8_t dma_buffer[1024] = "Hello, Debug!";
 static void DebugCycHandle(void) {
     TypdefDebugStatus *uart_handle = &DebugStatus[0];
-    elog_d(TAG, "DebugCycHandle called");
-    static uint32_t cycle_count = 0;
-    static uint32_t counter     = 0;
-    if (cycle_count++ % (1000 / CONFIG_DEBUG_CYCLE_TIMER_MS) == 0) {
-        // memset(dma_buffer, 0, sizeof(dma_buffer));
-        // sprintf((char *)dma_buffer, "DebugCycHandle cycle count: %d\r\n", counter);
-        // DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)dma_buffer, 128);
-        // vfb_send(DebugPrint, 0, dma_buffer, sizeof(dma_buffer));
-        // elog_i(TAG, "DebugCycHandle cycle count: %d", counter);
-        // elog_w(TAG, "DebugCycHandle cycle count: %d", counter);
-        // elog_e(TAG, "DebugCycHandle cycle count: %d", counter);
-        counter++;
-    } else {
-        // elog_d(TAG, "DebugCycHandle cycle count: %d", cycle_count);
-    }
-    /* BaseType_t xQueueReceive( QueueHandle_t xQueue,
-        void *pvBuffer,
-        TickType_t xTicksToWait ); */
     memset(dma_buffer, 0, sizeof(dma_buffer));
     if (xStreamBufferReceive(uart_handle->rx_stream_buffer, dma_buffer, uart_handle->buffer_size, 0) != 0) {
         vfb_send(DebugRcv, 0, dma_buffer, strlen((char *)dma_buffer));
-        // printf("DebugCycHandle: Received data: %s\r\n", dma_buffer);
     }
 }
 // DebugStreamRcvTask

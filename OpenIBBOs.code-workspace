@@ -42,7 +42,9 @@
 			"gpio.h": "c",
 			"dev_pin.h": "c",
 			"dev_basic.h": "c",
-			"register_sdk_cfg.h": "c"
+			"register_sdk_cfg.h": "c",
+			"freertos.h": "c",
+			"cmath": "c"
 		}
 	}
 }
