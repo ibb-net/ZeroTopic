@@ -18,7 +18,7 @@
 
 // RX DMA 配置
 #define DEBUG_RX_DMA_BASE_ADDR   DMA0
-#define DEBUG_RX_DMA_CHANNEL     DMA_CH1
+#define DEBUG_RX_DMA_CHANNEL     DMA_CH1  //DMA_CH0
 #define DEBUG_RX_DMA_REQUEST     DMA_REQUEST_USART0_RX
 
 // TX DMA 配置
@@ -28,5 +28,4 @@
 
 //Buffer
 #define DEBUG_UART_BUFFER_SIZE   128
-#define DEBUG_UART_BUFFER_NUM    16
 #endif // __DEBUG_CFG_H__

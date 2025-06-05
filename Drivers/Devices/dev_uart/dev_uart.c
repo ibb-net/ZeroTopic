@@ -180,7 +180,12 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
     usart_baudrate_set(ptrDevUartHandle->base, ptrDevUartHandle->baudrate);
     usart_receive_config(ptrDevUartHandle->base, USART_RECEIVE_ENABLE);
     usart_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_ENABLE);
+
+    usart_receiver_timeout_enable(ptrDevUartHandle->base);
+    usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_RT);
     usart_receiver_timeout_threshold_config(ptrDevUartHandle->base, ptrDevUartHandle->idle_timeout);
+
+    usart_enable(ptrDevUartHandle->base);
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
     if (status) {
         status->is_initialized = 1;                 // Mark as initialized
@@ -204,22 +209,70 @@ void DevUartDeinit(const DevUartHandleStruct *ptrDevUartHandle) {
 }
 
 void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle) {
-    nvic_irq_enable(USART0_IRQn, 2, 0);  // TODO
-    usart_receiver_timeout_enable(ptrDevUartHandle->base);
-    usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_RT);
-    usart_enable(ptrDevUartHandle->base);
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
+    if (status == NULL) {
+        printf("Failed to find UART status for base %x\r\n", ptrDevUartHandle->base);
+        return;
+    }
+    if (!status->is_initialized) {
+        printf("UART %s (%x) is not initialized. Call DevUartInit() first.\r\n", ptrDevUartHandle->device_name,
+               ptrDevUartHandle->base);
+        return;
+    }
+    if (status->is_started) {
+        printf("UART %s (%x) is already started.\r\n", ptrDevUartHandle->device_name, ptrDevUartHandle->base);
+        return;
+    }
+    if (status->handle == NULL) {
+        printf(
+            "[FAULT]DevUarStart: handle %s (%x) is NULL. Should call DevUartRegister() before using UART.\r\n",
+            ptrDevUartHandle->device_name, ptrDevUartHandle->base);
+        while (1);
+    }
+
+    nvic_irq_enable(USART0_IRQn, 2, 0);  // TODO
+    // usart_receiver_timeout_enable(ptrDevUartHandle->base);
+    // usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_RT);
+    // usart_enable(ptrDevUartHandle->base);
+
     if (status) {
         status->is_opened  = 1;  // Mark as opened
         status->is_started = 1;  // Mark as started
-    } else {
-        printf(
-            "Failed to find UART status for base "
-            "%x\r\n",
-            ptrDevUartHandle->base);
     }
 }
+void DevUartDMARecive(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *data, size_t len) {
+    if (ptrDevUartHandle == NULL || data == NULL || len == 0) {
+        printf(
+            "Invalid parameters for "
+            "DevUartDMARecive\r\n");
+        while (1);
+    }
+    dma_deinit(ptrDevUartHandle->rx_dma_base_addr, ptrDevUartHandle->rx_dma_channel);
+    dma_single_data_parameter_struct dma_init_struct;
+    // dma_single_data_para_struct_init(&dma_init_struct);  // TODO
+    SCB_CleanDCache_by_Addr((uint32_t *)data, len);
+    dma_init_struct.request             = ptrDevUartHandle->rx_dma_request;
+    dma_init_struct.direction           = DMA_PERIPH_TO_MEMORY;
+    dma_init_struct.memory0_addr        = (uint32_t)data;
+    dma_init_struct.memory_inc          = DMA_MEMORY_INCREASE_ENABLE;
+    dma_init_struct.periph_memory_width = DMA_PERIPH_WIDTH_8BIT;
+    dma_init_struct.number              = len;
+    dma_init_struct.periph_addr         = (uint32_t)(&USART_RDATA(ptrDevUartHandle->base));
+    dma_init_struct.periph_inc          = DMA_PERIPH_INCREASE_DISABLE;
+    dma_init_struct.priority            = DMA_PRIORITY_ULTRA_HIGH;
+    dma_single_data_mode_init(ptrDevUartHandle->rx_dma_base_addr, ptrDevUartHandle->rx_dma_channel,
+                              &dma_init_struct);
 
+    /* configure DMA mode */
+    dma_circulation_disable(ptrDevUartHandle->rx_dma_base_addr, ptrDevUartHandle->rx_dma_channel);
+    // TODO 增加DMAbuffer不足的额外处理
+    dma_interrupt_enable(ptrDevUartHandle->rx_dma_base_addr, ptrDevUartHandle->rx_dma_channel,
+                         DMA_CHXCTL_FTFIE);
+    dma_channel_enable(ptrDevUartHandle->rx_dma_base_addr, ptrDevUartHandle->rx_dma_channel);
+    /* USART DMA enable for reception */
+    usart_dma_receive_config(ptrDevUartHandle->base, USART_RECEIVE_DMA_ENABLE);
+    SCB_InvalidateDCache_by_Addr((uint32_t *)data, len);
+}
 void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *data, size_t len) {
     if (ptrDevUartHandle == NULL || data == NULL || len == 0) {
         printf(
@@ -228,10 +281,9 @@ void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *
         return;
     }
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
-    rcu_periph_clock_enable(RCU_DMA0);
-    rcu_periph_clock_enable(RCU_DMA1);
-    rcu_periph_clock_enable(RCU_DMAMUX);
-    nvic_irq_enable(DMA1_Channel0_IRQn, 2, 1);
+    // TODO
+
+    // TODO: Check if the DMA channel is already in use
 
     dma_single_data_parameter_struct dma_init_struct;
     SCB_CleanDCache_by_Addr((uint32_t *)data, len);
@@ -281,5 +333,19 @@ void DMA1_Channel0_IRQHandler(void) {
         if (status && status->dev_cfg->tx_dma_isr_cb) {
             status->dev_cfg->tx_dma_isr_cb((void *)status->handle);
         }
+    }
+}
+/*!
+    \brief      this function handles DMA_Channel0_IRQHandler exception
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+void DMA0_Channel0_IRQHandler(void) {
+    if (RESET != dma_interrupt_flag_get(DMA0, DMA_CH0, DMA_INT_FLAG_FTF)) {
+        dma_interrupt_flag_clear(DMA0, DMA_CH0, DMA_INT_FLAG_FTF);
+        // g_transfer_complete = SET;
+        // com_uart_rx_isr();
+        printf("DMA0_Channel0_IRQHandler called\r\n");
     }
 }

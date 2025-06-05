@@ -34,7 +34,6 @@ typedef struct
     DevUartHandleStruct uart_cfg;
     /* Buffer */
     uint32_t buffer_size;
-    uint32_t buffer_num;
 
 } TypdefDebugBSPCfg;
 
@@ -82,7 +81,6 @@ const TypdefDebugBSPCfg DebugBspCfg[DebugChannelMax] = {
             .rx_dma_isr_cb    = NULL,  // RX DMA ISR callback function
         },
         .buffer_size = DEBUG_UART_BUFFER_SIZE,
-        .buffer_num  = DEBUG_UART_BUFFER_NUM,
     },
 };
 
@@ -102,10 +100,9 @@ typedef struct
     TaskHandle_t tx_task_handle;
     /* Buffer */
     size_t buffer_size;
-    size_t buffer_num;
-    /* DMA List */
-    list_dma_buffer_t rx_list_handle;
-    list_dma_buffer_t tx_list_handle;
+    uint8_t *rx_buffer;  // Pointer to the buffer
+    /* lcfg */
+    const TypdefDebugBSPCfg *DebugBspCfg;  // BSP configuration
 
 } TypdefDebugStatus;
 TypdefDebugStatus DebugStatus[DebugChannelMax] = {0};
@@ -118,6 +115,7 @@ static const vfb_event_t DebugEventList[] = {
     DebugSet,
     DebugGet,
     DebugPrint,
+    DebugRcv,
 
 };
 
@@ -147,40 +145,38 @@ void DebugDeviceInit(void) {
             printf("DebugBspCfg[%d] uart base is 0, skip init!\r\n", i);
             continue;
         }
-        uart_handle->id = i;
+        uart_handle->id          = i;
+        uart_handle->DebugBspCfg = &DebugBspCfg[i];
         DevPinInit(&(DebugBspCfg[i].tx_gpio_cfg));
         DevPinInit(&(DebugBspCfg[i].rx_gpio_cfg));
+
         DevUartRegister(DebugBspCfg[i].uart_cfg.base, (void *)uart_handle);
         DevUartInit(&(DebugBspCfg[i].uart_cfg));
-        DevUarStart(&(DebugBspCfg[i].uart_cfg));  // TODO 启动需要单独剥离出来
+       
 
         uart_handle->uart_base   = DebugBspCfg[i].uart_cfg.base;
         uart_handle->buffer_size = DebugBspCfg[i].buffer_size;
-        uart_handle->buffer_num  = DebugBspCfg[i].buffer_num;
-        memset(uart_handle->device_name, 0, sizeof(uart_handle->device_name));
-        snprintf(uart_handle->device_name, sizeof(uart_handle->device_name), "Debug%d", i);
-        size_t one_item_size        = sizeof(uint8_t) * uart_handle->buffer_size;
-        uart_handle->rx_list_handle = xCreateListDMA(uart_handle->buffer_num, one_item_size);
-        uart_handle->tx_list_handle = xCreateListDMA(uart_handle->buffer_num, one_item_size);
-        uart_handle->lock_tx        = xSemaphoreCreateBinary();
-        uart_handle->lock           = xSemaphoreCreateBinary();
-        if (uart_handle->rx_list_handle == NULL || uart_handle->tx_list_handle == NULL) {
-            printf("create %s list failed!\r\n", uart_handle->device_name);
+        uart_handle->rx_buffer   = pvPortMalloc(DebugBspCfg[i].buffer_size);
+        if(uart_handle->rx_buffer == NULL) {
+            printf("[Fault]malloc %s buffer failed!\r\n", DebugBspCfg[i].uart_cfg.device_name);
+            while (1);
             return;
         }
-        uart_handle->lock = xSemaphoreCreateMutex();
+        DevUartDMARecive(&(DebugBspCfg[i].uart_cfg), uart_handle->rx_buffer, DebugBspCfg[i].buffer_size);
+
+      
+        memset(uart_handle->device_name, 0, sizeof(uart_handle->device_name));
+        snprintf(uart_handle->device_name, sizeof(uart_handle->device_name), "Debug%d", i);
+        uart_handle->lock_tx = xSemaphoreCreateBinary();
+        uart_handle->lock    = xSemaphoreCreateBinary();
+
+        uart_handle->lock = xSemaphoreCreateMutex();//TODO ????
         if (uart_handle->lock == NULL) {
             printf("create %s mutex failed!\r\n", uart_handle->device_name);
             return;
         }
-        uart_handle->rx_queue = xQueueCreate(uart_handle->buffer_num, sizeof(steam_info_struct));
-        uart_handle->tx_queue = xQueueCreate(uart_handle->buffer_num, sizeof(steam_info_struct));
-        if (uart_handle->rx_queue == NULL || uart_handle->tx_queue == NULL) {
-            printf("create %s steambuf failed!\r\n", uart_handle->device_name);
-            return;
-        }
-
         printf("create %s ok!\r\n", uart_handle->device_name);
+        DevUarStart(&(DebugBspCfg[i].uart_cfg));  // TODO 启动需要单独剥离出来
 
 #if 0
 		/* Create task */
@@ -251,6 +247,10 @@ static void DebugRcvHandle(void *msg) {
                 printf("[ERROR]DebugPrint: lock_tx is NULL\r\n");
             }
         } break;
+        case DebugRcv: {
+            elog_i(TAG, "Debug Com Recive :%s", (char *)MSG_GET_PAYLOAD(tmp_msg));
+
+        } break;
         default:
             printf("TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
             break;
@@ -260,7 +260,7 @@ static void DebugRcvHandle(void *msg) {
 // 超时处理的回调函数
 uint8_t dma_buffer[128] = "Hello, Debug!";
 static void DebugCycHandle(void) {
-    TypdefDebugStatus *uart_handle = &DebugStatus[0];
+    // TypdefDebugStatus *uart_handle = &DebugStatus[0];
     elog_d(TAG, "DebugCycHandle called");
     static uint32_t cycle_count = 0;
     static uint32_t counter     = 0;
@@ -278,7 +278,28 @@ static void DebugCycHandle(void) {
     }
 }
 static void __DebugRXISRHandle(void *arg) {
-    printf("RX ISR callback invoked with argument: %p\n", arg);
+    printf("RX ISR callback invoked with argument: %p\r\n", arg);
+    TypdefDebugStatus *uart_handle = (TypdefDebugStatus *)arg;
+    SCB_CleanDCache_by_Addr((uint32_t *)uart_handle, sizeof(TypdefDebugStatus));
+    uint32_t dma_periph;
+    uint32_t channelx;
+    dma_periph   = uart_handle->DebugBspCfg->uart_cfg.rx_dma_base_addr;
+    channelx     = uart_handle->DebugBspCfg->uart_cfg.rx_dma_channel;
+    uint32_t dma_transfer_number = dma_transfer_number_get(dma_periph, channelx);
+    if(dma_transfer_number == 0) {
+        printf("DMA transfer number is zero, no data received.\r\n");
+    }
+    int rx_count = uart_handle->buffer_size - dma_transfer_number;
+    printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count, uart_handle->buffer_size, dma_transfer_number);
+    if (rx_count <= 0) {
+        printf("RX count is zero or negative, no data received.\r\n");
+    }
+    else
+    {
+        //vfb_send_from_isr(DebugRcv, 0, uart_handle->rx_buffer, uart_handle->buffer_size);//TODO 由于malloc不支持isr
+        printf("RX ISR: Received data: %*s\r\n", rx_count, uart_handle->rx_buffer);
+        DevUartDMARecive(&(uart_handle->DebugBspCfg->uart_cfg), uart_handle->rx_buffer, uart_handle->buffer_size);
+    }
 }
 static void __DebugTXDMAISRHandle(void *arg) {
     TypdefDebugStatus *uart_handle = (TypdefDebugStatus *)arg;

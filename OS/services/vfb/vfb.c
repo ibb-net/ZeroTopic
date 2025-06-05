@@ -85,7 +85,7 @@ static int __vfb_list_add_queue(List_t *queue_list, QueueHandle_t queue_handle) 
     // Check if the queue already exists in the list
     ListItem_t *existing_item = __vfb_list_find_queue(queue_list, queue_handle);
     if (existing_item != NULL) {
-        VFB_D("Queue %p already exists in the list", queue_handle);
+        VFB_W("Queue %p already exists in the list\n", queue_handle);
         return 0;  // Queue already exists, no need to add again
     }
     ListItem_t *item = (ListItem_t *)pvPortMalloc(sizeof(ListItem_t));
@@ -236,6 +236,11 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
  使用 length+head的方式 实际申请的内存空间会比 实际使用多一个1字节,
  在传输字符 等,多出'\0' 不容易溢出 */
         tmp_msg.frame = pvPortMalloc(length + sizeof(vfb_buffer_union));
+        if( tmp_msg.frame == NULL) {
+            VFB_E("Failed to allocate memory for message frame for event %u", event);
+            __vfb_givelock(mode);
+            return FD_FAIL;
+        }
         memset(tmp_msg.frame, 0, length + sizeof(vfb_buffer_union));
         tmp_msg.frame->head.event   = event;
         tmp_msg.frame->head.use_cnt = 0;

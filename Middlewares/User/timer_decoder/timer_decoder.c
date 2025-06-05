@@ -198,7 +198,7 @@ static void __encoder_timer_clear(TypdefEncoderStruct *encoder) {
 static void ENCODER_TIMER_INIT_HANDLE(void *msg) {
     elog_i(TAG, "ENCODER_TIMER_INIT_HANDLE\r\n");
     // 发布事件，表示计时器已准备就绪
-    vfb_publish(ENCODER_TIMER_READY);
+    // vfb_publish(ENCODER_TIMER_READY);
     vfb_send(ENCODER_TIMER_START, DECODER_CHANNEL0, NULL, 0);  // 启动计时器
 
     VFBMsgDecoderStruct msg_decoder = {
