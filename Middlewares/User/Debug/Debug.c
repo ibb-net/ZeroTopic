@@ -150,6 +150,7 @@ void DebugDeviceInit(void) {
         uart_handle->id = i;
         DevPinInit(&(DebugBspCfg[i].tx_gpio_cfg));
         DevPinInit(&(DebugBspCfg[i].rx_gpio_cfg));
+        DevUartRegister(DebugBspCfg[i].uart_cfg.base, (void *)uart_handle);
         DevUartInit(&(DebugBspCfg[i].uart_cfg));
         DevUarStart(&(DebugBspCfg[i].uart_cfg));  // TODO 启动需要单独剥离出来
 
@@ -260,14 +261,17 @@ static void DebugRcvHandle(void *msg) {
 uint8_t dma_buffer[128] = "Hello, Debug!";
 static void DebugCycHandle(void) {
     TypdefDebugStatus *uart_handle = &DebugStatus[0];
-	elog_d(TAG, "DebugCycHandle called");
-    static uint32_t cycle_count    = 0;
-    static uint32_t counter        = 0;
+    elog_d(TAG, "DebugCycHandle called");
+    static uint32_t cycle_count = 0;
+    static uint32_t counter     = 0;
     if (cycle_count++ % (1000 / CONFIG_DEBUG_CYCLE_TIMER_MS) == 0) {
         memset(dma_buffer, 0, sizeof(dma_buffer));
         sprintf((char *)dma_buffer, "DebugCycHandle cycle count: %d\r\n", counter);
         // DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)dma_buffer, 128);
         vfb_send(DebugPrint, 0, dma_buffer, sizeof(dma_buffer));
+        elog_i(TAG, "DebugCycHandle cycle count: %d", cycle_count);
+        elog_w(TAG, "DebugCycHandle cycle count: %d", cycle_count);
+        elog_e(TAG, "DebugCycHandle cycle count: %d", cycle_count);
         counter++;
     } else {
         elog_d(TAG, "DebugCycHandle cycle count: %d", cycle_count);
@@ -277,8 +281,7 @@ static void __DebugRXISRHandle(void *arg) {
     printf("RX ISR callback invoked with argument: %p\n", arg);
 }
 static void __DebugTXDMAISRHandle(void *arg) {
-    DevUartHandleStruct *dev_handle = (DevUartHandleStruct *)arg;
-    TypdefDebugStatus *uart_handle  = &DebugStatus[uart_handle->id];
+    TypdefDebugStatus *uart_handle = (TypdefDebugStatus *)arg;
     xSemaphoreGiveFromISR(uart_handle->lock_tx, NULL);
 }
 

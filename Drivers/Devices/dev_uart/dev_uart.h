@@ -31,7 +31,7 @@ typedef struct
 int fputc(int ch, FILE *f);
 int __io_putchar(int ch) ;
 int debug_putbuffer(const char *buffer, size_t len);
-
+void DevUartRegister(uint32_t base, void *handle);
 void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle);
 void DevUartDeinit(const DevUartHandleStruct *ptrDevUartHandle);
 void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle);
