@@ -15,6 +15,7 @@
 #include "elog.h"
 #include "list/ex_list_dma.h"
 #include "os_server.h"
+#include "stream_buffer.h"
 
 #define TAG "DEBUG"
 #define DebugLogLvl ELOG_LVL_INFO
@@ -43,6 +44,7 @@ static void DebugCycHandle(void);
 static void DebugInitHandle(void *msg);
 static void __DebugRXISRHandle(void *arg);
 static void __DebugTXDMAISRHandle(void *arg);
+void DebugStreamRcvTask(void *arg);
 
 const TypdefDebugBSPCfg DebugBspCfg[DebugChannelMax] = {
     {
@@ -78,7 +80,7 @@ const TypdefDebugBSPCfg DebugBspCfg[DebugChannelMax] = {
             .rx_dma_base_addr = DEBUG_RX_DMA_BASE_ADDR,
             .rx_dma_channel   = DEBUG_RX_DMA_CHANNEL,
             .rx_dma_request   = DEBUG_RX_DMA_REQUEST,
-            .rx_dma_isr_cb    = NULL,  // RX DMA ISR callback function
+            .rx_dma_isr_cb    = __DebugRXISRHandle,  // RX DMA ISR callback function
         },
         .buffer_size = DEBUG_UART_BUFFER_SIZE,
     },
@@ -94,6 +96,7 @@ typedef struct
     SemaphoreHandle_t lock_tx;
     /* Queue */
     SemaphoreHandle_t rx_queue;
+    StreamBufferHandle_t rx_stream_buffer;  // Stream buffer for RX
     SemaphoreHandle_t tx_queue;
     /* Thread */
     TaskHandle_t rx_task_handle;
@@ -152,51 +155,28 @@ void DebugDeviceInit(void) {
 
         DevUartRegister(DebugBspCfg[i].uart_cfg.base, (void *)uart_handle);
         DevUartInit(&(DebugBspCfg[i].uart_cfg));
-       
 
-        uart_handle->uart_base   = DebugBspCfg[i].uart_cfg.base;
-        uart_handle->buffer_size = DebugBspCfg[i].buffer_size;
-        uart_handle->rx_buffer   = pvPortMalloc(DebugBspCfg[i].buffer_size);
-        if(uart_handle->rx_buffer == NULL) {
+        uart_handle->uart_base        = DebugBspCfg[i].uart_cfg.base;
+        uart_handle->buffer_size      = DebugBspCfg[i].buffer_size;
+        uart_handle->rx_stream_buffer = xStreamBufferCreate(DebugBspCfg[i].buffer_size, 1);
+        uart_handle->rx_buffer        = pvPortMalloc(DebugBspCfg[i].buffer_size);
+        if (uart_handle->rx_buffer == NULL) {
             printf("[Fault]malloc %s buffer failed!\r\n", DebugBspCfg[i].uart_cfg.device_name);
             while (1);
             return;
         }
         DevUartDMARecive(&(DebugBspCfg[i].uart_cfg), uart_handle->rx_buffer, DebugBspCfg[i].buffer_size);
 
-      
         memset(uart_handle->device_name, 0, sizeof(uart_handle->device_name));
         snprintf(uart_handle->device_name, sizeof(uart_handle->device_name), "Debug%d", i);
         uart_handle->lock_tx = xSemaphoreCreateBinary();
         uart_handle->lock    = xSemaphoreCreateBinary();
-
-        uart_handle->lock = xSemaphoreCreateMutex();//TODO ????
         if (uart_handle->lock == NULL) {
             printf("create %s mutex failed!\r\n", uart_handle->device_name);
             return;
         }
         printf("create %s ok!\r\n", uart_handle->device_name);
-        DevUarStart(&(DebugBspCfg[i].uart_cfg));  // TODO 启动需要单独剥离出来
-
-#if 0
-		/* Create task */
-		BaseType_t ret;
-		ret = xTaskCreate(bsp_uart_rx_thread, "uart_rx_task", configMINIMAL_STACK_SIZE * 2, (void *const)uart_handle, 2, NULL);
-		if (ret != pdPASS)
-		{
-			printf("create rx task failed!\r\n");
-			return;
-		}
-
-		ret = xTaskCreate(bsp_uart_tx_thread, "uart_tx_task", configMINIMAL_STACK_SIZE * 2, (void *const)uart_handle, 2, NULL);
-		if (ret != pdPASS)
-		{
-			vTaskDelete(uart_handle->rx_task_handle);
-			uart_handle->rx_task_handle = NULL;
-			printf("create tx task failed!\r\n");
-			return;
-		}
-#endif
+        DevUarStart(&(DebugBspCfg[i].uart_cfg));
     }
 }
 SYSTEM_REGISTER_INIT(MCUPreInitStage, MCUPreDebugRegisterPriority, DebugDeviceInit, DebugDeviceInit);
@@ -258,46 +238,72 @@ static void DebugRcvHandle(void *msg) {
 }
 
 // 超时处理的回调函数
-uint8_t dma_buffer[128] = "Hello, Debug!";
+uint8_t dma_buffer[1024] = "Hello, Debug!";
 static void DebugCycHandle(void) {
-    // TypdefDebugStatus *uart_handle = &DebugStatus[0];
+    TypdefDebugStatus *uart_handle = &DebugStatus[0];
     elog_d(TAG, "DebugCycHandle called");
     static uint32_t cycle_count = 0;
     static uint32_t counter     = 0;
     if (cycle_count++ % (1000 / CONFIG_DEBUG_CYCLE_TIMER_MS) == 0) {
-        memset(dma_buffer, 0, sizeof(dma_buffer));
-        sprintf((char *)dma_buffer, "DebugCycHandle cycle count: %d\r\n", counter);
+        // memset(dma_buffer, 0, sizeof(dma_buffer));
+        // sprintf((char *)dma_buffer, "DebugCycHandle cycle count: %d\r\n", counter);
         // DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)dma_buffer, 128);
-        vfb_send(DebugPrint, 0, dma_buffer, sizeof(dma_buffer));
-        elog_i(TAG, "DebugCycHandle cycle count: %d", counter);
-        elog_w(TAG, "DebugCycHandle cycle count: %d", counter);
-        elog_e(TAG, "DebugCycHandle cycle count: %d", counter);
+        // vfb_send(DebugPrint, 0, dma_buffer, sizeof(dma_buffer));
+        // elog_i(TAG, "DebugCycHandle cycle count: %d", counter);
+        // elog_w(TAG, "DebugCycHandle cycle count: %d", counter);
+        // elog_e(TAG, "DebugCycHandle cycle count: %d", counter);
         counter++;
     } else {
         // elog_d(TAG, "DebugCycHandle cycle count: %d", cycle_count);
     }
+    /* BaseType_t xQueueReceive( QueueHandle_t xQueue,
+        void *pvBuffer,
+        TickType_t xTicksToWait ); */
+    memset(dma_buffer, 0, sizeof(dma_buffer));
+    if (xStreamBufferReceive(uart_handle->rx_stream_buffer, dma_buffer, uart_handle->buffer_size, 0) != 0) {
+        vfb_send(DebugRcv, 0, dma_buffer, strlen((char *)dma_buffer));
+        // printf("DebugCycHandle: Received data: %s\r\n", dma_buffer);
+    }
+}
+// DebugStreamRcvTask
+void DebugStreamRcvTask(void *arg) {
+    TypdefDebugStatus *uart_handle = (TypdefDebugStatus *)arg;
+    if (uart_handle == NULL) {
+        printf("DebugStreamRcvTask: uart_handle is NULL\r\n");
+        vTaskDelete(NULL);
+        return;
+    }
+    printf("DebugStreamRcvTask started for %s\r\n", uart_handle->device_name);
+    while (1) {
+        if (xStreamBufferReceive(uart_handle->rx_stream_buffer, uart_handle->rx_buffer, uart_handle->buffer_size, portMAX_DELAY) > 0) {
+            printf("DebugStreamRcvTask: Received data: %s\r\n", uart_handle->rx_buffer);
+            DevUartDMARecive(&(uart_handle->DebugBspCfg->uart_cfg), uart_handle->rx_buffer, uart_handle->buffer_size);
+        }
+    }
 }
 static void __DebugRXISRHandle(void *arg) {
-    printf("RX ISR callback invoked with argument: %p\r\n", arg);
     TypdefDebugStatus *uart_handle = (TypdefDebugStatus *)arg;
     SCB_CleanDCache_by_Addr((uint32_t *)uart_handle, sizeof(TypdefDebugStatus));
     uint32_t dma_periph;
     uint32_t channelx;
-    dma_periph   = uart_handle->DebugBspCfg->uart_cfg.rx_dma_base_addr;
-    channelx     = uart_handle->DebugBspCfg->uart_cfg.rx_dma_channel;
+    dma_periph                   = uart_handle->DebugBspCfg->uart_cfg.rx_dma_base_addr;
+    channelx                     = uart_handle->DebugBspCfg->uart_cfg.rx_dma_channel;
     uint32_t dma_transfer_number = dma_transfer_number_get(dma_periph, channelx);
-    if(dma_transfer_number == 0) {
+    if (dma_transfer_number == 0) {
         printf("DMA transfer number is zero, no data received.\r\n");
     }
     int rx_count = uart_handle->buffer_size - dma_transfer_number;
-    printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count, uart_handle->buffer_size, dma_transfer_number);
+    // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count, uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
         printf("RX count is zero or negative, no data received.\r\n");
-    }
-    else
-    {
-        //vfb_send_from_isr(DebugRcv, 0, uart_handle->rx_buffer, uart_handle->buffer_size);//TODO 由于malloc不支持isr
-        printf("RX ISR: Received data: %*s\r\n", rx_count, uart_handle->rx_buffer);
+    } else {
+        /* BaseType_t xQueueSendFromISR( QueueHandle_t xQueue,
+const void *pvItemToQueue,
+BaseType_t *pxHigherPriorityTaskWoken ); */
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        if (xStreamBufferSendFromISR(uart_handle->rx_stream_buffer, uart_handle->rx_buffer, rx_count, &xHigherPriorityTaskWoken) == 0) {
+            printf("Failed to send data to stream buffer from ISR\r\n");
+        }
         DevUartDMARecive(&(uart_handle->DebugBspCfg->uart_cfg), uart_handle->rx_buffer, uart_handle->buffer_size);
     }
 }

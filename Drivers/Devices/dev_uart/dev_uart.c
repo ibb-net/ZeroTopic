@@ -161,8 +161,7 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
     for (size_t i = 0; i < sizeof(dev_clock_map) / sizeof(dev_clock_map[0]); i++) {
         if (dev_clock_map[i].device == ptrDevUartHandle->base) {
             rcu_periph_clock_enable(dev_clock_map[i].rcu_clock);
-            nvic_irq_enable(dev_irqn_map[i].irqn, 2,
-                            0);  // TODO 需要配置終端優先級
+            nvic_irq_enable(dev_irqn_map[i].irqn, 2, i);
             is_found = 1;
             break;
         }
@@ -229,12 +228,6 @@ void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle) {
             ptrDevUartHandle->device_name, ptrDevUartHandle->base);
         while (1);
     }
-
-    nvic_irq_enable(USART0_IRQn, 2, 0);  // TODO
-    // usart_receiver_timeout_enable(ptrDevUartHandle->base);
-    // usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_RT);
-    // usart_enable(ptrDevUartHandle->base);
-
     if (status) {
         status->is_opened  = 1;  // Mark as opened
         status->is_started = 1;  // Mark as started
@@ -249,7 +242,6 @@ void DevUartDMARecive(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t
     }
     dma_deinit(ptrDevUartHandle->rx_dma_base_addr, ptrDevUartHandle->rx_dma_channel);
     dma_single_data_parameter_struct dma_init_struct;
-    // dma_single_data_para_struct_init(&dma_init_struct);  // TODO
     SCB_CleanDCache_by_Addr((uint32_t *)data, len);
     dma_init_struct.request             = ptrDevUartHandle->rx_dma_request;
     dma_init_struct.direction           = DMA_PERIPH_TO_MEMORY;
@@ -265,7 +257,6 @@ void DevUartDMARecive(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t
 
     /* configure DMA mode */
     dma_circulation_disable(ptrDevUartHandle->rx_dma_base_addr, ptrDevUartHandle->rx_dma_channel);
-    // TODO 增加DMAbuffer不足的额外处理
     dma_interrupt_enable(ptrDevUartHandle->rx_dma_base_addr, ptrDevUartHandle->rx_dma_channel,
                          DMA_CHXCTL_FTFIE);
     dma_channel_enable(ptrDevUartHandle->rx_dma_base_addr, ptrDevUartHandle->rx_dma_channel);
@@ -281,10 +272,6 @@ void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *
         return;
     }
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
-    // TODO
-
-    // TODO: Check if the DMA channel is already in use
-
     dma_single_data_parameter_struct dma_init_struct;
     SCB_CleanDCache_by_Addr((uint32_t *)data, len);
     dma_deinit(ptrDevUartHandle->tx_dma_base_addr, ptrDevUartHandle->tx_dma_channel);
@@ -342,10 +329,15 @@ void DMA1_Channel0_IRQHandler(void) {
     \retval     none
 */
 void DMA0_Channel0_IRQHandler(void) {
+    static DevUartStatusStruct *status;
+    if (status == NULL) {
+        status = __DevUartGetStatus(USART0);
+    }
     if (RESET != dma_interrupt_flag_get(DMA0, DMA_CH0, DMA_INT_FLAG_FTF)) {
         dma_interrupt_flag_clear(DMA0, DMA_CH0, DMA_INT_FLAG_FTF);
-        // g_transfer_complete = SET;
-        // com_uart_rx_isr();
-        printf("DMA0_Channel0_IRQHandler called\r\n");
+        if (status && status->dev_cfg->rx_dma_isr_cb) {
+            // Call the RX DMA ISR callback function
+            status->dev_cfg->rx_dma_isr_cb((void *)status->handle);
+        }
     }
 }
