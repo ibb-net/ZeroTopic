@@ -31,7 +31,7 @@
 #define VFB_I printf
 #define VFB_E printf
 #define VFB_W printf
-#define VFB_D printf
+#define VFB_D 
 #define VFB_SUBSCRIBE(num, list) vfb_subscribe(num, list, sizeof(list) / sizeof(vfb_event_t))
 
 // TODO 改为指针偏移
@@ -40,7 +40,10 @@
 #define MSG_GET_LENGTH(msg) (((vfb_message_t)msg)->frame->head.length)
 #define MSG_GET_PAYLOAD(msg) (&(((vfb_message_t)msg)->frame->head.payload_offset))
 #define MSG_GET_USE_CNT(msg) (((vfb_message_t)msg)->frame->head.use_cnt)
-
+typedef enum {
+    VFB_MSG_MODE_TASK,  // Task mode
+    VFB_MSG_MODE_ISR,   // ISR mode
+} vfb_msg_mode_t;
 typedef uint16_t vfb_event_t;
 typedef union {
     uintptr_t *buffer;
@@ -96,6 +99,7 @@ void VFB_MsgReceive(QueueHandle_t xQueue,
                     void (*rcv_msg_cb)(void *),
                     void (*rcv_timeout_cb)(void));
 uint8_t vfb_send(vfb_event_t event, uint32_t data, void *payload, uint16_t length);
+uint8_t vfb_send_from_isr(vfb_event_t event, uint32_t data, void *payload, uint16_t length);
 uint8_t vfb_publish(vfb_event_t event);
 void VFBTaskFrame(void *pvParameters);
 #endif  // __VFB_SERVER_H__

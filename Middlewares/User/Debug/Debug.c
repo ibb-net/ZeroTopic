@@ -269,12 +269,12 @@ static void DebugCycHandle(void) {
         sprintf((char *)dma_buffer, "DebugCycHandle cycle count: %d\r\n", counter);
         // DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)dma_buffer, 128);
         vfb_send(DebugPrint, 0, dma_buffer, sizeof(dma_buffer));
-        elog_i(TAG, "DebugCycHandle cycle count: %d", cycle_count);
-        elog_w(TAG, "DebugCycHandle cycle count: %d", cycle_count);
-        elog_e(TAG, "DebugCycHandle cycle count: %d", cycle_count);
+        elog_i(TAG, "DebugCycHandle cycle count: %d", counter);
+        elog_w(TAG, "DebugCycHandle cycle count: %d", counter);
+        elog_e(TAG, "DebugCycHandle cycle count: %d", counter);
         counter++;
     } else {
-        elog_d(TAG, "DebugCycHandle cycle count: %d", cycle_count);
+        // elog_d(TAG, "DebugCycHandle cycle count: %d", cycle_count);
     }
 }
 static void __DebugRXISRHandle(void *arg) {

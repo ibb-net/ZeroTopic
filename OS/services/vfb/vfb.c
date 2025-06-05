@@ -169,13 +169,54 @@ QueueHandle_t vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, u
     VFB_I("Task %s subscribe Event Success,valid %d,invalid %d\r\n", taskName, valiad_counter, invalid_counter);
     return queue_handle;
 }
+uint8_t __vfb_takelock(vfb_msg_mode_t mode) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    if (mode == VFB_MSG_MODE_ISR) {
+        return xSemaphoreTakeFromISR(__vfb_info.xFDSemaphore, &xHigherPriorityTaskWoken) == pdTRUE ? FD_PASS : FD_FAIL;
+    } else if (mode == VFB_MSG_MODE_TASK) {
+        return xSemaphoreTake(__vfb_info.xFDSemaphore, pdMS_TO_TICKS(100)) == pdTRUE ? FD_PASS : FD_FAIL;
+    } else {
+        return FD_FAIL;  // Invalid mode
+    }
+}
+uint8_t __vfb_givelock(vfb_msg_mode_t mode) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    if (mode == VFB_MSG_MODE_ISR) {
+        xSemaphoreGiveFromISR(__vfb_info.xFDSemaphore, &xHigherPriorityTaskWoken);
+        return FD_PASS;
+    } else if (mode == VFB_MSG_MODE_TASK) {
+        xSemaphoreGive(__vfb_info.xFDSemaphore);
+        return FD_PASS;
+    } else {
+        return FD_FAIL;  // Invalid mode
+    }
+}
+uint8_t __vfb_send_queue(vfb_msg_mode_t mode, QueueHandle_t queue_handle,
+                         const void *const pvItemToQueue) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    if (queue_handle == NULL || pvItemToQueue == NULL) {
+        VFB_E("Queue handle or item to queue is NULL");
+        return FD_FAIL;
+    }
+    if (mode == VFB_MSG_MODE_ISR) {
+        return xQueueSendFromISR(queue_handle, pvItemToQueue, &xHigherPriorityTaskWoken) == pdPASS ? FD_PASS : FD_FAIL;
+    } else if (mode == VFB_MSG_MODE_TASK) {
+        return xQueueSend(queue_handle, pvItemToQueue, pdMS_TO_TICKS(100)) == pdPASS ? FD_PASS : FD_FAIL;
+    } else {
+        VFB_E("Invalid mode for sending to queue");
+        return FD_FAIL;  // Invalid mode
+    }
+}
 /**
  * @brief Send a message to the event queue
  *
  * @param msg The message to send
  * @return uint8_t FD_PASS on success, FD_FAIL on failure
  */
-uint8_t vfb_send(vfb_event_t event, uint32_t data, void *payload,uint16_t length ) {
+
+uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, void *payload, uint16_t length) {
+    vfb_message tmp_msg;
     if (length > 0 && payload == NULL) {
         VFB_E("Payload is NULL but length is %u for event %u", length, event);
         return FD_FAIL;
@@ -184,62 +225,58 @@ uint8_t vfb_send(vfb_event_t event, uint32_t data, void *payload,uint16_t length
         VFB_E("length is 0,but payload is empty for event %u", event);
         return FD_FAIL;
     }
-    vfb_message tmp_msg;
-    /* Notice:
-    使用 length+head的方式 实际申请的内存空间会比 实际使用多一个1字节,
-    在传输字符 等,多出'\0' 不容易溢出 */
-    tmp_msg.frame = pvPortMalloc(length + sizeof(vfb_buffer_union));
-    memset(tmp_msg.frame, 0, length + sizeof(vfb_buffer_union));
-    tmp_msg.frame->head.event   = event;
-    tmp_msg.frame->head.use_cnt = 0;
-    tmp_msg.frame->head.data    = data;
-    tmp_msg.frame->head.length  = length;
 
-    if (length > 0 && payload != NULL) {
-        memcpy(&(tmp_msg.frame->head.payload_offset), payload, length);
+    if (__vfb_takelock(mode) == FD_PASS) {
+        List_t *event_list = __vfb_list_get_head(event);
+        if (event_list == NULL) {
+            VFB_E("Failed to get event list for event %u", event);
+            return FD_FAIL;
+        }
+        /* Notice:
+ 使用 length+head的方式 实际申请的内存空间会比 实际使用多一个1字节,
+ 在传输字符 等,多出'\0' 不容易溢出 */
+        tmp_msg.frame = pvPortMalloc(length + sizeof(vfb_buffer_union));
+        memset(tmp_msg.frame, 0, length + sizeof(vfb_buffer_union));
+        tmp_msg.frame->head.event   = event;
+        tmp_msg.frame->head.use_cnt = 0;
+        tmp_msg.frame->head.data    = data;
+        tmp_msg.frame->head.length  = length;
+        if (length > 0 && payload != NULL) {
+            memcpy(&(tmp_msg.frame->head.payload_offset), payload, length);
 
-    } else {
-        tmp_msg.frame->head.payload_offset = NULL;
-    }
-
-    List_t *event_list = __vfb_list_get_head(event);
-    if (event_list == NULL) {
-        VFB_E("Failed to get event list for event %u", event);
-        return FD_FAIL;
-    }
-    // VFB_D("Event %u, registered queue count: %u\r\n", event, listCURRENT_LIST_LENGTH(event_list));
-    if (xSemaphoreTake(__vfb_info.xFDSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
+        } else {
+            tmp_msg.frame->head.payload_offset = NULL;
+        }
         tmp_msg.frame->head.use_cnt = listCURRENT_LIST_LENGTH(event_list);
         ListItem_t *item            = listGET_HEAD_ENTRY(event_list);
         for (uint16_t i = 0; i < listCURRENT_LIST_LENGTH(event_list); i++) {
             if (item == listGET_END_MARKER(event_list)) {
                 VFB_W("No queue found for event %u", event);
-                xSemaphoreGive(__vfb_info.xFDSemaphore);
                 break;
             }
             QueueHandle_t queue_handle = (QueueHandle_t)listGET_LIST_ITEM_VALUE(item);
             if (queue_handle == NULL) {
                 VFB_E("Queue handle is NULL for event %u", event);
-                xSemaphoreGive(__vfb_info.xFDSemaphore);
                 tmp_msg.frame->head.use_cnt--;
-                return FD_FAIL;
+                continue;  // Skip this queue
             }
-            // VFB_D("Task %s sending message to queue %p for event %u, data: %ld, length: %u\r\n",
-            //   pcTaskGetName(xTaskGetCurrentTaskHandle()), queue_handle, event, data, length);
-            // 关闭任务调度
 
-            if (xQueueSend(queue_handle, &tmp_msg, pdMS_TO_TICKS(100)) != pdPASS) {
+            if (__vfb_send_queue(mode, queue_handle, &tmp_msg) != FD_PASS) {
                 VFB_E("Failed to send message to queue for event %u", event);
-                xSemaphoreGive(__vfb_info.xFDSemaphore);
                 tmp_msg.frame->head.use_cnt--;
-                return FD_FAIL;
+                continue;  // Skip this queue
             }
-
             // VFB_D("Message use count incremented, current use count: %u\r\n", tmp_msg.frame->head.use_cnt);
             item = listGET_NEXT(item);
         }
         // VFB_D("Task %s sent message for event %u, data: %ld, length: %u\r\n", pcTaskGetName(xTaskGetCurrentTaskHandle()), event, data, length);
-        xSemaphoreGive(__vfb_info.xFDSemaphore);
+        if (tmp_msg.frame->head.use_cnt == 0) {
+            VFB_W("No queue found for event %u, use count is 0", event);
+            vPortFree(tmp_msg.frame);
+        } else {
+            // VFB_D("Message sent for event %u, use count: %u", event, tmp_msg.frame->head.use_cnt);
+        }
+        __vfb_givelock(mode);
         return FD_PASS;
     } else {
         VFB_E("Failed to take semaphore");
@@ -247,8 +284,14 @@ uint8_t vfb_send(vfb_event_t event, uint32_t data, void *payload,uint16_t length
     }
 }
 
+uint8_t vfb_send(vfb_event_t event, uint32_t data, void *payload, uint16_t length) {
+    return __vfb_send_core(VFB_MSG_MODE_TASK, event, data, payload, length);
+}
+uint8_t vfb_send_from_isr(vfb_event_t event, uint32_t data, void *payload, uint16_t length) {
+    return __vfb_send_core(VFB_MSG_MODE_ISR, event, data, payload, length);
+}
 uint8_t vfb_publish(vfb_event_t event) {
-    return vfb_send(event, 0,NULL ,0);
+    return vfb_send(event, 0, NULL, 0);
 }
 #if 0
 /**
@@ -441,7 +484,7 @@ void VFBTaskFrame(void *pvParameters) {
         VFB_E("Failed to subscribe to event queue");
         return;
     }
-    if(task_cfg->init_msg_cb != NULL) {
+    if (task_cfg->init_msg_cb != NULL) {
         task_cfg->init_msg_cb(NULL);  // Call the initialization callback if provided
     }
     VFB_MsgReceive(queue_handle, task_cfg->xTicksToWait, task_cfg->rcv_msg_cb, task_cfg->rcv_timeout_cb);
