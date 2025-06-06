@@ -87,7 +87,7 @@ static void __ShellCreateTaskHandle(void) {
         ShellStatus[i].shell.read  = NULL;            // Assign your read function here
         ShellStatus[i].shell.write = userShellWrite;  // Assign your write function here
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskShell", configMINIMAL_STACK_SIZE * 10, (void *)&Shell_task_cfg, BspShellTaskPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskShell", configMINIMAL_STACK_SIZE * 2, (void *)&Shell_task_cfg, BspShellTaskPriority, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerPerInitStage, ServerPreShellRegisterPriority, __ShellCreateTaskHandle, __ShellCreateTaskHandle init);
 

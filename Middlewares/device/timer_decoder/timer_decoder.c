@@ -219,7 +219,7 @@ static void ENCODER_TIMER_RCV_HANDLE(void *msg) {
                 elog_e(TAG, "ENCODER_TIMER_START: Invalid channel %d", channel);
                 return;  // 无效通道
             }
-            elog_i(TAG, "ENCODER_TIMER_START %d", channel);
+            elog_i(TAG, "ENCODER_TIMER_START Channel %d", channel);
             encoder_struct[channel].channel_ctr          = 1;                                                         // 启用通道
             encoder_struct[channel].last_encoder_counter = timer_counter_read(encoder_struct[channel].timer_handle);  // 读取当前计时器值
         } break;
