@@ -176,6 +176,7 @@ void DebugDeviceInit(void) {
             return;
         }
         printf("create %s ok!\r\n", uart_handle->device_name);
+
         DevUarStart(&(DebugBspCfg[i].uart_cfg));
     }
 }
@@ -186,6 +187,7 @@ static void DebugCreateTaskHandle(void) {
     }
 
     xTaskCreate(VFBTaskFrame, "VFBTaskDebug", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg, BspDebugTaskPriority, NULL);
+    xTaskCreate(DebugStreamRcvTask, "DebugRx", configMINIMAL_STACK_SIZE * 2, (void *)&Debug_task_cfg, BspDebugTaskPriority, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerPerInitStage, ServerPreDebugRegisterPriority, DebugCreateTaskHandle, DebugCreateTaskHandle init);
 
@@ -238,27 +240,24 @@ static void DebugRcvHandle(void *msg) {
 }
 
 // 超时处理的回调函数
-uint8_t dma_buffer[1024] = "Hello, Debug!";
+uint8_t dma_buffer[DEBUG_UART_BUFFER_SIZE] = "Hello, Debug!";
 static void DebugCycHandle(void) {
-    TypdefDebugStatus *uart_handle = &DebugStatus[0];
-    memset(dma_buffer, 0, sizeof(dma_buffer));
-    if (xStreamBufferReceive(uart_handle->rx_stream_buffer, dma_buffer, uart_handle->buffer_size, 0) != 0) {
-        vfb_send(DebugRcv, 0, dma_buffer, strlen((char *)dma_buffer));
-    }
+    // TypdefDebugStatus *uart_handle = &DebugStatus[0];
+    // memset(dma_buffer, 0, sizeof(dma_buffer));
+    // if (xStreamBufferReceive(uart_handle->rx_stream_buffer, dma_buffer, uart_handle->buffer_size, 0) != 0) {
+    //     vfb_send(DebugRcv, 0, dma_buffer, strlen((char *)dma_buffer));
+    // }
 }
 // DebugStreamRcvTask
 void DebugStreamRcvTask(void *arg) {
-    TypdefDebugStatus *uart_handle = (TypdefDebugStatus *)arg;
-    if (uart_handle == NULL) {
-        printf("DebugStreamRcvTask: uart_handle is NULL\r\n");
-        vTaskDelete(NULL);
-        return;
-    }
-    printf("DebugStreamRcvTask started for %s\r\n", uart_handle->device_name);
+    TypdefDebugStatus *uart_handle = &DebugStatus[0];
+    int rcv_count                  = 0;
+    memset(dma_buffer, 0, sizeof(dma_buffer));
     while (1) {
-        if (xStreamBufferReceive(uart_handle->rx_stream_buffer, uart_handle->rx_buffer, uart_handle->buffer_size, portMAX_DELAY) > 0) {
-            printf("DebugStreamRcvTask: Received data: %s\r\n", uart_handle->rx_buffer);
-            DevUartDMARecive(&(uart_handle->DebugBspCfg->uart_cfg), uart_handle->rx_buffer, uart_handle->buffer_size);
+        rcv_count = xStreamBufferReceive(uart_handle->rx_stream_buffer, dma_buffer, uart_handle->buffer_size, portMAX_DELAY);
+        if (rcv_count > 0) {
+            vfb_send(DebugRcv, 0, dma_buffer, rcv_count);
+            memset(dma_buffer, 0, rcv_count);
         }
     }
 }

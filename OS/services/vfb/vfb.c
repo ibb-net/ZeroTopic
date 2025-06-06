@@ -230,20 +230,26 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
         List_t *event_list = __vfb_list_get_head(event);
         if (event_list == NULL) {
             VFB_E("Failed to get event list for event %u", event);
+            __vfb_givelock(mode);
+            return FD_FAIL;
+        }
+        if (listCURRENT_LIST_LENGTH(event_list) == 0) {
+            VFB_W("No queues subscribed for event %u", event);
+            __vfb_givelock(mode);
             return FD_FAIL;
         }
         /* Notice:
  使用 length+head的方式 实际申请的内存空间会比 实际使用多一个1字节,
  在传输字符 等,多出'\0' 不容易溢出 */
         tmp_msg.frame = pvPortMalloc(length + sizeof(vfb_buffer_union));
-        if( tmp_msg.frame == NULL) {
+        if (tmp_msg.frame == NULL) {
             VFB_E("Failed to allocate memory for message frame for event %u", event);
             __vfb_givelock(mode);
             return FD_FAIL;
         }
         memset(tmp_msg.frame, 0, length + sizeof(vfb_buffer_union));
         tmp_msg.frame->head.event   = event;
-        tmp_msg.frame->head.use_cnt = 0;
+        tmp_msg.frame->head.use_cnt = listCURRENT_LIST_LENGTH(event_list);
         tmp_msg.frame->head.data    = data;
         tmp_msg.frame->head.length  = length;
         if (length > 0 && payload != NULL) {
@@ -252,8 +258,8 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
         } else {
             tmp_msg.frame->head.payload_offset = NULL;
         }
-        tmp_msg.frame->head.use_cnt = listCURRENT_LIST_LENGTH(event_list);
-        ListItem_t *item            = listGET_HEAD_ENTRY(event_list);
+        // printf("use_cnt %u\r\n", tmp_msg.frame->head.use_cnt);
+        ListItem_t *item = listGET_HEAD_ENTRY(event_list);
         for (uint16_t i = 0; i < listCURRENT_LIST_LENGTH(event_list); i++) {
             if (item == listGET_END_MARKER(event_list)) {
                 VFB_W("No queue found for event %u", event);
@@ -263,24 +269,38 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
             if (queue_handle == NULL) {
                 VFB_E("Queue handle is NULL for event %u", event);
                 tmp_msg.frame->head.use_cnt--;
+                if (tmp_msg.frame->head.use_cnt == 0) {
+                    VFB_W("No queue found for event %u, use count is 0", event);
+                    vPortFree(tmp_msg.frame);
+                }
+                while (1) {
+                    /* code */
+                }
+
                 continue;  // Skip this queue
             }
 
             if (__vfb_send_queue(mode, queue_handle, &tmp_msg) != FD_PASS) {
                 VFB_E("Failed to send message to queue for event %u", event);
                 tmp_msg.frame->head.use_cnt--;
+                if (tmp_msg.frame->head.use_cnt == 0) {
+                    VFB_W("No queue found for event %u, use count is 0", event);
+                    vPortFree(tmp_msg.frame);
+                }
+                while (1) {
+                    /* code */
+                }
+
                 continue;  // Skip this queue
             }
             // VFB_D("Message use count incremented, current use count: %u\r\n", tmp_msg.frame->head.use_cnt);
             item = listGET_NEXT(item);
         }
-        // VFB_D("Task %s sent message for event %u, data: %ld, length: %u\r\n", pcTaskGetName(xTaskGetCurrentTaskHandle()), event, data, length);
-        if (tmp_msg.frame->head.use_cnt == 0) {
-            VFB_W("No queue found for event %u, use count is 0", event);
-            vPortFree(tmp_msg.frame);
-        } else {
-            VFB_W("Message sent for event %u, use count: %u\r\n", event, tmp_msg.frame->head.use_cnt);
-        }
+        // printf("use_cnt %u\r\n", tmp_msg.frame->head.use_cnt);
+        // VFB_W("Task %s sent message for event %u, data: %ld, length: %u use_cnt %u\r\n", pcTaskGetName(xTaskGetCurrentTaskHandle()), event, data, length, tmp_msg.frame->head.use_cnt);
+
+        // VFB_W("Message sent for event %u, use count: %u\r\n", event, tmp_msg.frame->head.use_cnt);
+
         __vfb_givelock(mode);
         return FD_PASS;
     } else {
@@ -453,17 +473,17 @@ void VFB_MsgReceive(QueueHandle_t xQueue,
                 rcv_msg_cb(msg);
             }
             if (msg->frame->head.use_cnt == 0) {
-                VFB_E("Message use count is zero, Force freeing message\r\n");
+                // VFB_E("Message use count is zero, Force freeing message\r\n");
                 // vPortFree(msg);
             } else {
                 msg->frame->head.use_cnt--;
-                VFB_E("Message use count decremented, current use count: %u\r\n", msg->frame->head.use_cnt);
+                // VFB_E("Message use count decremented, current use count: %u\r\n", msg->frame->head.use_cnt);
             }
             if (msg->frame->head.use_cnt == 0) {
-                VFB_E("Message use count is zero, freeing message\r\n");
+                // VFB_E("Message use count is zero, freeing message\r\n");
                 vPortFree(msg->frame);
             } else {
-                VFB_E("Message use count is %u, not freeing message\r\n", (msg->frame->head.use_cnt));
+                // VFB_E("Message use count is %u, not freeing message\r\n", (msg->frame->head.use_cnt));
             }
             msg = NULL;  // Reset msg pointer to avoid dangling pointer issues
         } else {
@@ -480,9 +500,9 @@ void VFBTaskFrame(void *pvParameters) {
         VFB_E("Task configuration is NULL");
         return;
     }
-    //printf("Create Task %s started\r\n", task_cfg->name);
-    // printf("Task Parameters: pvParameters = %p, queue_num = %u, event_num = %u, xTicksToWait = %d\r\n",
-    //        task_cfg->pvParameters, task_cfg->queue_num, task_cfg->event_num, task_cfg->xTicksToWait);
+    // printf("Create Task %s started\r\n", task_cfg->name);
+    //  printf("Task Parameters: pvParameters = %p, queue_num = %u, event_num = %u, xTicksToWait = %d\r\n",
+    //         task_cfg->pvParameters, task_cfg->queue_num, task_cfg->event_num, task_cfg->xTicksToWait);
     QueueHandle_t queue_handle = NULL;
     queue_handle               = vfb_subscribe(task_cfg->queue_num, task_cfg->event_list, task_cfg->event_num);
     if (queue_handle == NULL) {

@@ -87,7 +87,7 @@ static void __ShellCreateTaskHandle(void) {
         ShellStatus[i].shell.read  = NULL;            // Assign your read function here
         ShellStatus[i].shell.write = userShellWrite;  // Assign your write function here
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskShell", configMINIMAL_STACK_SIZE*4, (void *)&Shell_task_cfg, BspShellTaskPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskShell", configMINIMAL_STACK_SIZE * 10, (void *)&Shell_task_cfg, BspShellTaskPriority, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerPerInitStage, ServerPreShellRegisterPriority, __ShellCreateTaskHandle, __ShellCreateTaskHandle init);
 
@@ -99,10 +99,9 @@ static void __ShellInitHandle(void *msg) {
 }
 // 接收消息的回调函数
 static void __ShellRcvHandle(void *msg) {
-    TaskHandle_t curTaskHandle     = xTaskGetCurrentTaskHandle();
-    TypdefShellStatus *uart_handle = &ShellStatus[0];
-    char *taskName                 = pcTaskGetName(curTaskHandle);
-    vfb_message_t tmp_msg          = (vfb_message_t)msg;
+    vfb_message_t tmp_msg = (vfb_message_t)msg;
+    Shell *shell          = &ShellStatus[0].shell;
+    char data;
     switch (tmp_msg->frame->head.event) {
         case DebugStartReady: {
         } break;
@@ -114,16 +113,22 @@ static void __ShellRcvHandle(void *msg) {
             if (size > 0 && buffer == NULL) {
                 elog_i(TAG, "Received empty or invalid data\r\n");
             }
-            printf("[Shell] RCV: %s\r\n", buffer);
-            printf("[Shell] RCV size: %d\r\n", size);
-            for (size_t i = 0; i < size-1; i++) {
-                shellHandler(&(uart_handle->shell), buffer[i]);
+            // printf("[Shell] RCV: %s\r\n", buffer);
+            // printf("[Shell] RCV size: %d\r\n", size);
+            for (size_t i = 0; i < size; i++) {
+                data = buffer[i];
+                // printf("[Shell] RCV[%d] char: %c 0x%2x\r\n", i, data,data);
+                shellHandler(shell, data);
+                // printf("[Shell] RCV[%d] Done\r\n", i);
             }
-            printf("[Shell] RCV end\r\n");
+            // printf("[Shell] RCV end\r\n");
         } break;
-        default:
+        default: {
+            TaskHandle_t curTaskHandle = xTaskGetCurrentTaskHandle();
+            char *taskName             = pcTaskGetName(curTaskHandle);
             elog_i(TAG, "TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
-            break;
+
+        } break;
     }
 }
 
