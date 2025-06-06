@@ -10,10 +10,7 @@
 #include "dev_basic.h"
 #include "dev_pin.h"
 #include "dev_uart.h"
-// #include "Debug.h"
-// #include "Dma.h"
-#include "elog.h"
-// #include "list/ex_list_dma.h"
+
 #include "os_server.h"
 #include "stream_buffer.h"
 

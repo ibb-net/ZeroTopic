@@ -4,7 +4,6 @@
  * @version 3.0.0
  * @date 2019-12-30
  *
- * @copyright (c) 2020 Letter
  *
  */
 

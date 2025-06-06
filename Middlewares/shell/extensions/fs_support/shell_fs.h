@@ -1,11 +1,9 @@
 /**
  * @file shell_fs.h
- * @author Letter (nevermindzzt@gmail.com)
  * @brief shell file system support
  * @version 0.1
  * @date 2020-07-22
  * 
- * @copyright (c) 2020 Letter
  * 
  */
 #ifndef __SHELL_FS_H__

@@ -1,11 +1,9 @@
 /**
  * @file log.c
- * @author Letter (nevermindzzt@gmail.com)
  * @brief log
  * @version 1.0.0
  * @date 2020-07-30
  * 
- * @copyright (c) 2020 Letter
  * 
  */
 #include "log.h"

@@ -1,10 +1,8 @@
 /**
  * @file shell.c
- * @author Letter (NevermindZZT@gmail.com)
  * @version 3.0.0
  * @date 2019-12-30
  * 
- * @copyright (c) 2020 Letter
  * 
  */
 
@@ -116,7 +114,7 @@ static const char *shellText[] =
         "\r\n"
         "Build:       "__DATE__" "__TIME__"\r\n"
         "Version:     "SHELL_VERSION"\r\n"
-        "Copyright:   (c) 2020 Letter\r\n",
+        "Copyright:   (c) 2025 Yuri Sun\r\n",
 #endif
     [SHELL_TEXT_CMD_TOO_LONG] = 
         "\r\nWarning: Command is too long\r\n",

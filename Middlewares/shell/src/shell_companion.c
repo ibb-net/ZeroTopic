@@ -1,11 +1,9 @@
 /**
  * @file shell_companion.c
- * @author Letter (nevermindzzt@gmail.com)
  * @brief shell companion object support
  * @version 3.0.3
  * @date 2020-07-22
  * 
- * @copyright (c) 2020 Letter
  * 
  */
  #include "shell.h"

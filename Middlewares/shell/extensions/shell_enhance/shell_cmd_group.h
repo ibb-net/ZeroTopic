@@ -1,11 +1,9 @@
 /**
  * @file shell_cmd_group.h
- * @author Letter(nevermindzzt@gmail.com)
  * @brief shell command group support
  * @version 0.1
  * @date 2020-10-18
  * 
- * @copyright (c) 2020 Letter
  * 
  */
 #include "shell.h"
