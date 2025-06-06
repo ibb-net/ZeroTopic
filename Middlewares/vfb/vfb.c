@@ -243,7 +243,7 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
  在传输字符 等,多出'\0' 不容易溢出 */
         tmp_msg.frame = pvPortMalloc(length + sizeof(vfb_buffer_union));
         if (tmp_msg.frame == NULL) {
-            VFB_E("Failed to allocate memory for message frame for event %u", event);
+            VFB_E("Failed to allocate memory for message frame for event %u\r\n", event);
             __vfb_givelock(mode);
             return FD_FAIL;
         }
@@ -507,6 +507,11 @@ void VFBTaskFrame(void *pvParameters) {
     queue_handle               = vfb_subscribe(task_cfg->queue_num, task_cfg->event_list, task_cfg->event_num);
     if (queue_handle == NULL) {
         VFB_E("Failed to subscribe to event queue");
+        VFB_E("Task %s will not run, waiting for events forever", task_cfg->name);
+        while (1) {
+            /* code */
+        }
+
         return;
     }
     if (task_cfg->init_msg_cb != NULL) {

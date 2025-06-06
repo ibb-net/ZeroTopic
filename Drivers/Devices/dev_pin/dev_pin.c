@@ -1,12 +1,11 @@
 
 #define CONFIG_DEV_PIN_EN 1
 #if CONFIG_DEV_PIN_EN
-#include "dev_basic.h"
 #include "dev_pin.h"
 
+#include "dev_basic.h"
 
-void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle)
-{
+void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle) {
     static const struct
     {
         uint32_t gpio_base;
@@ -25,36 +24,51 @@ void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle)
     };
 
     uint8_t is_found = 0;
-    for (size_t i = 0; i < sizeof(dev_clock_map) / sizeof(dev_clock_map[0]); i++)
-    {
-        if (dev_clock_map[i].gpio_base == ptrDevPinHandle->base)
-        {
+    for (size_t i = 0; i < sizeof(dev_clock_map) / sizeof(dev_clock_map[0]); i++) {
+        if (dev_clock_map[i].gpio_base == ptrDevPinHandle->base) {
             rcu_periph_clock_enable(dev_clock_map[i].rcu_clock);
             is_found = 1;
             break;
         }
     }
 
-    if (!is_found)
-    {
+    if (!is_found) {
         printf("gpio base %x error!\r\n", ptrDevPinHandle->base);
         return;
     }
 
     /* GPIO 配置 */
-    if (ptrDevPinHandle->af)
-    {
+    if (ptrDevPinHandle->af) {
         /* 配置为复用功能 */
         gpio_af_set(ptrDevPinHandle->base, ptrDevPinHandle->af, ptrDevPinHandle->pin);
         gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_AF, GPIO_PUPD_PULLUP, ptrDevPinHandle->pin);
         gpio_output_options_set(ptrDevPinHandle->base, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, ptrDevPinHandle->pin);
-    }
-    else
-    {
-        /* 配置为普通输出 */
-        gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, ptrDevPinHandle->pin);
-        gpio_output_options_set(ptrDevPinHandle->base, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, ptrDevPinHandle->pin);
+    } else {
+        if (ptrDevPinHandle->pin_mode == DevPinModeInput) {
+            /* 配置为输入 */
+            gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, ptrDevPinHandle->pin);
+
+        } else if (ptrDevPinHandle->pin_mode == DevPinModeOutput) {
+            /* 配置为普通输出 */
+            gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, ptrDevPinHandle->pin);
+            gpio_output_options_set(ptrDevPinHandle->base, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, ptrDevPinHandle->pin);
+            gpio_bit_write(ptrDevPinHandle->base, ptrDevPinHandle->pin, ptrDevPinHandle->bit_value ? SET : RESET);
+        } else {
+            // do nothing
+        }
     }
 }
 
+// DevPinWrite
+void DevPinWrite(const DevPinHandleStruct *ptrDevPinHandle, uint8_t bit_value) {
+    if (ptrDevPinHandle->pin_mode == DevPinModeOutput) {
+        gpio_bit_write(ptrDevPinHandle->base, ptrDevPinHandle->pin, bit_value ? SET : RESET);
+    } else {
+        printf("Error: Pin %s is not configured as output.\r\n", ptrDevPinHandle->device_name);
+    }
+}
+
+uint8_t DevPinRead(const DevPinHandleStruct *ptrDevPinHandle) {
+    return (gpio_input_bit_get(ptrDevPinHandle->base, ptrDevPinHandle->pin) == SET) ? 1 : 0;
+}
 #endif

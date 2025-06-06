@@ -28,7 +28,8 @@ typedef enum {
 
 /* BoardInitStage Startup */
 typedef enum {
-    MCUPre_TIMER_ENCODER_INIT,
+    BoardTimerEncoderRegisterPrority,
+    BoardIORegisterPriority,
     BOARD_INIT_STAGE_PROCESS_MAX,  // Maximum value for BoardInitStage
 } BoardInitStageProcessEnum;
 
@@ -42,6 +43,7 @@ typedef enum {
     AppLEDRegisterPriority,
     AppDemoRegisterPriority,
     AppTimerEncoderRegisterPriority,
+    AppIORegisterPriority,
     APP_INIT_STAGE_PROCESS_MAX,  // Maximum value for AppInitStage
 } AppInitStageProcessEnum;
 

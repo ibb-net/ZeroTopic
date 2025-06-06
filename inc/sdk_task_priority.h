@@ -8,7 +8,7 @@ typedef enum
     AppTimereEncoderTaskPriority,
     AppLEDTaskPriority,
     AppDemoTaskPriority,
-
+    AppIOTaskPriority,
     SDK_TASK_PRIORITY_LOW, // 低优先级任务
 
     SDK_TASK_PRIORITY_MEDIUM, // 中等优先级任务

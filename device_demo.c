@@ -3,16 +3,18 @@
 #define CONFIG_DEBUG_EN 1
 #if CONFIG_DEBUG_EN
 #include <stdio.h>
+#include "string.h"
 
 #include "gd32h7xx.h"
+
 /* Device */
 #include "Device.h"
 #include "dev_basic.h"
 #include "dev_pin.h"
 #include "dev_uart.h"
-
 #include "elog.h"
 #include "os_server.h"
+// #include "app_event.h"
 
 #define TAG "Demo"
 #define DemoLogLvl ELOG_LVL_INFO
@@ -31,7 +33,7 @@ typedef struct
 
 static void __DemoCreateTaskHandle(void);
 static void __DemoRcvHandle(void *msg);
-static void __DemoRcvHandle(void);
+static void __DemoCycHandle(void);
 static void __DemoInitHandle(void *msg);
 static void __DemoRXISRHandle(void *arg);
 static void __DemoTXDMAISRHandle(void *arg);
@@ -51,12 +53,14 @@ TypdefDemoStatus DemoStatus[DemoChannelMax] = {0};
 /* ===================================================================================== */
 
 static const vfb_event_t DemoEventList[] = {
+/*     
     DemoStart,
     DemoStop,
     DemoSet,
     DemoGet,
     DemoPrint,
-    DemoRcv,
+    DemoRcv, 
+*/
 
 };
 
@@ -72,7 +76,7 @@ static const VFBTaskStruct Demo_task_cfg = {
     .xTicksToWait            = pdMS_TO_TICKS(CONFIG_DEBUG_CYCLE_TIMER_MS),   // Wait indefinitely
     .init_msg_cb             = __DemoInitHandle,                             // Callback for initialization messages
     .rcv_msg_cb              = __DemoRcvHandle,                              // Callback for received messages
-    .rcv_timeout_cb          = __DemoRcvHandle,                              // Callback for timeout
+    .rcv_timeout_cb          = __DemoCycHandle,                              // Callback for timeout
 };
 
 /* ===================================================================================== */
@@ -84,8 +88,8 @@ void DemoDeviceInit(void) {
         TypdefDemoStatus *DemoStatusHandle = &DemoStatus[i];
 
         DemoStatusHandle->id = i;
-        memset(uart_handle->device_name, 0, sizeof(uart_handle->device_name));
-        snprintf(uart_handle->device_name, sizeof(uart_handle->device_name), "Demo%d", i);
+        memset(DemoStatusHandle->device_name, 0, sizeof(DemoStatusHandle->device_name));
+        snprintf(DemoStatusHandle->device_name, sizeof(DemoStatusHandle->device_name), "Demo%d", i);
     }
 }
 SYSTEM_REGISTER_INIT(MCUPreInitStage, MCUPreDemoRegisterPriority, DemoDeviceInit, DemoDeviceInit);
@@ -105,7 +109,7 @@ static void __DemoInitHandle(void *msg) {
 // 接收消息的回调函数
 static void __DemoRcvHandle(void *msg) {
     TaskHandle_t curTaskHandle    = xTaskGetCurrentTaskHandle();
-    TypdefDemoStatus *uart_handle = &DemoStatus[0];
+    TypdefDemoStatus *DemoStatusTmp = &DemoStatus[0];
     char *taskName                = pcTaskGetName(curTaskHandle);
     vfb_message_t tmp_msg         = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
@@ -118,12 +122,29 @@ static void __DemoRcvHandle(void *msg) {
     }
 }
 
-static void __DemoRcvHandle(void) {
+static void __DemoCycHandle(void) {
     TypdefDemoStatus *DemoStatusHandle = &DemoStatus[0];
     if (DemoStatusHandle == NULL) {
-        elog_e("[ERROR]DemoStatusHandle NULL\r\n");
+        elog_e(TAG,"[ERROR]DemoStatusHandle NULL\r\n");
         return;
     }
 }
 
 #endif
+
+static void CmdDemoHelp(void) {
+    printf("Usage: demo <state>\r\n");
+    printf("  <state>: 0 for off, 1 for on\r\n");
+    printf("Example: demo 1\r\n");
+}
+static int CmdDemoHandle(int argc, char *argv[]) {
+    if (argc != 2) {
+        CmdDemoHelp();
+        return 0;
+    }
+    
+
+    return 0;
+}
+
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), Demo,CmdDemoHandle, demo command );

@@ -3,18 +3,27 @@
 // #include "semphr.h"
 #include "dev_basic.h"
 
+typedef enum
+{
+    DevPinModeOutput = 0, // 输出模式
+    DevPinModeInput,      // 输入模式
+    DevPinModeAF,      // 输入模式
+} DevPinModeEnum;
 typedef struct
 {
     char device_name[DEVICE_NAME_MAX];
     uint32_t base;
     uint32_t af;
     uint32_t pin;
+    DevPinModeEnum pin_mode; // 0: output, 1: input
+    uint8_t  bit_value; // 0: low, 1: high
+
 
 } DevPinHandleStruct;
 
 
 void DevPinInit(const DevPinHandleStruct * ptrDevPinHandle);
-
-
+void DevPinWrite(const DevPinHandleStruct *ptrDevPinHandle, uint8_t bit_value);
+uint8_t DevPinRead(const DevPinHandleStruct *ptrDevPinHandle);
 
 #endif // __DEV_PIN_H

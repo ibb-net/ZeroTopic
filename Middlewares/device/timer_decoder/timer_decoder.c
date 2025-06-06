@@ -131,7 +131,7 @@ void device_timer_encoder_init(void) {
         encoder_struct[i].channel_ctr  = 0;                              // 初始化通道状态为停止
     }
 }
-SYSTEM_REGISTER_INIT(BoardInitStage, MCUPre_TIMER_ENCODER_INIT, device_timer_encoder_init, device_timer_encoder_init);
+SYSTEM_REGISTER_INIT(BoardInitStage, BoardTimerEncoderRegisterPrority, device_timer_encoder_init, device_timer_encoder_init);
 
 
 // 函数声明
