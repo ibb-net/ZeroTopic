@@ -1,5 +1,12 @@
 #ifndef __DEBUG_CFG_H__
 #define __DEBUG_CFG_H__
+#include "config.h"
+
+// UART 配置
+
+#define DEBUG_UART_BASE          USART0
+#define DEBUG_UART_BAUDRATE      115200
+#define DEBUG_UART_IDLE_TIMEOUT  100  // 单位：ms
 
 // TX GPIO 配置
 #define DEBUG_TX_GPIO_PORT       GPIOB
@@ -11,10 +18,7 @@
 #define DEBUG_RX_GPIO_AF         GPIO_AF_4
 #define DEBUG_RX_GPIO_PIN        GPIO_PIN_15
 
-// UART 配置
-#define DEBUG_UART_BASE          USART0
-#define DEBUG_UART_BAUDRATE      115200
-#define DEBUG_UART_IDLE_TIMEOUT  100  // 单位：ms
+
 
 // RX DMA 配置
 #define DEBUG_RX_DMA_BASE_ADDR   DMA0

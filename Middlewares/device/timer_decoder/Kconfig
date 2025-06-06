@@ -1,25 +1,26 @@
 config TIMER_DECODER_EN
-    bool "Enable Timer Decoder/正交译码器功能使能"
+    bool "正交译码器功能使能"
     default n
     help
         Enable support for the timer decoder functionality. This includes
 
 
 config TIMER_DECODER_CHANNEL_MAX
-    int "Number of Timer Decoder Channels/正交译码器通道数量"
+    int "正交译码器通道数量"
     default 1
+    depends on TIMER_DECODER_EN
     range 1 2
     help
         Set the number of timer decoder channels to be used. This can be set to 1 or 2.    
 config TIMER_DECODER_CH0_EN
-    bool "Enable Timer Decoder Channel 0/正交译码器通道0使能"
+    bool "通道0使能"
     default y
     depends on TIMER_DECODER_EN
     help
         Enable support for Timer Decoder Channel 1. This includes GPIO, timer configurations, and other related settings.
 
 choice
-    prompt "Select Timer for Encoder Channel 0/选择正交译码器通道0使用的定时器"
+    prompt "选择通道0的定时器配置"
     depends on TIMER_DECODER_CH0_EN
     default ENCODER_CH0_TIMER_0
 
@@ -143,88 +144,88 @@ config ENCODER_CH0_TIMER_RCU
     default RCU_TIMER50 if ENCODER_CH0_TIMER_50
     default RCU_TIMER51 if ENCODER_CH0_TIMER_51
 
-menu "Channel 0 Step Mode Configuration/通道0步进模式配置"
+menu "通道0步进模式配置"
     depends on TIMER_DECODER_CH0_EN
 
 config TIMER_DECODER_CH0_STEP0
-    int "Step Mode for Channel 0/通道0步进模式"
+    int "通道0步进模式"
     default 0
     help
         Configure the step mode for Timer Decoder Channel 0.Unused -1
 
 config TIMER_DECODER_CH0_STEP1
-    int "Step Mode for Channel 1/通道1步进模式"
+    int "通道1步进模式"
     default 400
     help
         Configure the step mode for Timer Decoder Channel 1.Unused -1
 config TIMER_DECODER_CH0_STEP2
-    int "Step Mode for Channel 2/通道2步进模式"
+    int "通道2步进模式"
     default 800
     help
         Configure the step mode for Timer Decoder Channel 2.Unused -1
         
 config TIMER_DECODER_CH0_STEP3
-    int "Step Mode for Channel 3/通道3步进模式"
+    int "通道3步进模式"
     default 1200
     help
         Configure the step mode for Timer Decoder Channel 3.Unused -1
 config TIMER_DECODER_CH0_STEP4
-    int "Step Mode for Channel 4/通道4步进模式"
+    int "通道4步进模式"
     default 1600
     help
         Configure the step mode for Timer Decoder Channel 4.Unused -1
 config TIMER_DECODER_CH0_STEP5
-    int "Step Mode for Channel 5/通道5步进模式"
+    int "通道5步进模式"
     default 2000
     help
         Configure the step mode for Timer Decoder Channel 5.Unused -1
 config TIMER_DECODER_CH0_STEP6
-    int "Step Mode for Channel 6/通道6步进模式"
+    int "通道6步进模式"
     default 2400
     help
         Configure the step mode for Timer Decoder Channel 6.Unused -1
 config TIMER_DECODER_CH0_STEP7
-    int "Step Mode for Channel 7/通道7步进模式"
+    int "通道7步进模式"
     default 2800
     help
         Configure the step mode for Timer Decoder Channel 7.Unused -1
 config TIMER_DECODER_CH0_STEP8
-    int "Step Mode for Channel 8/通道8步进模式"
+    int "通道8步进模式"
     default 3200
     help
         Configure the step mode for Timer Decoder Channel 8.Unused -1
 config TIMER_DECODER_CH0_STEP9
-    int "Step Mode for Channel 9/通道9步进模式"
+    int "通道9步进模式"
     default 3600
     help
         Configure the step mode for Timer Decoder Channel 9.Unused -1
 config TIMER_DECODER_CH0_STEP10
-    int "Step Mode for Channel 10/通道10步进模式"
+    int "通道10步进模式"
     default 4000
     help
         Configure the step mode for Timer Decoder Channel 10.Unused -1
 config TIMER_DECODER_CH0_STEP11
-    int "Step Mode for Channel 11/通道11步进模式"
+    int "通道11步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 11.Unused -1
 config TIMER_DECODER_CH0_STEP12
-    int "Step Mode for Channel 12/通道12步进模式"
+    int "通道12步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 12.Unused -1
 config TIMER_DECODER_CH0_STEP13
-    int "Step Mode for Channel 13/通道13步进模式"
+    int "通道13步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 13.Unused -1
 config TIMER_DECODER_CH0_STEP14
-    int "Step Mode for Channel 14/通道14步进模式"
+    int "通道14步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 14.Unused -1
 config TIMER_DECODER_CH0_STEP15
-    int "Step Mode for Channel 15/通道15步进模式"
+    int "通道15步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 15.Unused -1
@@ -239,7 +240,7 @@ endmenu
 
 
 config TIMER_DECODER_CH1_EN
-    bool "Enable Timer Decoder Channel 0/正交译码器通道0使能"
+    bool "通道1使能"
     default y
     depends on TIMER_DECODER_EN
     help
@@ -247,7 +248,7 @@ config TIMER_DECODER_CH1_EN
 
 
 choice
-    prompt "Select Timer for Encoder Channel 1/选择正交译码器通道0使用的定时器"
+    prompt "选择通道1的定时器配置"
     depends on TIMER_DECODER_CH1_EN
     default ENCODER_CH1_TIMER_0
 
@@ -373,87 +374,87 @@ config ENCODER_CH1_TIMER_RCU
 
 
 
-menu   "Channel 1 Step Mode Configuration/通道1步进模式配置"
+menu   "通道1步进模式配置"
     depends on TIMER_DECODER_CH1_EN
 config TIMER_DECODER_CH1_STEP0
-    int "Step Mode for Channel 0/通道0步进模式"
+    int "通道0步进模式"
     default 0
     help
         Configure the step mode for Timer Decoder Channel 0.Unused -1
 
 config TIMER_DECODER_CH1_STEP1
-    int "Step Mode for Channel 1/通道1步进模式"
+    int "通道1步进模式"
     default 400
     help
         Configure the step mode for Timer Decoder Channel 1.Unused -1
 config TIMER_DECODER_CH1_STEP2
-    int "Step Mode for Channel 2/通道2步进模式"
+    int "通道2步进模式"
     default 800
     help
         Configure the step mode for Timer Decoder Channel 2.Unused -1
 config TIMER_DECODER_CH1_STEP3
-    int "Step Mode for Channel 3/通道3步进模式"
+    int "通道3步进模式"
     default 1200
     help
         Configure the step mode for Timer Decoder Channel 3.Unused -1
 config TIMER_DECODER_CH1_STEP4
-    int "Step Mode for Channel 4/通道4步进模式"
+    int "通道4步进模式"
     default 1600
     help
         Configure the step mode for Timer Decoder Channel 4.Unused -1
 
 config TIMER_DECODER_CH1_STEP5
-    int "Step Mode for Channel 5/通道5步进模式"
+    int "通道5步进模式"
     default 2000
     help
         Configure the step mode for Timer Decoder Channel 5.Unused -1
 config TIMER_DECODER_CH1_STEP6
-    int "Step Mode for Channel 6/通道6步进模式"
+    int "通道6步进模式"
     default 2400
     help
         Configure the step mode for Timer Decoder Channel 6.Unused -1
 config TIMER_DECODER_CH1_STEP7
-    int "Step Mode for Channel 7/通道7步进模式"
+    int "通道7步进模式"
     default 2800
     help
         Configure the step mode for Timer Decoder Channel 7.Unused -1
 config TIMER_DECODER_CH1_STEP8
-    int "Step Mode for Channel 8/通道8步进模式"
+    int "通道8步进模式"
     default 3200
     help
         Configure the step mode for Timer Decoder Channel 8.Unused -1
 config TIMER_DECODER_CH1_STEP9
-    int "Step Mode for Channel 9/通道9步进模式"
+    int "通道9步进模式"
     default 3600
     help
         Configure the step mode for Timer Decoder Channel 9.Unused -1
 config TIMER_DECODER_CH1_STEP10
-    int "Step Mode for Channel 10/通道10步进模式"
+    int "通道10步进模式"
     default 4000
     help
         Configure the step mode for Timer Decoder Channel 10.Unused -1
 config TIMER_DECODER_CH1_STEP11
-    int "Step Mode for Channel 11/通道11步进模式"
+    int "通道11步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 11.Unused -1
 config TIMER_DECODER_CH1_STEP12
-    int "Step Mode for Channel 12/通道12步进模式"
+    int "通道12步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 12.Unused -1
 config TIMER_DECODER_CH1_STEP13
-    int "Step Mode for Channel 13/通道13步进模式"
+    int "通道13步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 13.Unused -1
 config TIMER_DECODER_CH1_STEP14
-    int "Step Mode for Channel 14/通道14步进模式"
+    int "通道14步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 14.Unused -1
 config TIMER_DECODER_CH1_STEP15
-    int "Step Mode for Channel 15/通道15步进模式"
+    int "通道15步进模式"
     default -1
     help
         Configure the step mode for Timer Decoder Channel 15.Unused -1

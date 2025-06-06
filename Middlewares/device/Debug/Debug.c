@@ -1,7 +1,10 @@
 
 #include "DebugCfg.h"
-#define CONFIG_DEBUG_EN 1
-#if CONFIG_DEBUG_EN
+
+#ifndef CONFIG_UART_DEBUG_EN
+#define CONFIG_UART_DEBUG_EN 1
+#endif
+#if CONFIG_UART_DEBUG_EN
 #include <stdio.h>
 #include "string.h"
 #include "gd32h7xx.h"

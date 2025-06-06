@@ -1,6 +1,12 @@
 
 
-menu "Middlewares SDK"
-source "../OpenIBBOs/Middlewares/User/timer_decoder/Kconfig"
-
+menu "中间件配置"
+menu "基础组件"
+menu "Debug组件"
+source "../OpenIBBOs/Middlewares/device/Debug/Kconfig"
+endmenu
+endmenu
+menu "复杂设备"
+source "../OpenIBBOs/Middlewares/device/timer_decoder/Kconfig"
+endmenu
 endmenu
