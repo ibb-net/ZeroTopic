@@ -1,8 +1,8 @@
 /* LOG DEFINE */
-// #define LOG_TAG      "VFB"
-// #define LOG_LVL      LOG_LVL_INFO
-// #include "ulog.h"
 
+#define TAG       "VFB"
+#define VFBLogLvl ELOG_LVL_INFO
+#include "elog.h"
 #include "vfb/vfb.h"
 
 #include <ctype.h>
@@ -120,6 +120,7 @@ void vfb_server_init(void) {
         return;
     }
     vListInitialise(&(__vfb_info.event_list));
+    elog_set_filter_tag_lvl(TAG, VFBLogLvl);
 
     xSemaphoreGive(__vfb_info.xFDSemaphore);
     VFB_I("FD server initialized successfully");

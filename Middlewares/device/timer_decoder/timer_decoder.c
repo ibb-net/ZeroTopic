@@ -9,6 +9,7 @@
 #include "os_server.h"
 #include "timer_decoder.h"
 #define TAG "ENCODER"
+#define TimerEcoderPriority PriorityOperationGroup0
 
 typedef struct
 {
@@ -131,7 +132,7 @@ void device_timer_encoder_init(void) {
         encoder_struct[i].channel_ctr  = 0;                              // 初始化通道状态为停止
     }
 }
-SYSTEM_REGISTER_INIT(BoardInitStage, BoardTimerEncoderRegisterPrority, device_timer_encoder_init, device_timer_encoder_init);
+SYSTEM_REGISTER_INIT(BoardInitStage, TimerEcoderPriority, device_timer_encoder_init, device_timer_encoder_init);
 
 
 // 函数声明
@@ -173,9 +174,9 @@ void ENCODER_TIMER_CREATE_HANDLE(void) {
         __encoder_timer_clear(&encoder_struct[i]);                  // 初始化每个通道的计时器
     }
 
-    xTaskCreate(VFBTaskFrame, "Encoder", configMINIMAL_STACK_SIZE, (void *)&ENCODER_TIMER_task_cfg, AppTimereEncoderTaskPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "Encoder", configMINIMAL_STACK_SIZE, (void *)&ENCODER_TIMER_task_cfg, TimerEcoderPriority, NULL);
 }
-SYSTEM_REGISTER_INIT(AppInitStage, AppTimerEncoderRegisterPriority, ENCODER_TIMER_CREATE_HANDLE, timer_encoder init);
+SYSTEM_REGISTER_INIT(ServerInitStage, TimerEcoderPriority, ENCODER_TIMER_CREATE_HANDLE, timer_encoder init);
 
 static void __encoder_timer_clear(TypdefEncoderStruct *encoder) {
     // encoder->phy_value = DEFAULT_TIMER_VALUE;								   // 重置物理值

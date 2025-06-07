@@ -6,19 +6,20 @@
 #endif
 #if CONFIG_UART_DEBUG_EN
 #include <stdio.h>
-#include "string.h"
+
 #include "gd32h7xx.h"
+#include "string.h"
 /* Device */
 #include "Device.h"
 #include "dev_basic.h"
 #include "dev_pin.h"
 #include "dev_uart.h"
-
 #include "os_server.h"
 #include "stream_buffer.h"
 
-#define TAG "DEBUG"
-#define DebugLogLvl ELOG_LVL_INFO
+#define TAG           "DEBUG"
+#define DebugLogLvl   ELOG_LVL_INFO
+#define DebugPriority PriorityCommunitGroup3
 
 #ifndef DebugChannelMax
 #define DebugChannelMax 1
@@ -138,6 +139,13 @@ static const VFBTaskStruct Debug_task_cfg = {
 };
 
 /* ===================================================================================== */
+void DebugComPreInit(void) {
+    DevPinInit(&(DebugBspCfg[0].tx_gpio_cfg));
+    DevPinInit(&(DebugBspCfg[0].rx_gpio_cfg));
+    DevUartPreInit(&(DebugBspCfg[0].uart_cfg));
+    printf("DebugComPreInit Done\r\n");
+}
+/* ===================================================================================== */
 
 void DebugDeviceInit(void) {
     printf("DebugDeviceInit\r\n");
@@ -179,17 +187,18 @@ void DebugDeviceInit(void) {
 
         DevUarStart(&(DebugBspCfg[i].uart_cfg));
     }
+ 
+    elog_start();
 }
-SYSTEM_REGISTER_INIT(MCUPreInitStage, MCUPreDebugRegisterPriority, DebugDeviceInit, DebugDeviceInit);
+SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugDeviceInit, DebugDeviceInit);
 
 static void DebugCreateTaskHandle(void) {
-    for (size_t i = 0; i < DebugChannelMax; i++) {
-    }
+    DebugDeviceInit();
 
-    xTaskCreate(VFBTaskFrame, "VFBTaskDebug", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg, BspDebugTaskPriority, NULL);
-    xTaskCreate(DebugStreamRcvTask, "DebugRx", configMINIMAL_STACK_SIZE * 2, (void *)&Debug_task_cfg, BspDebugTaskPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskDebug", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg, DebugPriority, NULL);
+    xTaskCreate(DebugStreamRcvTask, "DebugRx", configMINIMAL_STACK_SIZE * 2, (void *)&Debug_task_cfg, DebugPriority, NULL);
 }
-SYSTEM_REGISTER_INIT(ServerPerInitStage, ServerPreDebugRegisterPriority, DebugCreateTaskHandle, DebugCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugCreateTaskHandle, DebugCreateTaskHandle init);
 
 static void DebugInitHandle(void *msg) {
     elog_i(TAG, "DebugInitHandle\r\n");

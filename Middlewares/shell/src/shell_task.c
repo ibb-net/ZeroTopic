@@ -15,6 +15,8 @@
 
 #define TAG "Shell"
 #define ShellLogLvl ELOG_LVL_INFO
+#define ShellPriority PrioritySystemPriGroup0
+
 #define ShellBufferSize (512)
 #ifndef ShellChannelMax
 #define ShellChannelMax 1
@@ -87,9 +89,9 @@ static void __ShellCreateTaskHandle(void) {
         ShellStatus[i].shell.read  = NULL;            // Assign your read function here
         ShellStatus[i].shell.write = userShellWrite;  // Assign your write function here
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskShell", configMINIMAL_STACK_SIZE * 2, (void *)&Shell_task_cfg, BspShellTaskPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskShell", configMINIMAL_STACK_SIZE * 2, (void *)&Shell_task_cfg, ShellPriority, NULL);
 }
-SYSTEM_REGISTER_INIT(ServerPerInitStage, ServerPreShellRegisterPriority, __ShellCreateTaskHandle, __ShellCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(ServerInitStage, ShellPriority, __ShellCreateTaskHandle, __ShellCreateTaskHandle init);
 
 static void __ShellInitHandle(void *msg) {
     // printf("__ShellInitHandle\r\n");

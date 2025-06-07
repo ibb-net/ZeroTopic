@@ -10,11 +10,10 @@
 
 // #include "gd32h757z_start.h"
 
-#include "sdk_event.h"
-#include "sdk_task_priority.h"
+#include "SDKEvent.h"
+#include "SDKTaskPriority.h"
 
 #include "register/register.h"
-#include "register/register_sdk_cfg.h"
 
 #include "shell.h"
 #include "elog.h"

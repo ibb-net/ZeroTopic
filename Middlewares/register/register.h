@@ -8,7 +8,7 @@
 #include "semphr.h"
 #include "stdio.h"
 typedef enum {
-    MCUPreInitStage,
+    PreStartupInitStage,
     ServerPerInitStage,
     MCUInitStage,
     BoardInitStage,

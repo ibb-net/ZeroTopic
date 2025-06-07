@@ -17,8 +17,9 @@
 #include "os_server.h"
 // #include "app_event.h"
 
-#define TAG "Key"
-#define KeyLogLvl ELOG_LVL_INFO
+#define TAG         "Key"
+#define KeyLogLvl   ELOG_LVL_INFO
+#define KeyPriority PriorityOperationGroup0
 
 #ifndef KeyChannelMax
 #define KeyChannelMax 32
@@ -40,7 +41,6 @@ static void key_short_press_callback(TypdefKeyStatus *key_status);
 // const TypdefKeyBSPCfg KeyBspCfg[KeyChannelMax] = {
 
 // };
-
 
 TypdefKeyStatus KeyStatus[KeyChannelMax] = {0};
 
@@ -69,9 +69,9 @@ static const VFBTaskStruct Key_task_cfg = {
 };
 
 /* ===================================================================================== */
-
+#if 0
 void KeyDeviceInit(void) {
-    elog_i(TAG,"KeyDeviceInit\r\n");
+    elog_i(TAG, "KeyDeviceInit\r\n");
 
     for (size_t i = 0; i < KeyChannelMax; i++) {
         TypdefKeyStatus *KeyStatusHandle      = &KeyStatus[i];
@@ -82,14 +82,20 @@ void KeyDeviceInit(void) {
         KeyStatusHandle->long_press_triggered = 0;
     }
 }
-SYSTEM_REGISTER_INIT(BoardInitStage, BoardKeyRegisterPriority, KeyDeviceInit, KeyDeviceInit);
-
+SYSTEM_REGISTER_INIT(BoardInitStage, KeyPriority, KeyDeviceInit, KeyDeviceInit);
+#endif
 static void __KeyCreateTaskHandle(void) {
     for (size_t i = 0; i < KeyChannelMax; i++) {
+        TypdefKeyStatus *KeyStatusHandle      = &KeyStatus[i];
+        KeyStatusHandle->cfg                  = NULL;
+        KeyStatusHandle->enable               = 0;
+        KeyStatusHandle->state                = 0;
+        KeyStatusHandle->press_time           = 0;
+        KeyStatusHandle->long_press_triggered = 0;
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskKey", configMINIMAL_STACK_SIZE, (void *)&Key_task_cfg, BspKeyTaskPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskKey", configMINIMAL_STACK_SIZE, (void *)&Key_task_cfg, KeyPriority, NULL);
 }
-SYSTEM_REGISTER_INIT(ServerInitStage, ServerPreKeyRegisterPriority, __KeyCreateTaskHandle, __KeyCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(ServerInitStage, KeyPriority, __KeyCreateTaskHandle, __KeyCreateTaskHandle init);
 
 static void __KeyInitHandle(void *msg) {
     elog_i(TAG, "__KeyInitHandle\r\n");
@@ -98,10 +104,10 @@ static void __KeyInitHandle(void *msg) {
 }
 // 接收消息的回调函数
 static void __KeyRcvHandle(void *msg) {
-    TaskHandle_t curTaskHandle    = xTaskGetCurrentTaskHandle();
+    TaskHandle_t curTaskHandle = xTaskGetCurrentTaskHandle();
     // TypdefKeyStatus *KeyStatusTmp = &KeyStatus[0];
-    char *taskName                = pcTaskGetName(curTaskHandle);
-    vfb_message_t tmp_msg         = (vfb_message_t)msg;
+    char *taskName        = pcTaskGetName(curTaskHandle);
+    vfb_message_t tmp_msg = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
         case KeyStart: {
             elog_i(TAG, "KeyStartTask %d", tmp_msg->frame->head.data);
@@ -168,7 +174,7 @@ static void __KeyRegister(TypdefKeyBSPCfg *cfg) {
             elog_i(TAG, "Key %s registered successfully on slot %d\r\n", cfg->device_name, i);
         }
     }
-    elog_e(TAG,"No available key slots to register\r\n");
+    elog_e(TAG, "No available key slots to register\r\n");
 }
 static void __KeyScan(void) {
     for (int i = 0; i < KeyChannelMax; i++) {

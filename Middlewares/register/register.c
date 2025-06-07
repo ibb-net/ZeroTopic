@@ -129,6 +129,8 @@ void SystemRegisterRun(STARTUP_STAGE_ENUM stage) {
             printf("\t\tItem[%d] %s : %s has no function\r\n", i, itemStruct->name, itemStruct->desc);
         }
         item = item->pxNext;
+        //delay
+        vTaskDelay(pdMS_TO_TICKS(10));  // Delay for 10 milliseconds
     }
 }
 

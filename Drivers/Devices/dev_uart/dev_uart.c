@@ -126,6 +126,41 @@ void DevUartRegister(uint32_t base, void *handle) {
         printf("Failed to find UART status for base %x\r\n", base);
     }
 }
+void DevUartPreInit(const DevUartHandleStruct *ptrDevUartHandle) {
+    static const struct {
+        uint32_t device;
+        rcu_periph_enum rcu_clock;
+    } dev_clock_map[] = {
+        {USART0, RCU_USART0},
+        {USART1, RCU_USART1},
+        {USART2, RCU_USART2},
+        {UART3, RCU_UART3},
+        {UART4, RCU_UART4},
+        {USART5, RCU_USART5},
+        {UART6, RCU_UART6},
+        {UART7, RCU_UART7},
+
+    };
+    uint8_t is_found = 0;
+    for (size_t i = 0; i < sizeof(dev_clock_map) / sizeof(dev_clock_map[0]); i++) {
+        if (dev_clock_map[i].device == ptrDevUartHandle->base) {
+            rcu_periph_clock_enable(dev_clock_map[i].rcu_clock);
+            is_found = 1;
+            break;
+        }
+    }
+    if (!is_found) {
+        while (1);
+    }
+
+    usart_deinit(ptrDevUartHandle->base);
+    usart_word_length_set(ptrDevUartHandle->base, USART_WL_8BIT);
+    usart_stop_bit_set(ptrDevUartHandle->base, USART_STB_1BIT);
+    usart_parity_config(ptrDevUartHandle->base, USART_PM_NONE);
+    usart_baudrate_set(ptrDevUartHandle->base, ptrDevUartHandle->baudrate);
+    usart_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_ENABLE);
+    usart_enable(ptrDevUartHandle->base);
+}
 void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
     static const struct {
         uint32_t device;
