@@ -23,6 +23,10 @@ typedef enum
 	DebugGet,
     DebugPrint,
     DebugRcv,
+    KeyRister,    // Register key event
+    KeyUnRister,  // Unregister key event
+    KeyStart,     // Start key task
+    KeyStop,      // Stop key task
     
 
     SDK_EVENT_LIST_APP_START = 2000, // 应用事件起始编号

@@ -29,12 +29,14 @@ typedef enum {
 /* BoardInitStage Startup */
 typedef enum {
     BoardTimerEncoderRegisterPrority,
+    BoardKeyRegisterPriority,
     BoardIORegisterPriority,
     BOARD_INIT_STAGE_PROCESS_MAX,  // Maximum value for BoardInitStage
 } BoardInitStageProcessEnum;
 
 /* ServerInitStage Startup */
 typedef enum {
+    ServerPreKeyRegisterPriority, 
     SERVER_INIT_STAGE_PROCESS_MAX,  // Maximum value for ServerInitStage
 } ServerInitStageProcessEnum;
 

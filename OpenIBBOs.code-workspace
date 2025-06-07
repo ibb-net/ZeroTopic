@@ -45,7 +45,8 @@
 			"register_sdk_cfg.h": "c",
 			"freertos.h": "c",
 			"cmath": "c",
-			"string.h": "c"
+			"string.h": "c",
+			"keycfg.h": "c"
 		}
 	}
 }

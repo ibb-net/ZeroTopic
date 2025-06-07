@@ -13,7 +13,7 @@ typedef enum
 
     SDK_TASK_PRIORITY_MEDIUM, // 中等优先级任务
 
-
+    BspKeyTaskPriority,
     SDK_TASK_PRIORITY_HIGH, // 高优先级任务
    
     BSP_DEMO_TASK_PRIORITY, // BSP演示任务优先级

@@ -1,7 +1,7 @@
 
 #include "DemoCfg.h"
-#define CONFIG_DEBUG_EN 1
-#if CONFIG_DEBUG_EN
+#define CONFIG_Demo_EN 1
+#if CONFIG_Demo_EN
 #include <stdio.h>
 #include "string.h"
 
@@ -35,8 +35,6 @@ static void __DemoCreateTaskHandle(void);
 static void __DemoRcvHandle(void *msg);
 static void __DemoCycHandle(void);
 static void __DemoInitHandle(void *msg);
-static void __DemoRXISRHandle(void *arg);
-static void __DemoTXDMAISRHandle(void *arg);
 
 const TypdefDemoBSPCfg DemoBspCfg[DemoChannelMax] = {
 
@@ -68,7 +66,7 @@ static const VFBTaskStruct Demo_task_cfg = {
     .name         = "VFBTaskDemo",  // Task name
     .pvParameters = NULL,
     // .uxPriority = 10,											  // Task parameters
-    .queue_num               = 32,                                           // Number of queues to subscribe
+    .queue_num               = 8,                                           // Number of queues to subscribe
     .event_list              = DemoEventList,                                // Event list to subscribe
     .event_num               = sizeof(DemoEventList) / sizeof(vfb_event_t),  // Number of events to subscribe
     .startup_wait_event_list = NULL,                                         // Events to wait for at startup
@@ -82,7 +80,7 @@ static const VFBTaskStruct Demo_task_cfg = {
 /* ===================================================================================== */
 
 void DemoDeviceInit(void) {
-    printf("DemoDeviceInit\r\n");
+    elog_i(TAG,"DemoDeviceInit\r\n");
 
     for (size_t i = 0; i < DemoChannelMax; i++) {
         TypdefDemoStatus *DemoStatusHandle = &DemoStatus[i];
@@ -117,7 +115,7 @@ static void __DemoRcvHandle(void *msg) {
             elog_i(TAG, "DemoStartTask %d", tmp_msg->frame->head.data);
         } break;
         default:
-            printf("TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
+        elog_e(TAG,"TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
             break;
     }
 }
@@ -133,9 +131,9 @@ static void __DemoCycHandle(void) {
 #endif
 
 static void CmdDemoHelp(void) {
-    printf("Usage: demo <state>\r\n");
-    printf("  <state>: 0 for off, 1 for on\r\n");
-    printf("Example: demo 1\r\n");
+    elog_i(TAG,"Usage: demo <state>\r\n");
+    elog_i(TAG,"  <state>: 0 for off, 1 for on\r\n");
+    elog_i(TAG,"Example: demo 1\r\n");
 }
 static int CmdDemoHandle(int argc, char *argv[]) {
     if (argc != 2) {
