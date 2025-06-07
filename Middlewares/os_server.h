@@ -3,6 +3,7 @@
 
 #include "FreeRTOS.h"
 #include "list.h"
+#include "task.h"
 #include "queue.h"
 #include "semphr.h"
 #include "vfb/vfb_config.h"

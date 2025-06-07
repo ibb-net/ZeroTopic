@@ -142,6 +142,7 @@ static const VFBTaskStruct Debug_task_cfg = {
 void DebugComPreInit(void) {
     DevPinInit(&(DebugBspCfg[0].tx_gpio_cfg));
     DevPinInit(&(DebugBspCfg[0].rx_gpio_cfg));
+    DevUartRegister(DebugBspCfg[0].uart_cfg.base, (void *)&DebugStatus[0]);
     DevUartPreInit(&(DebugBspCfg[0].uart_cfg));
     printf("DebugComPreInit Done\r\n");
 }
@@ -183,11 +184,9 @@ void DebugDeviceInit(void) {
             printf("create %s mutex failed!\r\n", uart_handle->device_name);
             return;
         }
-        printf("create %s ok!\r\n", uart_handle->device_name);
-
         DevUarStart(&(DebugBspCfg[i].uart_cfg));
     }
- 
+
     elog_start();
 }
 SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugDeviceInit, DebugDeviceInit);
@@ -196,15 +195,13 @@ static void DebugCreateTaskHandle(void) {
     DebugDeviceInit();
 
     xTaskCreate(VFBTaskFrame, "VFBTaskDebug", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg, DebugPriority, NULL);
-    xTaskCreate(DebugStreamRcvTask, "DebugRx", configMINIMAL_STACK_SIZE * 2, (void *)&Debug_task_cfg, DebugPriority, NULL);
+    xTaskCreate(DebugStreamRcvTask, "DebugRx", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg, DebugPriority - 1, NULL);
 }
 SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugCreateTaskHandle, DebugCreateTaskHandle init);
 
 static void DebugInitHandle(void *msg) {
     elog_i(TAG, "DebugInitHandle\r\n");
     elog_set_filter_tag_lvl(TAG, DebugLogLvl);
-
-    vfb_publish(DebugStartReady);
     vfb_send(DebugStart, 0, NULL, 0);
 }
 // 接收消息的回调函数

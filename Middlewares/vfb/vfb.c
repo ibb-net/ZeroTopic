@@ -123,7 +123,7 @@ void vfb_server_init(void) {
     elog_set_filter_tag_lvl(TAG, VFBLogLvl);
 
     xSemaphoreGive(__vfb_info.xFDSemaphore);
-    VFB_I("FD server initialized successfully");
+    VFB_I("FD server initialized successfully\r\n");
 }
 void vfg_server_info(void) {
     printf("VFB Server Info:\n");
@@ -235,7 +235,7 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
             return FD_FAIL;
         }
         if (listCURRENT_LIST_LENGTH(event_list) == 0) {
-            VFB_W("No queues subscribed for event %u", event);
+            VFB_W("No queues subscribed for event %u\r\n", event);
             __vfb_givelock(mode);
             return FD_FAIL;
         }

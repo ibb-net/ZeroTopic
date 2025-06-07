@@ -30,6 +30,7 @@ typedef struct
 
 int fputc(int ch, FILE *f);
 int __io_putchar(int ch) ;
+uint8_t isReady(void);
 int debug_putbuffer(const char *buffer, size_t len);
 void DevUartRegister(uint32_t base, void *handle);
 void DevUartPreInit(const DevUartHandleStruct *ptrDevUartHandle);

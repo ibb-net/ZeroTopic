@@ -14,7 +14,7 @@ typedef struct {
     const DevUartHandleStruct *dev_cfg;  // Pointer to the UART handle
     void *handle;
 } DevUartStatusStruct;
-
+uint8_t pre_init = 0;
 static DevUartStatusStruct *__DevUartGetStatus(uint32_t base);
 DevUartStatusStruct dev_uart_status[] = {{
                                              .base           = USART0,
@@ -96,13 +96,17 @@ int __io_putchar(int ch) {
     if (status == NULL) {
         status = __DevUartGetStatus(USART0);
     }
-    if (!status || !status->is_initialized || !status->is_opened || !status->is_started) {
+    if (!status || !status->is_initialized) {
         return ch;  // Error handling
     }
     // usart_data_transmit(USART0, (uint8_t)ch);
     usart_data_transmit(status->base, (uint8_t)ch);  // 这里不能用dma
     while (RESET == usart_flag_get(USART0, USART_FLAG_TBE));
     return ch;
+}
+uint8_t isReady(void)
+{
+    return (dev_uart_status[0].is_initialized && dev_uart_status[0].is_opened && dev_uart_status[0].is_started);
 }
 int debug_putbuffer(const char *buffer, size_t len) {
     for (size_t i = 0; i < len; i++) {
@@ -160,6 +164,11 @@ void DevUartPreInit(const DevUartHandleStruct *ptrDevUartHandle) {
     usart_baudrate_set(ptrDevUartHandle->base, ptrDevUartHandle->baudrate);
     usart_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_ENABLE);
     usart_enable(ptrDevUartHandle->base);
+    DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
+    if (status) {
+        status->is_initialized = 1;
+        status->dev_cfg        = ptrDevUartHandle;
+    }
 }
 void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
     static const struct {
@@ -251,10 +260,6 @@ void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle) {
     if (!status->is_initialized) {
         printf("UART %s (%x) is not initialized. Call DevUartInit() first.\r\n", ptrDevUartHandle->device_name,
                ptrDevUartHandle->base);
-        return;
-    }
-    if (status->is_started) {
-        printf("UART %s (%x) is already started.\r\n", ptrDevUartHandle->device_name, ptrDevUartHandle->base);
         return;
     }
     if (status->handle == NULL) {

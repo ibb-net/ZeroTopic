@@ -47,7 +47,7 @@ TypdefKeyStatus KeyStatus[KeyChannelMax] = {0};
 /* ===================================================================================== */
 
 static const vfb_event_t KeyEventList[] = {
-    KeyRister,    // Register key event
+    KeyRegister,  // Register key event
     KeyUnRister,  // Unregister key event
     KeyStart,     // Start key task
     KeyStop,      // Stop key task
@@ -93,7 +93,7 @@ static void __KeyCreateTaskHandle(void) {
         KeyStatusHandle->press_time           = 0;
         KeyStatusHandle->long_press_triggered = 0;
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskKey", configMINIMAL_STACK_SIZE, (void *)&Key_task_cfg, KeyPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskKey", configMINIMAL_STACK_SIZE * 2, (void *)&Key_task_cfg, KeyPriority, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerInitStage, KeyPriority, __KeyCreateTaskHandle, __KeyCreateTaskHandle init);
 
@@ -113,10 +113,11 @@ static void __KeyRcvHandle(void *msg) {
             elog_i(TAG, "KeyStartTask %d", tmp_msg->frame->head.data);
         } break;
 
-        case KeyRister: {
+        case KeyRegister: {
             __KeyRegister((TypdefKeyBSPCfg *)MSG_GET_PAYLOAD(tmp_msg));
-            elog_i(TAG, "KeyRister: %s", ((TypdefKeyBSPCfg *)MSG_GET_PAYLOAD(tmp_msg))->device_name);
-        }
+            elog_i(TAG, "KeyRegister: %s", ((TypdefKeyBSPCfg *)MSG_GET_PAYLOAD(tmp_msg))->device_name);
+        } break;
+
         default:
             printf("TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
             break;
@@ -129,22 +130,27 @@ static void __KeyCycHandle(void) {
     //     elog_e(TAG, "[ERROR]KeyStatusHandle NULL\r\n");
     //     return;
     // }
+    static uint32_t last_scan_time = 0;
+    last_scan_time++;
+    if (last_scan_time % (1000 / pdMS_TO_TICKS(CONFIG_DEBUG_CYCLE_TIMER_MS)) == 0) {
+        // elog_i(TAG, "__KeyCycHandle\r\n");
+    }
     __KeyScan();
 }
 static void key_short_press_callback(TypdefKeyStatus *key_status) {
-    elog_i(TAG, "Key %s short pressed\r\n", key_status->cfg->device_name);
     if (key_status->cfg->short_press_event == 0) {
         // elog_e(TAG, "Short press event is not configured for key %s\r\n", key_status->cfg->device_name);
         return;
     }
+    elog_i(TAG, "Key %s short pressed\r\n", key_status->cfg->device_name);
     vfb_send(key_status->cfg->short_press_event, 0, NULL, 0);
 }
 static void key_long_press_callback(TypdefKeyStatus *key_status) {
-    elog_i(TAG, "Key %s long pressed\r\n", key_status->cfg->device_name);
     if (key_status->cfg->long_press_event == 0) {
         // elog_e(TAG, "Long press event is not configured for key %s\r\n", key_status->cfg->device_name);
         return;
     }
+    elog_i(TAG, "Key %s long pressed\r\n", key_status->cfg->device_name);
     vfb_send(key_status->cfg->long_press_event, 0, NULL, 0);
 }
 // 注册按键,遍历KeyStatus查找cfg为空,并新增
@@ -163,7 +169,12 @@ static void __KeyRegister(TypdefKeyBSPCfg *cfg) {
     }
     for (size_t i = 0; i < KeyChannelMax; i++) {
         if (KeyStatus[i].cfg == NULL) {
-            KeyStatus[i].cfg                  = cfg;
+            KeyStatus[i].cfg = pvPortMalloc(sizeof(TypdefKeyBSPCfg));
+            if (KeyStatus[i].cfg == NULL) {
+                elog_e(TAG, "Failed to allocate memory for key configuration.\r\n");
+                return;
+            }
+            memcpy(KeyStatus[i].cfg, cfg, sizeof(TypdefKeyBSPCfg));
             KeyStatus[i].enable               = 1;
             KeyStatus[i].state                = 0;
             KeyStatus[i].press_time           = 0;
@@ -172,6 +183,7 @@ static void __KeyRegister(TypdefKeyBSPCfg *cfg) {
             /* InitGPIO */
             DevPinInit(&cfg->pin);
             elog_i(TAG, "Key %s registered successfully on slot %d\r\n", cfg->device_name, i);
+            return;
         }
     }
     elog_e(TAG, "No available key slots to register\r\n");

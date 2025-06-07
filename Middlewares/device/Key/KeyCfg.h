@@ -5,7 +5,7 @@
 
 #define SHORT_PRESS_THRESHOLD 500  // 短按阈值（毫秒）
 #define LONG_PRESS_THRESHOLD 2000  // 长按阈值（毫秒）
-#define CONFIG_DEBUG_CYCLE_TIMER_MS 30
+#define CONFIG_DEBUG_CYCLE_TIMER_MS 50
 
 #define KEY_CHANNEL_MAX 32  // 最大按键通道数
 

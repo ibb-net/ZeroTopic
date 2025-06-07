@@ -55,7 +55,6 @@ TypdefShellStatus ShellStatus[ShellChannelMax] = {0};
 
 static const vfb_event_t ShellEventList[] = {
     DebugRcv,
-    DebugStartReady,
 
 };
 
@@ -89,7 +88,7 @@ static void __ShellCreateTaskHandle(void) {
         ShellStatus[i].shell.read  = NULL;            // Assign your read function here
         ShellStatus[i].shell.write = userShellWrite;  // Assign your write function here
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskShell", configMINIMAL_STACK_SIZE * 2, (void *)&Shell_task_cfg, ShellPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskShell", configMINIMAL_STACK_SIZE * 5, (void *)&Shell_task_cfg, ShellPriority, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerInitStage, ShellPriority, __ShellCreateTaskHandle, __ShellCreateTaskHandle init);
 
@@ -105,8 +104,6 @@ static void __ShellRcvHandle(void *msg) {
     Shell *shell          = &ShellStatus[0].shell;
     char data;
     switch (tmp_msg->frame->head.event) {
-        case DebugStartReady: {
-        } break;
         case DebugRcv: {
             if (ShellStatus[0].is_init == 0)
                 break;

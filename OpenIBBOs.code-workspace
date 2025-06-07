@@ -47,7 +47,8 @@
 			"cmath": "c",
 			"string.h": "c",
 			"keycfg.h": "c",
-			"stream_buffer.h": "c"
+			"stream_buffer.h": "c",
+			"freertosconfig.h": "c"
 		}
 	}
 }

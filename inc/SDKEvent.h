@@ -1,6 +1,6 @@
 #ifndef __SDK_EVENT_H__
 #define __SDK_EVENT_H__
-#define SDK_EVENT_LIST_APP_START 1000
+#define SDK_EVENT_LIST_APP_START 2000
 typedef enum {
 
     EVENT_LIST_SDK = 0,
@@ -15,14 +15,13 @@ typedef enum {
     ENCODER_TIMER_GET_PHY,
     ENCODER_TIMER_SET_PHY,
     ENCODER_TIMER_SET_MODE,
-    DebugStartReady,
     DebugStart,
     DebugStop,
     DebugSet,
     DebugGet,
     DebugPrint,
     DebugRcv,
-    KeyRister,    // Register key event
+    KeyRegister,    // Register key event
     KeyUnRister,  // Unregister key event
     KeyStart,     // Start key task
     KeyStop,      // Stop key task

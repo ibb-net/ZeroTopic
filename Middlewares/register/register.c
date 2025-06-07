@@ -8,8 +8,12 @@
  */
 
 #include "register.h"
+
 #include "stdio.h"
 #include "string.h"
+#include "elog.h"
+#define TAG "Register"
+#define RegisterLogLvl ELOG_LVL_INFO
 
 #if defined(__CC_ARM) || (defined(__ARMCC_VERSION) && __ARMCC_VERSION >= 6000000)
 extern const unsigned int SystemRegisterMap$$Base;
@@ -22,7 +26,13 @@ extern const unsigned int _SystemRegisterMapEnd;
 #endif
 
 SysregisterStruct __SystemRegisterMap;
-
+char *stage_name[] = {
+    "PreStartupInitStage",
+    "ServerPerInitStage",
+    "MCUInitStage",
+    "BoardInitStage",
+    "ServerInitStage",
+    "AppInitStage"};
 /**
  * @brief  Get the count of items in a specific startup stage.
  *
@@ -106,12 +116,12 @@ void SystemRegisterInit(void) {
         }
         // Update the count of items in the current stage
         __SystemRegisterMap.statge_count[i] = listCURRENT_LIST_LENGTH(&(__SystemRegisterMap.statge_list[i]));
-        printf("Stage[%d] count %d\r\n", i, __SystemRegisterMap.statge_count[i]);
+        printf("Stage[%s] count %d\r\n", stage_name[i], __SystemRegisterMap.statge_count[i]);
         // Print the items in the current stage
         ListItem_t *item = listGET_HEAD_ENTRY(&(__SystemRegisterMap.statge_list[i]));
         for (size_t j = 0; j < __SystemRegisterMap.statge_count[i]; j++) {
             StarupItemStruct *itemStruct = (StarupItemStruct *)listGET_LIST_ITEM_VALUE(item);
-            printf("\tItem[%d] %s : %s\r\n", j, itemStruct->name, itemStruct->desc);
+            printf("\tItem[%d] %s \r\n", j, itemStruct->name);
             item = item->pxNext;
         }
     }
@@ -119,17 +129,19 @@ void SystemRegisterInit(void) {
 void SystemRegisterRun(STARTUP_STAGE_ENUM stage) {
     List_t *stage_list = &(__SystemRegisterMap.statge_list[stage]);
     ListItem_t *item   = listGET_HEAD_ENTRY(stage_list);
-    printf("SystemRegisterRun Stage %d\r\n", stage);
+
+    elog_i(TAG,"Startup %s %d %s\r\n", stage_name[stage], __SystemRegisterMap.statge_count[stage],
+           __SystemRegisterMap.statge_count[stage] > 0 ? "items" : "item");
     for (size_t i = 0; i < __SystemRegisterMap.statge_count[stage]; i++) {
         StarupItemStruct *itemStruct = (StarupItemStruct *)listGET_LIST_ITEM_VALUE(item);
-        printf("\tRun Item[%d] %s : %s\r\n", i, itemStruct->name, itemStruct->desc);
+        elog_i(TAG,"\tStartup Item[%d] %s\r\n", i, itemStruct->name);
         if (itemStruct->func) {
             itemStruct->func();  // Call the function associated with the item
         } else {
-            printf("\t\tItem[%d] %s : %s has no function\r\n", i, itemStruct->name, itemStruct->desc);
+            elog_i(TAG,"\t\tItem[%d] %s : %s has no function\r\n", i, itemStruct->name, itemStruct->desc);
         }
         item = item->pxNext;
-        //delay
+        // delay
         vTaskDelay(pdMS_TO_TICKS(10));  // Delay for 10 milliseconds
     }
 }

@@ -63,7 +63,7 @@ void elog_port_output(const char *log, size_t size) {
     static uint32_t is_os_run = 0;
     if (is_os_run == 0) {
         debug_putbuffer(log, size);
-        is_os_run = xTaskGetSchedulerState() == taskSCHEDULER_RUNNING ? 1 : 0;
+        is_os_run = isReady();  // Check if the OS is running
     } else {
         vfb_send(DebugPrint, 0, (void *)log, size);
     }
