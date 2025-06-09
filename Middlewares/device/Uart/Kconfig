@@ -1,0 +1,35 @@
+menu "Uart串口"
+config UART_Uart_EN
+    bool "串口Uart使能"
+    default y
+    help
+        串口Uart功能使能启用后,系统将支持串口调试输出
+
+config Uart_UART_CHANNEL
+    int "串口通道COM"
+    depends on UART_Uart_EN
+    default 0
+    range 0 7
+    help
+        配置串口通道COM,0表示COM0,1表示COM1等
+
+config Uart_UART_RATE
+    int "串口波特率"
+    depends on UART_Uart_EN
+    default 115200
+    help
+        配置串口波特率
+config Uart_UART_BUFFER_SIZE
+    depends on UART_Uart_EN
+    int "串口缓冲区大小"
+    default 2048
+    help
+        配置串口缓存区大小      
+config Uart_UART_TX_PORT
+    string "Uart TX GPIO复用功能"
+    default GPIOB
+    help
+        配置Uart串口TX引脚的GPIO复用功能,默认GPIOB
+
+
+endmenu

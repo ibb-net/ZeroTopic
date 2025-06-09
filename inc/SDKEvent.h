@@ -25,6 +25,13 @@ typedef enum {
     KeyUnRister,  // Unregister key event
     KeyStart,     // Start key task
     KeyStop,      // Stop key task
+    UartStart,
+    UartStop,
+    UartSet,
+    UartGet,
+    UartPrint,
+    UartRcv,
+
 
     /************************************************* */
     SDK_EVENT_NUM,

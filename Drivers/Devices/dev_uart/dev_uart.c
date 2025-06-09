@@ -104,8 +104,7 @@ int __io_putchar(int ch) {
     while (RESET == usart_flag_get(USART0, USART_FLAG_TBE));
     return ch;
 }
-uint8_t isReady(void)
-{
+uint8_t isReady(void) {
     return (dev_uart_status[0].is_initialized && dev_uart_status[0].is_opened && dev_uart_status[0].is_started);
 }
 int debug_putbuffer(const char *buffer, size_t len) {
@@ -375,6 +374,52 @@ void DMA0_Channel0_IRQHandler(void) {
     }
     if (RESET != dma_interrupt_flag_get(DMA0, DMA_CH0, DMA_INT_FLAG_FTF)) {
         dma_interrupt_flag_clear(DMA0, DMA_CH0, DMA_INT_FLAG_FTF);
+        if (status && status->dev_cfg->rx_dma_isr_cb) {
+            // Call the RX DMA ISR callback function
+            status->dev_cfg->rx_dma_isr_cb((void *)status->handle);
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////
+void UART6_IRQHandler(void) {
+    static DevUartStatusStruct *status;
+    if (status == NULL) {
+        status = __DevUartGetStatus(UART6);
+    }
+    if (RESET != usart_interrupt_flag_get(UART6, USART_INT_FLAG_RT)) {
+        usart_interrupt_flag_clear(UART6, USART_INT_FLAG_RT);
+        if (status && status->dev_cfg->rx_isr_cb) {
+            status->dev_cfg->rx_isr_cb((void *)status->handle);
+        }
+    }
+}
+
+void DMA1_Channel1_IRQHandler(void) {
+    static DevUartStatusStruct *status;
+    if (status == NULL) {
+        status = __DevUartGetStatus(UART6);
+    }
+    if (RESET != dma_interrupt_flag_get(DMA1, DMA_CH1, DMA_INT_FLAG_FTF)) {
+        dma_interrupt_flag_clear(DMA1, DMA_CH1, DMA_INT_FLAG_FTF);
+        if (status && status->dev_cfg->tx_dma_isr_cb) {
+            status->dev_cfg->tx_dma_isr_cb((void *)status->handle);
+        }
+    }
+}
+/*!
+    \brief      this function handles DMA_Channel0_IRQHandler exception
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+void DMA0_Channel1_IRQHandler(void) {
+    static DevUartStatusStruct *status;
+    if (status == NULL) {
+        status = __DevUartGetStatus(UART6);
+    }
+    if (RESET != dma_interrupt_flag_get(DMA0, DMA_CH1, DMA_INT_FLAG_FTF)) {
+        dma_interrupt_flag_clear(DMA0, DMA_CH1, DMA_INT_FLAG_FTF);
         if (status && status->dev_cfg->rx_dma_isr_cb) {
             // Call the RX DMA ISR callback function
             status->dev_cfg->rx_dma_isr_cb((void *)status->handle);
