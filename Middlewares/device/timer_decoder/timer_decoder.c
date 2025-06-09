@@ -261,6 +261,7 @@ static void ENCODER_TIMER_RCV_HANDLE(void *msg) {
                     encoder_struct[channel].step_index = 0;  // 步进索引重置为0
                 elog_i(TAG, "Encoder channel %d set to STEP mode", channel);
             } else {
+                encoder_struct[channel].phy_value = tmp_decoder->phy_value;  // 设置物理值
                 elog_i(TAG, "Encoder channel %d set to CONTINUOUS mode", channel);
             }
         } break;
