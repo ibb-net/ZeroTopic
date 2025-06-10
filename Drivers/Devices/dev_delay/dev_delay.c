@@ -9,8 +9,8 @@
 
 __IO uint32_t delay_time      = 0U;
 __IO uint16_t timer_prescaler = 23U;
-__IO uint32_t timeout_flg=0;
-static void hw_time_set(uint8_t unit,uint32_t ntime);
+__IO uint32_t timeout_flg     = 0;
+static void hw_time_set(uint8_t unit, uint32_t ntime);
 static void hw_delay(uint32_t ntime, uint8_t unit);
 
 /*!
@@ -23,8 +23,14 @@ void DevDelayInit(void) {
     /* enable the TIM2 global interrupt */
     nvic_irq_enable(DELAY_TIMER_IRQn, 1U, 0U);
     rcu_periph_clock_enable(DELAY_TIMER_RCU);
-
-    uint8_t unit=TIM_USEC_DELAY;
+}
+/*!
+    \brief      configures DELAY_TIMER for delay routine based on DELAY_TIMER
+    \param[in]  unit: msec /usec
+    \param[out] none
+    \retval     none
+*/
+static void hw_time_set(uint8_t unit, uint32_t ntime) {
     timer_parameter_struct timer_basestructure;
     timer_deinit(DELAY_TIMER);
     timer_struct_para_init(&timer_basestructure);
@@ -32,7 +38,7 @@ void DevDelayInit(void) {
     timer_disable(DELAY_TIMER);
     timer_interrupt_disable(DELAY_TIMER, TIMER_INT_UP);
     if (TIM_USEC_DELAY == unit) {
-        timer_basestructure.period    = (uint64_t)((10 - 1)*ntime);
+        timer_basestructure.period    = (uint64_t)((10 - 1) * ntime);
         timer_basestructure.prescaler = 30 - 1;
         ;
     } else if (TIM_MSEC_DELAY == unit) {
@@ -42,7 +48,7 @@ void DevDelayInit(void) {
     } else {
         /* no operation */
     }
-    
+
     timer_basestructure.alignedmode       = TIMER_COUNTER_EDGE;
     timer_basestructure.counterdirection  = TIMER_COUNTER_UP;
     timer_basestructure.clockdivision     = TIMER_CKDIV_DIV1;
@@ -54,51 +60,6 @@ void DevDelayInit(void) {
     timer_interrupt_enable(DELAY_TIMER, TIMER_INT_UP);
     /* DELAY_TIMER enable counter */
     timer_enable(DELAY_TIMER);
-
-
-#if 0
-    /* -----------------------------------------------------------------------
-   TIMER50 configuration:
-   TIMER50 frequency = 300MHz/1500 = 200KHz, the period is 1s(200000/200000 = 1s).
-   ----------------------------------------------------------------------- */
-   nvic_irq_enable(TIMER50_IRQn, 0,0);
-    timer_parameter_struct timer_initpara;
-    /* enable the peripherals clock */
-    rcu_periph_clock_enable(RCU_TIMER50);
-    
-    /* deinit a TIMER */
-    timer_deinit(TIMER50);
-    /* initialize TIMER init parameter struct */
-    timer_struct_para_init(&timer_initpara);
-    /* TIMER50 configuration */
-    timer_initpara.prescaler         = 1500 - 1;
-    timer_initpara.alignedmode       = TIMER_COUNTER_EDGE;
-    timer_initpara.counterdirection  = TIMER_COUNTER_UP;
-    timer_initpara.period            = (uint64_t)(200000 - 1);
-    timer_initpara.clockdivision     = TIMER_CKDIV_DIV1;
-    timer_initpara.repetitioncounter = 0;
-    timer_init(TIMER50, &timer_initpara);
-
-    timer_interrupt_flag_clear(TIMER50, TIMER_INT_FLAG_UP);
-    /* enable the TIMER interrupt */
-    timer_interrupt_enable(TIMER50, TIMER_INT_UP);
-    /* enable a TIMER */
-    timer_enable(TIMER50);
-
-#endif
-}
-/*!
-    \brief      configures DELAY_TIMER for delay routine based on DELAY_TIMER
-    \param[in]  unit: msec /usec
-    \param[out] none
-    \retval     none
-*/
-static void hw_time_set(uint8_t unit,uint32_t ntime) {
-    timer_parameter_struct timer_basestructure;
-    timer_deinit(DELAY_TIMER);
-    timer_struct_para_init(&timer_basestructure);
-
-
 }
 /*!
     \brief      delay routine based on DELAY_TIMER
@@ -108,16 +69,56 @@ static void hw_time_set(uint8_t unit,uint32_t ntime) {
     \retval     none
 */
 static void hw_delay(uint32_t ntime, uint8_t unit) {
-    timeout_flg=1;
-    hw_time_set(unit,ntime);
+    timeout_flg = 1;
+    hw_time_set(unit, ntime);
     while (timeout_flg) {
     }
     timer_disable(DELAY_TIMER);
 }
 
-void DevDelayUs(uint32_t ntime) {
+void DevDelayUs(uint16_t ntime) {
     // hw_time_set(TIM_USEC_DELAY);
-    hw_delay(ntime, TIM_USEC_DELAY);
+    // hw_delay(ntime, TIM_USEC_DELAY);
+    uint16_t max;
+    if (ntime <= 2) {
+        return;
+    } else if (ntime <= 10) {
+        max = 35;
+        for (uint16_t i = 0; i < ntime; i++) {
+            for (volatile uint16_t j = 0; j < max; j++) {
+            }
+        }
+    } else if (ntime <= 20) {
+        max = 38;
+        for (uint16_t i = 0; i < ntime; i++) {
+            for (volatile uint16_t j = 0; j < max; j++) {
+            }
+        }
+    } else if (ntime <= 50) {
+        max = 41;
+        for (uint16_t i = 0; i < ntime; i++) {
+            for (volatile uint16_t j = 0; j < max; j++) {
+            }
+        }
+    } else if (ntime <= 100) {
+        max = 42;
+        for (uint16_t i = 0; i < ntime; i++) {
+            for (volatile uint16_t j = 0; j < max; j++) {
+            }
+        }
+    } else if (ntime <= 200) {
+        max = 42;
+        for (uint16_t i = 0; i < ntime; i++) {
+            for (volatile uint16_t j = 0; j < max; j++) {
+            }
+        }
+    }else {
+        max = 42;
+        for (uint16_t i = 0; i < ntime; i++) {
+            for (volatile uint16_t j = 0; j < max; j++) {
+            }
+        }
+    }
 }
 
 void DevDelayMs(uint32_t ntime) {
@@ -140,6 +141,6 @@ void TIMER50_IRQHandler(void) {
         /* clear update interrupt bit */
         timer_interrupt_flag_clear(TIMER50, TIMER_INT_FLAG_UP);
         // delay_timer_irq();
-        timeout_flg=0;
+        timeout_flg = 0;
     }
 }
