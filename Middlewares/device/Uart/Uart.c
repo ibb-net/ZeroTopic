@@ -25,7 +25,7 @@
 #define UartChannelMax 1
 #endif
 #ifndef CONFIG_Uart_CYCLE_TIMER_MS
-#define CONFIG_Uart_CYCLE_TIMER_MS 5
+#define CONFIG_Uart_CYCLE_TIMER_MS 100
 #endif
 /* ===================================================================================== */
 typedef struct
@@ -212,10 +212,14 @@ static void UartInitHandle(void *msg) {
     elog_set_filter_tag_lvl(TAG, UartLogLvl);
     vfb_send(UartStart, 0, NULL, 0);
 }
-//5A A5 05 82 00A0 007D
-uint8_t buzzer_1s[]={
-    0x5A, 0xA5, 0x05, 0x82, 0x00, 0xA0, 0x00, 0x7D
-};
+// 5A A5 05 82 00A0 007D
+uint8_t buzzer_1s[] = {
+    0x5A, 0xA5, 0x05, 0x82, 0x00, 0xA0, 0x00, 0x7D};
+uint8_t bl_30[] = {
+    0x5A, 0xA5, 0x04, 0x82, 0x00, 0x82, 0x64};
+
+uint8_t bl_100[] = {
+    0x5A, 0xA5, 0x04, 0x82, 0x00, 0x82,  0x20};
 // 接收消息的回调函数
 static void UartRcvHandle(void *msg) {
     TaskHandle_t curTaskHandle    = xTaskGetCurrentTaskHandle();
@@ -261,7 +265,21 @@ static void UartRcvHandle(void *msg) {
 
 // 超时处理的回调函数
 static void UartCycHandle(void) {
+    static uint8_t cnt   = 0;
+    static uint8_t cnt_1 = 0;
+    if (cnt % 20 == 0) {
+        if (cnt_1) {
+            elog_i(TAG, "Backlight 30%%");
+            vfb_send(UartPrint, 0, bl_30, sizeof(bl_30));  // 测试背光
+            cnt_1 = 0;
+        } else {
+            cnt_1 = 1;
+            elog_i(TAG, "Backlight 100%%");
+            vfb_send(UartPrint, 0, bl_100, sizeof(bl_100));  // 测试背光
+        }
+    }
 
+    cnt++;
 }
 // UartStreamRcvTask
 void UartStreamRcvTask(void *arg) {
