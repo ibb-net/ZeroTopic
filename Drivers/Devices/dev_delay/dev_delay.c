@@ -80,12 +80,13 @@ static void hw_time_set(uint8_t unit) {
     timer_disable(DELAY_TIMER);
     timer_interrupt_disable(DELAY_TIMER, TIMER_INT_UP);
     if (TIM_USEC_DELAY == unit) {
-        timer_basestructure.period = (uint64_t)(20 - 1);  // ms
-        timer_basestructure.prescaler         = 15 - 1;
+
+        timer_basestructure.period = (uint64_t)(10-1);  
+        timer_basestructure.prescaler         = 30 -1;
         ;
     } else if (TIM_MSEC_DELAY == unit) {
-        timer_basestructure.period = (uint64_t)(200 - 1);
-        timer_basestructure.prescaler         = 1500 - 1;
+        timer_basestructure.period = (uint64_t)(100 - 1);
+        timer_basestructure.prescaler         = 3000 - 1;
         ;
     } else {
         /* no operation */
@@ -173,7 +174,7 @@ void TIMER50_IRQHandler(void) {
         /* clear update interrupt bit */
         timer_interrupt_flag_clear(TIMER50, TIMER_INT_FLAG_UP);
         /* toggle selected led */
-        gd_eval_led_toggle(LED2);
+        // gd_eval_led_toggle(LED2);
         delay_timer_irq();
     }
 }

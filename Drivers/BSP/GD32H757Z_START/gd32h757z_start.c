@@ -78,7 +78,7 @@ void gd_eval_led_init(led_typedef_enum lednum)
     rcu_periph_clock_enable(GPIO_CLK[lednum]);
     /* configure led GPIO port */ 
     gpio_mode_set(GPIO_PORT[lednum], GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_PIN[lednum]);
-    gpio_output_options_set(GPIO_PORT[lednum], GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, GPIO_PIN[lednum]);
+    gpio_output_options_set(GPIO_PORT[lednum], GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, GPIO_PIN[lednum]);
     GPIO_BC(GPIO_PORT[lednum]) = GPIO_PIN[lednum];
 }
 
