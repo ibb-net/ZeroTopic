@@ -24,8 +24,8 @@
 #ifndef DemoChannelMax
 #define DemoChannelMax 1
 #endif
-#ifndef CONFIG_DEBUG_CYCLE_TIMER_MS
-#define CONFIG_DEBUG_CYCLE_TIMER_MS 5
+#ifndef CONFIG_Demo_CYCLE_TIMER_MS
+#define CONFIG_Deni_CYCLE_TIMER_MS 5
 #endif
 /* ===================================================================================== */
 typedef struct
@@ -73,7 +73,7 @@ static const VFBTaskStruct Demo_task_cfg = {
     .event_num               = sizeof(DemoEventList) / sizeof(vfb_event_t),  // Number of events to subscribe
     .startup_wait_event_list = NULL,                                         // Events to wait for at startup
     .startup_wait_event_num  = 0,                                            // Number of startup events to wait for
-    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_DEBUG_CYCLE_TIMER_MS),   // Wait indefinitely
+    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_Demo_CYCLE_TIMER_MS),   // Wait indefinitely
     .init_msg_cb             = __DemoInitHandle,                             // Callback for initialization messages
     .rcv_msg_cb              = __DemoRcvHandle,                              // Callback for received messages
     .rcv_timeout_cb          = __DemoCycHandle,                              // Callback for timeout
@@ -82,7 +82,7 @@ static const VFBTaskStruct Demo_task_cfg = {
 /* ===================================================================================== */
 
 void DemoDeviceInit(void) {
-    elog_i(TAG, "DemoDeviceInit\r\n");
+    elog_i(TAG, "DemoDeviceInit");
 
     for (size_t i = 0; i < DemoChannelMax; i++) {
         TypdefDemoStatus *DemoStatusHandle = &DemoStatus[i];
@@ -102,7 +102,7 @@ static void __DemoCreateTaskHandle(void) {
 SYSTEM_REGISTER_INIT(AppInitStage, DemoPriority, __DemoCreateTaskHandle, __DemoCreateTaskHandle init);
 
 static void __DemoInitHandle(void *msg) {
-    elog_i(TAG, "__DemoInitHandle\r\n");
+    elog_i(TAG, "__DemoInitHandle");
     elog_set_filter_tag_lvl(TAG, DemoLogLvl);
     vfb_send(DemoStart, 0, NULL, 0);
 }
@@ -117,7 +117,7 @@ static void __DemoRcvHandle(void *msg) {
             elog_i(TAG, "DemoStartTask %d", tmp_msg->frame->head.data);
         } break;
         default:
-            elog_e(TAG, "TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
+            elog_e(TAG, "TASK %s RCV: unknown event: %d", taskName, tmp_msg->frame->head.event);
             break;
     }
 }
@@ -125,7 +125,7 @@ static void __DemoRcvHandle(void *msg) {
 static void __DemoCycHandle(void) {
     TypdefDemoStatus *DemoStatusHandle = &DemoStatus[0];
     if (DemoStatusHandle == NULL) {
-        elog_e(TAG, "[ERROR]DemoStatusHandle NULL\r\n");
+        elog_e(TAG, "[ERROR]DemoStatusHandle NULL");
         return;
     }
 }
@@ -133,9 +133,9 @@ static void __DemoCycHandle(void) {
 #endif
 
 static void CmdDemoHelp(void) {
-    elog_i(TAG, "Usage: demo <state>\r\n");
-    elog_i(TAG, "  <state>: 0 for off, 1 for on\r\n");
-    elog_i(TAG, "Example: demo 1\r\n");
+    elog_i(TAG, "Usage: demo <state>");
+    elog_i(TAG, "  <state>: 0 for off, 1 for on");
+    elog_i(TAG, "Example: demo 1");
 }
 static int CmdDemoHandle(int argc, char *argv[]) {
     if (argc != 2) {

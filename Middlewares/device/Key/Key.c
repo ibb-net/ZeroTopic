@@ -24,8 +24,8 @@
 #ifndef KeyChannelMax
 #define KeyChannelMax 32
 #endif
-#ifndef CONFIG_DEBUG_CYCLE_TIMER_MS
-#define CONFIG_DEBUG_CYCLE_TIMER_MS 30
+#ifndef CONFIG_KEY_CYCLE_TIMER_MS
+#define CONFIG_KEY_CYCLE_TIMER_MS 30
 #endif
 /* ===================================================================================== */
 
@@ -63,7 +63,7 @@ static const VFBTaskStruct Key_task_cfg = {
     .event_num               = sizeof(KeyEventList) / sizeof(vfb_event_t),  // Number of events to subscribe
     .startup_wait_event_list = NULL,                                        // Events to wait for at startup
     .startup_wait_event_num  = 0,                                           // Number of startup events to wait for
-    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_DEBUG_CYCLE_TIMER_MS),  // Wait indefinitely
+    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_KEY_CYCLE_TIMER_MS),  // Wait indefinitely
     .init_msg_cb             = __KeyInitHandle,                             // Callback for initialization messages
     .rcv_msg_cb              = __KeyRcvHandle,                              // Callback for received messages
     .rcv_timeout_cb          = __KeyCycHandle,                              // Callback for timeout
@@ -72,7 +72,7 @@ static const VFBTaskStruct Key_task_cfg = {
 /* ===================================================================================== */
 #if 0
 void KeyDeviceInit(void) {
-    elog_i(TAG, "KeyDeviceInit\r\n");
+    elog_i(TAG, "KeyDeviceInit");
 
     for (size_t i = 0; i < KeyChannelMax; i++) {
         TypdefKeyStatus *KeyStatusHandle      = &KeyStatus[i];
@@ -116,7 +116,7 @@ static void __KeyRcvHandle(void *msg) {
         } break;
 
         default:
-            printf("TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
+            printf("TASK %s RCV: unknown event: %d", taskName, tmp_msg->frame->head.event);
             break;
     }
 }
@@ -124,55 +124,55 @@ static void __KeyRcvHandle(void *msg) {
 static void __KeyCycHandle(void) {
     // TypdefKeyStatus *KeyStatusHandle = &KeyStatus[0];
     // if (KeyStatusHandle == NULL) {
-    //     elog_e(TAG, "[ERROR]KeyStatusHandle NULL\r\n");
+    //     elog_e(TAG, "[ERROR]KeyStatusHandle NULL");
     //     return;
     // }
     static uint32_t last_scan_time = 0;
     last_scan_time++;
-    if (last_scan_time % (1000 / pdMS_TO_TICKS(CONFIG_DEBUG_CYCLE_TIMER_MS)) == 0) {
-        // elog_i(TAG, "__KeyCycHandle\r\n");
+    if (last_scan_time % (1000 / pdMS_TO_TICKS(CONFIG_KEY_CYCLE_TIMER_MS)) == 0) {
+        // elog_i(TAG, "__KeyCycHandle");
     }
     __KeyScan();
 }
 static void __KeyShortPressCallback(TypdefKeyStatus *key_status) {
     if (key_status->cfg->short_press_event == 0) {
-        // elog_e(TAG, "Short press event is not configured for key %s\r\n", key_status->cfg->device_name);
+        // elog_e(TAG, "Short press event is not configured for key %s", key_status->cfg->device_name);
         return;
     }
-    elog_i(TAG, "Key %s short pressed\r\n", key_status->cfg->device_name);
+    elog_i(TAG, "Key %s short pressed", key_status->cfg->device_name);
     vfb_send(key_status->cfg->short_press_event, 0, NULL, 0);
 }
 static void __KeyLongPressCallback(TypdefKeyStatus *key_status) {
     if (key_status->cfg->long_press_event == 0) {
-        // elog_e(TAG, "Long press event is not configured for key %s\r\n", key_status->cfg->device_name);
+        // elog_e(TAG, "Long press event is not configured for key %s", key_status->cfg->device_name);
         return;
     }
-    elog_i(TAG, "Key %s long pressed\r\n", key_status->cfg->device_name);
+    elog_i(TAG, "Key %s long pressed", key_status->cfg->device_name);
     vfb_send(key_status->cfg->long_press_event, 0, NULL, 0);
 }
 static void __KeyToggleCallback(TypdefKeyStatus *key_status) {
     if (key_status == NULL || key_status->cfg == NULL) {
-        elog_e(TAG, "Key status or configuration is NULL\r\n");
+        elog_e(TAG, "Key status or configuration is NULL");
         return;
     }
     if (key_status->cfg->toggle_event == 0) {
         return;
     }
-    elog_i(TAG, "Key %s toggled, state: %d\r\n", key_status->cfg->device_name, key_status->state);
+    elog_i(TAG, "Key %s toggled, state: %d", key_status->cfg->device_name, key_status->state);
     vfb_send(key_status->cfg->toggle_event, key_status->state, NULL, 0);
 }
 // 注册按键,遍历KeyStatus查找cfg为空,并新增
 static void __KeyRegister(TypdefKeyBSPCfg *cfg) {
     if (cfg == NULL) {
-        elog_e(TAG, "Key configuration is NULL, please check the configuration.\r\n");
+        elog_e(TAG, "Key configuration is NULL, please check the configuration.");
         return;
     }
     if (cfg->pin.base == 0 || cfg->pin.pin == 0) {
-        elog_e(TAG, "Key pin configuration is invalid, please check the configuration.\r\n");
+        elog_e(TAG, "Key pin configuration is invalid, please check the configuration.");
         return;
     }
     if (cfg->pin.pin_mode != DevPinModeInput) {
-        elog_e(TAG, "Key pin mode is not input, please check the configuration.\r\n");
+        elog_e(TAG, "Key pin mode is not input, please check the configuration.");
         return;
     }
     for (size_t i = 0; i < KeyChannelMax; i++) {
@@ -195,7 +195,7 @@ static void __KeyRegister(TypdefKeyBSPCfg *cfg) {
             return;
         }
     }
-    elog_e(TAG, "No available key slots to register\r\n");
+    elog_e(TAG, "No available key slots to register");
 }
 static void __KeyScan(void) {
     for (int i = 0; i < KeyChannelMax; i++) {
@@ -259,15 +259,15 @@ static void __KeyScan(void) {
                 }
             } break;
             default:
-                elog_e(TAG, "Unknown trigger mode: %d\r\n", triger_mode);
+                elog_e(TAG, "Unknown trigger mode: %d", triger_mode);
                 continue;  // Skip this key if the trigger mode is unknown
         }
     }
 }
 static void CmdKeyHelp(void) {
-    printf("Usage: Key <state>\r\n");
-    printf("  <state>: 0 for off, 1 for on\r\n");
-    printf("Example: Key 1\r\n");
+    printf("Usage: Key <state>");
+    printf("  <state>: 0 for off, 1 for on");
+    printf("Example: Key 1");
 }
 static int CmdKeyHandle(int argc, char *argv[]) {
     if (argc != 2) {

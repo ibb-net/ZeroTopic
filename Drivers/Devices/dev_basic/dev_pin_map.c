@@ -1,8 +1,8 @@
 #include "dev_basic.h"
 #include "dev_pin.h"
 
-
-const DevPinClockMap DevPinMap[GD32H7XXZ_PIN_MAP_MAX] = {
+const TypedefDevPinMap DevPinMap[GD32H7XXZ_PIN_MAP_MAX] = {
+    {"DEV_PIN_START", DEV_PIN_START, 0, 0, 0},
     {"GPIOE_PIN2", DEV_PIN_PE2, RCU_GPIOE, GPIOE, GPIO_PIN_2},
     {"GPIOE_PIN3", DEV_PIN_PE3, RCU_GPIOE, GPIOE, GPIO_PIN_3},
     {"GPIOE_PIN4", DEV_PIN_PE4, RCU_GPIOE, GPIOE, GPIO_PIN_4},

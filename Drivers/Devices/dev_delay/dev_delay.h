@@ -4,7 +4,7 @@
 #include "dev_basic.h"
 void DevDelayInit(void);
 void TIMER3_IRQHandler(void);
-void DevDelayUs(uint32_t ntime);
+void DevDelayUs(uint16_t ntime);
 void DevDelayMs(uint32_t ntime);
 void TIMER50_IRQHandler(void);
 #endif  // __DEV_DELAY_H
