@@ -119,7 +119,7 @@ static const vfb_event_t UartEventList[] = {
     UartStop,
     UartSet,
     UartGet,
-    UartPrint,
+    UartSend,
     UartRcv,
 
 };
@@ -141,21 +141,23 @@ static const VFBTaskStruct Uart_task_cfg = {
 
 /* ===================================================================================== */
 void UartComPreInit(void) {
+#if 0
     DevPinInit(&(UartBspCfg[0].tx_gpio_cfg));
     DevPinInit(&(UartBspCfg[0].rx_gpio_cfg));
     DevUartRegister(UartBspCfg[0].uart_cfg.base, (void *)&UartStatus[0]);
     DevUartPreInit(&(UartBspCfg[0].uart_cfg));
     printf("UartComPreInit Done\r\n");
+#endif
 }
 /* ===================================================================================== */
 
 void UartDeviceInit(void) {
-    printf("UartDeviceInit\r\n");
+    elog_i(TAG, "UartDeviceInit\r\n");
 
     for (size_t i = 0; i < UartChannelMax; i++) {
         TypdefUartStatus *uart_handle = &UartStatus[i];
         if (UartBspCfg[i].uart_cfg.base == 0) {
-            printf("UartBspCfg[%d] uart base is 0, skip init!\r\n", i);
+            elog_w(TAG, "UartBspCfg[%d] uart base is 0, skip init!\r\n", i);
             continue;
         }
         uart_handle->id         = i;
@@ -171,13 +173,13 @@ void UartDeviceInit(void) {
         uart_handle->rx_stream_buffer = xStreamBufferCreate(UartBspCfg[i].buffer_size, 1);
         uart_handle->rx_buffer        = pvPortMalloc(UartBspCfg[i].buffer_size);
         if (uart_handle->rx_buffer == NULL) {
-            printf("[Fault]malloc %s buffer failed!\r\n", UartBspCfg[i].uart_cfg.device_name);
+            elog_e(TAG, "[Fault]malloc %s buffer failed!\r\n", UartBspCfg[i].uart_cfg.device_name);
             while (1);
             return;
         }
         uart_handle->rx_buffer_for_vfb = pvPortMalloc(UartBspCfg[i].buffer_size);
         if (uart_handle->rx_buffer_for_vfb == NULL) {
-            printf("[Fault]malloc %s buffer for vfb failed!\r\n", UartBspCfg[i].uart_cfg.device_name);
+            elog_e(TAG, "[Fault]malloc %s buffer for vfb failed!\r\n", UartBspCfg[i].uart_cfg.device_name);
             vPortFree(uart_handle->rx_buffer);
             while (1);
             return;
@@ -189,7 +191,7 @@ void UartDeviceInit(void) {
         uart_handle->lock_tx = xSemaphoreCreateBinary();
         uart_handle->lock    = xSemaphoreCreateBinary();
         if (uart_handle->lock == NULL) {
-            printf("create %s mutex failed!\r\n", uart_handle->device_name);
+            elog_e(TAG, "create %s mutex failed!\r\n", uart_handle->device_name);
             return;
         }
         DevUarStart(&(UartBspCfg[i].uart_cfg));
@@ -219,7 +221,7 @@ uint8_t bl_30[] = {
     0x5A, 0xA5, 0x04, 0x82, 0x00, 0x82, 0x64};
 
 uint8_t bl_100[] = {
-    0x5A, 0xA5, 0x04, 0x82, 0x00, 0x82,  0x20};
+    0x5A, 0xA5, 0x04, 0x82, 0x00, 0x82, 0x20};
 // 接收消息的回调函数
 static void UartRcvHandle(void *msg) {
     TaskHandle_t curTaskHandle    = xTaskGetCurrentTaskHandle();
@@ -229,7 +231,7 @@ static void UartRcvHandle(void *msg) {
     switch (tmp_msg->frame->head.event) {
         case UartStart: {
             elog_i(TAG, "UartStart %d", tmp_msg->frame->head.data);
-            vfb_send(UartPrint, 0, buzzer_1s, sizeof(buzzer_1s));  // 测试蜂鸣器
+            vfb_send(UartSend, 0, buzzer_1s, sizeof(buzzer_1s));  // 测试蜂鸣器
         } break;
         case UartStop: {
         } break;
@@ -237,20 +239,21 @@ static void UartRcvHandle(void *msg) {
         } break;
         case UartGet: {
         } break;
-        case UartPrint: {
+        case UartSend: {
             if (tmp_msg->frame->head.length == 0 || tmp_msg->frame->head.payload_offset == NULL) {
-                printf("[ERROR]UartPrint: payload is NULL or length is 0\r\n");
+                elog_i(TAG, "[ERROR]UartSend: payload is NULL or length is 0\r\n");
                 return;
             }
-            elog_i(TAG, "UartPrint: %s", (char *)MSG_GET_PAYLOAD(tmp_msg));
+            elog_i(TAG, "UartSend: length: %d", MSG_GET_LENGTH(tmp_msg));
+            elog_hexdump(TAG, 16, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
             DevUartDMASend(&UartBspCfg[0].uart_cfg, (const uint8_t *)MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
             // wait for TX DMA complete lock_tx
             if (uart_handle->lock_tx != NULL) {
                 if (xSemaphoreTake(uart_handle->lock_tx, pdMS_TO_TICKS(300)) == pdFALSE) {
-                    printf("[ERROR]UartPrint: lock_tx timeout\r\n");
+                    elog_e(TAG, "[ERROR]UartSend: lock_tx timeout\r\n");
                 }
             } else {
-                printf("[ERROR]UartPrint: lock_tx is NULL\r\n");
+                elog_e(TAG, "[ERROR]UartSend: lock_tx is NULL\r\n");
             }
         } break;
         case UartRcv: {
@@ -258,7 +261,7 @@ static void UartRcvHandle(void *msg) {
 
         } break;
         default:
-            printf("TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
+            elog_e(TAG, "TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
             break;
     }
 }
@@ -267,19 +270,21 @@ static void UartRcvHandle(void *msg) {
 static void UartCycHandle(void) {
     static uint8_t cnt   = 0;
     static uint8_t cnt_1 = 0;
+    #if 0
     if (cnt % 20 == 0) {
         if (cnt_1) {
             elog_i(TAG, "Backlight 30%%");
-            vfb_send(UartPrint, 0, bl_30, sizeof(bl_30));  // 测试背光
+            vfb_send(UartSend, 0, bl_30, sizeof(bl_30));  // 测试背光
             cnt_1 = 0;
         } else {
             cnt_1 = 1;
             elog_i(TAG, "Backlight 100%%");
-            vfb_send(UartPrint, 0, bl_100, sizeof(bl_100));  // 测试背光
+            vfb_send(UartSend, 0, bl_100, sizeof(bl_100));  // 测试背光
         }
     }
 
     cnt++;
+    #endif
 }
 // UartStreamRcvTask
 void UartStreamRcvTask(void *arg) {
@@ -303,19 +308,19 @@ static void __UartRXISRHandle(void *arg) {
     channelx                     = uart_handle->UartBspCfg->uart_cfg.rx_dma_channel;
     uint32_t dma_transfer_number = dma_transfer_number_get(dma_periph, channelx);
     if (dma_transfer_number == 0) {
-        printf("DMA transfer number is zero, no data received.\r\n");
+        elog_e(TAG, "DMA transfer number is zero, no data received.\r\n");
     }
     int rx_count = uart_handle->buffer_size - dma_transfer_number;
     // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count, uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
-        printf("RX count is zero or negative, no data received.\r\n");
+        elog_e(TAG, "RX count is zero or negative, no data received.\r\n");
     } else {
         /* BaseType_t xQueueSendFromISR( QueueHandle_t xQueue,
 const void *pvItemToQueue,
 BaseType_t *pxHigherPriorityTaskWoken ); */
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         if (xStreamBufferSendFromISR(uart_handle->rx_stream_buffer, uart_handle->rx_buffer, rx_count, &xHigherPriorityTaskWoken) == 0) {
-            printf("Failed to send data to stream buffer from ISR\r\n");
+            elog_e(TAG, "Failed to send data to stream buffer from ISR\r\n");
         }
         DevUartDMARecive(&(uart_handle->UartBspCfg->uart_cfg), uart_handle->rx_buffer, uart_handle->buffer_size);
     }

@@ -29,7 +29,7 @@ typedef enum {
     UartStop,
     UartSet,
     UartGet,
-    UartPrint,
+    UartSend,
     UartRcv,
     Ds18b20Start,
     Ds18b20Stop,
