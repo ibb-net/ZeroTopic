@@ -35,7 +35,9 @@ typedef enum {
     Ds18b20Stop,
     Ds18b20Covert,
     Ds18b20GetTemperature,
-
+    DACSgm3533Start,
+    DACSgm3533Stop,
+    DACSgm3533Get,
     /************************************************* */
     SDK_EVENT_NUM,
     SDK_EVENT_LIST_MAX = SDK_EVENT_LIST_APP_START - 1
