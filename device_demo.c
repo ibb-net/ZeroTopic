@@ -3,6 +3,8 @@
 #define CONFIG_Demo_EN 1
 #if CONFIG_Demo_EN
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 #include "gd32h7xx.h"
 #include "string.h"
@@ -138,7 +140,7 @@ static void CmdDemoHelp(void) {
     elog_i(TAG, "Example: demo 1");
 }
 static int CmdDemoHandle(int argc, char *argv[]) {
-    if (argc != 2) {
+    if (argc < 2) {
         CmdDemoHelp();
         return 0;
     }

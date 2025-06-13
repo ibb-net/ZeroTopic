@@ -189,7 +189,7 @@ void DebugDeviceInit(void) {
 
     elog_start();
 }
-SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugDeviceInit, DebugDeviceInit);
+// SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugDeviceInit, DebugDeviceInit);
 
 static void DebugCreateTaskHandle(void) {
     DebugDeviceInit();
@@ -200,9 +200,10 @@ static void DebugCreateTaskHandle(void) {
 SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugCreateTaskHandle, DebugCreateTaskHandle init);
 
 static void DebugInitHandle(void *msg) {
-    elog_i(TAG, "DebugInitHandle\r\n");
+    printf("DebugInitHandle\r\n");
     elog_set_filter_tag_lvl(TAG, DebugLogLvl);
     vfb_send(DebugStart, 0, NULL, 0);
+    printf("DebugInitHandle Done\r\n");
 }
 // 接收消息的回调函数
 static void DebugRcvHandle(void *msg) {

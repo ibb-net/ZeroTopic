@@ -197,9 +197,8 @@ void UartDeviceInit(void) {
         DevUarStart(&(UartBspCfg[i].uart_cfg));
     }
 
-    elog_start();
 }
-SYSTEM_REGISTER_INIT(PreStartupInitStage, UartPriority, UartDeviceInit, UartDeviceInit);
+// SYSTEM_REGISTER_INIT(MCUInitStage, UartPriority, UartDeviceInit, UartDeviceInit);
 
 static void UartCreateTaskHandle(void) {
     UartDeviceInit();
@@ -207,7 +206,7 @@ static void UartCreateTaskHandle(void) {
     xTaskCreate(VFBTaskFrame, "VFBTaskUart", configMINIMAL_STACK_SIZE, (void *)&Uart_task_cfg, UartPriority, NULL);
     xTaskCreate(UartStreamRcvTask, "UartRx", configMINIMAL_STACK_SIZE, (void *)&Uart_task_cfg, UartPriority - 1, NULL);
 }
-SYSTEM_REGISTER_INIT(PreStartupInitStage, UartPriority, UartCreateTaskHandle, UartCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(ServerInitStage, UartPriority, UartCreateTaskHandle, UartCreateTaskHandle init);
 
 static void UartInitHandle(void *msg) {
     elog_i(TAG, "UartInitHandle\r\n");

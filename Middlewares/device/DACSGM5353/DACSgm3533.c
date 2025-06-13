@@ -2,7 +2,9 @@
 #include "DACSgm3533Cfg.h"
 #define CONFIG_DACSgm3533_EN 1
 #if CONFIG_DACSgm3533_EN
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "gd32h7xx.h"
 #include "string.h"
@@ -27,18 +29,142 @@
 #define CONFIG_DACSgm3533_CYCLE_TIMER_MS 100
 #endif
 /* ===================================================================================== */
+#define ARRAYSIZE 2
+__IO uint16_t spi_send_buffer[DACSgm3533ChannelMax][ARRAYSIZE] = {
+    {0xA5A5, 0xA5A5},  // Channel 0
+    {0x5a5a, 0x5a5a},  // Channel 1
+};
 typedef struct
 {
-    uint32_t id;
+    uint32_t ch;
+    DevPinHandleStruct nss_gpio_cfg;   // NSS GPIO configuration
+    DevPinHandleStruct sck_gpio_cfg;   // SCK GPIO configuration
+    DevPinHandleStruct mosi_gpio_cfg;  // MOSI GPIO configuration
+    // DevPinHandleStruct miso_gpio_cfg;  // MISO GPIO configuration
+
+    uint32_t spi_base;
+    uint32_t spi_rcu;
+    spi_idx_enum spi_idx;          // SPI index
+    spi_parameter_struct spi_cfg;  // SPI configuration
+    // DMA configuration
+    uint32_t dma_base_addr;  // TX DMA base address
+    uint32_t dma_channel;    // TX DMA channel
+
+    dma_single_data_parameter_struct dma_fg;
 } TypdefDACSgm3533BSPCfg;
 
 static void __DACSgm3533CreateTaskHandle(void);
 static void __DACSgm3533RcvHandle(void *msg);
 static void __DACSgm3533CycHandle(void);
 static void __DACSgm3533InitHandle(void *msg);
-
+void DACSgm3533DSPISend(uint8_t ch, uint16_t data);
 const TypdefDACSgm3533BSPCfg DACSgm3533BspCfg[DACSgm3533ChannelMax] = {
+    /* SPI5  */
+    {
+        .ch           = 0,
+        .nss_gpio_cfg = {
+            .device_name = "DACSgm3533_NSS",
+            .base        = GPIOA,
+            .af          = 0,
+            .pin         = GPIO_PIN_15,
+            .pin_mode    = DevPinModeOutput,
+            .bit_value   = 1,  // Active low
+        },
+        .sck_gpio_cfg = {
+            .device_name = "DACSgm3533_SCK",
+            .base        = GPIOC,
+            .af          = GPIO_AF_6,
+            .pin         = GPIO_PIN_10,
+            .pin_mode    = DevPinModeAF,
+        },
+        .mosi_gpio_cfg = {
+            .device_name = "DACSgm3533_MOSI",
+            .base        = GPIOC,
+            .af          = GPIO_AF_6,
+            .pin         = GPIO_PIN_12,
+            .pin_mode    = DevPinModeAF,
+        },
 
+        .spi_base = SPI2,
+        .spi_rcu  = RCU_SPI2,
+        .spi_idx  = IDX_SPI2,
+        .spi_cfg  = {
+             .device_mode          = SPI_MASTER,
+             .trans_mode           = SPI_TRANSMODE_BDTRANSMIT,
+             .data_size            = SPI_DATASIZE_8BIT,
+             .clock_polarity_phase = SPI_CK_PL_LOW_PH_1EDGE,
+             .nss                  = SPI_NSS_SOFT,
+             .prescale             = SPI_PSC_256,
+             .endian               = SPI_ENDIAN_MSB,
+
+        },
+        .dma_base_addr = DMA0,
+        .dma_channel   = DMA_CH2,
+        .dma_fg        = {
+                   .request             = DMA_REQUEST_SPI2_TX,
+                   .direction           = DMA_MEMORY_TO_PERIPH,
+                   .memory0_addr        = (uint32_t)spi_send_buffer[0],  // To be set later
+                   .memory_inc          = DMA_MEMORY_INCREASE_ENABLE,
+                   .periph_memory_width = DMA_PERIPH_WIDTH_8BIT,
+                   .number              = ARRAYSIZE,  // Number of bytes to transfer
+                   .periph_addr         = (uint32_t)(&SPI_TDATA(SPI2)),
+                   .periph_inc          = DMA_PERIPH_INCREASE_DISABLE,
+                   .priority            = DMA_PRIORITY_HIGH,
+                   .circular_mode       = DMA_CIRCULAR_MODE_DISABLE,
+        },
+
+    },
+    // spi0
+
+    {
+        .ch           = 1,
+        .nss_gpio_cfg = {
+            .device_name = "DACSgm3533_NSS", .base = GPIOG, .af = 0, .pin = GPIO_PIN_10, .pin_mode = DevPinModeOutput,
+            .bit_value = 1,  // Active low
+        },
+        .sck_gpio_cfg = {
+            .device_name = "DACSgm3533_SCK",
+            .base        = GPIOG,
+            .af          = GPIO_AF_6,
+            .pin         = GPIO_PIN_11,
+            .pin_mode    = DevPinModeAF,
+        },
+        .mosi_gpio_cfg = {
+            .device_name = "DACSgm3533_MOSI",
+            .base        = GPIOD,
+            .af          = GPIO_AF_6,
+            .pin         = GPIO_PIN_7,
+            .pin_mode    = DevPinModeAF,
+        },
+
+        .spi_base = SPI0,
+        .spi_rcu  = RCU_SPI0,
+        .spi_idx  = IDX_SPI0,
+        .spi_cfg  = {
+             .device_mode          = SPI_MASTER,
+             .trans_mode           = SPI_TRANSMODE_BDTRANSMIT,
+             .data_size            = SPI_DATASIZE_8BIT,
+             .clock_polarity_phase = SPI_CK_PL_LOW_PH_1EDGE,
+             .nss                  = SPI_NSS_SOFT,
+             .prescale             = SPI_PSC_256,
+             .endian               = SPI_ENDIAN_MSB,
+
+        },
+        .dma_base_addr = DMA1,
+        .dma_channel   = DMA_CH2,
+        .dma_fg        = {
+                   .request             = DMA_REQUEST_SPI0_TX,
+                   .direction           = DMA_MEMORY_TO_PERIPH,
+                   .memory0_addr        = (uint32_t)spi_send_buffer[1],  // To be set later
+                   .memory_inc          = DMA_MEMORY_INCREASE_ENABLE,
+                   .periph_memory_width = DMA_PERIPH_WIDTH_8BIT,
+                   .number              = ARRAYSIZE,  // Number of bytes to transfer
+                   .periph_addr         = (uint32_t)(&SPI_TDATA(SPI0)),
+                   .periph_inc          = DMA_PERIPH_INCREASE_DISABLE,
+                   .priority            = DMA_PRIORITY_HIGH,
+                   .circular_mode       = DMA_CIRCULAR_MODE_DISABLE,
+        },
+    },
 };
 
 typedef struct
@@ -85,6 +211,28 @@ void DACSgm3533DeviceInit(void) {
         DACSgm3533StatusHandle->id = i;
         memset(DACSgm3533StatusHandle->device_name, 0, sizeof(DACSgm3533StatusHandle->device_name));
         snprintf(DACSgm3533StatusHandle->device_name, sizeof(DACSgm3533StatusHandle->device_name), "DACSgm3533%d", i);
+
+        // Initialize GPIOs
+        DevPinHandleStruct *nss_gpio_cfg  = &DACSgm3533BspCfg[i].nss_gpio_cfg;
+        DevPinHandleStruct *sck_gpio_cfg  = &DACSgm3533BspCfg[i].sck_gpio_cfg;
+        DevPinHandleStruct *mosi_gpio_cfg = &DACSgm3533BspCfg[i].mosi_gpio_cfg;
+        DevPinInit(nss_gpio_cfg);
+        DevPinInit(sck_gpio_cfg);
+        DevPinInit(mosi_gpio_cfg);
+        /* RCU */
+        rcu_periph_clock_enable(DACSgm3533BspCfg[i].spi_rcu);
+        rcu_spi_clock_config(DACSgm3533BspCfg[i].spi_idx, RCU_SPISRC_PLL0Q);
+        // Initialize SPI
+        spi_i2s_deinit(DACSgm3533BspCfg[i].spi_base);
+        spi_parameter_struct spi_init_struct;
+        spi_parameter_struct *spi_cfg = &DACSgm3533BspCfg[i].spi_cfg;
+
+        spi_init(DACSgm3533BspCfg[i].spi_base, spi_cfg);
+        spi_byte_access_enable(DACSgm3533BspCfg[i].spi_base);
+        spi_nss_output_enable(DACSgm3533BspCfg[i].spi_base);
+
+        DACSgm3533DSPISend(i, 0x0000);  // Send initial data to clear the buffer
+        elog_i(TAG, "DACSgm3533[%d] device_name: %s, spi_base: 0x%08X", i, DACSgm3533StatusHandle->device_name, DACSgm3533BspCfg[i].spi_base);
     }
 }
 SYSTEM_REGISTER_INIT(MCUInitStage, DACSgm3533Priority, DACSgm3533DeviceInit, DACSgm3533DeviceInit);
@@ -126,18 +274,82 @@ static void __DACSgm3533CycHandle(void) {
 }
 
 #endif
+void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
+    elog_i(TAG, "SendDACHex: ch=%d, data=0x%04X %d", ch, data, data);
+    spi_byte_access_enable(DACSgm3533BspCfg[ch].spi_base);  // Enable byte access for SPI
+    spi_nss_output_enable(DACSgm3533BspCfg[ch].spi_base);   // Enable NSS output for SPI
+    SCB_CleanDCache_by_Addr((uint32_t *)spi_send_buffer[ch], ARRAYSIZE);
+    uint8_t i = ch;
+    if (i >= DACSgm3533ChannelMax) {
+        elog_e(TAG, "Invalid channel: %d", i);
+        return;
+    }
+    memset(spi_send_buffer[i], 0, sizeof(spi_send_buffer[i]));  // Clear the buffer
+    memcpy(spi_send_buffer[i], &data, sizeof(data));            // Copy data to the buffer
+    elog_i(TAG, "spi_send_buffer[%d]: 0x%02X 0x%02X", i, spi_send_buffer[i][0], spi_send_buffer[i][1]);
+    TypdefDACSgm3533Status *DACSgm3533StatusHandle = &DACSgm3533Status[i];
+    DevPinHandleStruct *nss_gpio_cfg               = &DACSgm3533BspCfg[i].nss_gpio_cfg;
+    dma_single_data_parameter_struct *dma_fg       = (dma_single_data_parameter_struct *)&DACSgm3533BspCfg[i].dma_fg;
+    elog_i(TAG, "spi dam buffer 0x%02x 0x%02x", *((uint8_t *)dma_fg->memory0_addr),
+           *((uint8_t *)dma_fg->memory0_addr + 1));
+    dma_deinit(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel);
+    dma_single_data_mode_init(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel, dma_fg);
+    dma_channel_enable(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel);  // Enable DMA channel
 
-static void CmdDACSgm3533Help(void) {
-    elog_i(TAG, "Usage: sgm3533 <state>");
-    elog_i(TAG, "  <state>: 0 for off, 1 for on");
-    elog_i(TAG, "Example: sgm3533 1");
+    // Set NSS high
+    spi_current_data_num_config(DACSgm3533BspCfg[i].spi_base, ARRAYSIZE * 2);                                         // Clear current data number
+    DevPinWrite(nss_gpio_cfg, 1);                                                                                     // Set NSS high (inactive state)
+    spi_enable(DACSgm3533BspCfg[i].spi_base);                                                                         // Enable SPI
+    DevPinWrite(nss_gpio_cfg, 0);                                                                                     // Set NSS low (active state)
+    spi_dma_enable(DACSgm3533BspCfg[i].spi_base, SPI_DMA_TRANSMIT);                                                   // Enable DMA for SPI transmit
+    spi_master_transfer_start(DACSgm3533BspCfg[i].spi_base, SPI_TRANS_START);                                         // Start SPI transfer
+    while (dma_flag_get(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel, DMA_FLAG_FTF) == RESET);  // Wait for transfer complete
+    dma_flag_clear(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel, DMA_FLAG_FTF);                 // Clear transfer complete flag
+
+    while (RESET == spi_i2s_flag_get(DACSgm3533BspCfg[i].spi_base, SPI_FLAG_TP));  // Wait until transmit buffer is empty
+    spi_i2s_data_transmit(DACSgm3533BspCfg[i].spi_base, spi_send_buffer[i][0]);    // Transmit first byte
+    while (RESET == spi_i2s_flag_get(DACSgm3533BspCfg[i].spi_base, SPI_FLAG_TP));  // Wait until transmit buffer is empty
+    spi_i2s_data_transmit(DACSgm3533BspCfg[i].spi_base, spi_send_buffer[i][1]);    // Transmit second byte
+    DevPinWrite(nss_gpio_cfg, 1);
+    elog_i(TAG, "DACSgm3533[%d] device_name: %s, spi_base: 0x%08X", i, DACSgm3533StatusHandle->device_name, DACSgm3533BspCfg[i].spi_base);
+    elog_i(TAG, "send data: 0x%04X to channel %d", data, ch);
+    elog_i(TAG, "Send done");
 }
+static void SendDACHex(uint8_t ch, uint16_t data) {
+    DACSgm3533DSPISend(ch, data);
+}
+static void CmdDACSgm3533Help(void) {
+    printf("Usage: sgm3533 <command>\r\n");
+    printf("Commands:\r\n");
+    printf("  help          Show this help message\r\n");
+    printf("  data <ch> <data>  Set DAC data for channel <ch> in hex format (e.g., 0x1234)\r\n");
+}
+
 static int CmdDACSgm3533Handle(int argc, char *argv[]) {
-    if (argc != 2) {
+    if (argc < 2) {
         CmdDACSgm3533Help();
         return 0;
     }
-
+    if (strcmp(argv[1], "help") == 0) {
+        CmdDACSgm3533Help();
+        return 0;
+    }
+    if (strcmp(argv[1], "data") == 0) {
+        if (argc < 4) {
+            elog_e(TAG, "Usage: sgm3533 data <ch> <data>");
+            return 0;
+        }
+        printf("\r\nSetting DAC data for channel %s with data %s\r\n", argv[2], argv[3]);
+        uint8_t ch    = atoi(argv[2]);
+        uint16_t data = (uint16_t)strtol(argv[3], NULL, 16);  // Convert hex string to uint16_t
+        if (ch >= DACSgm3533ChannelMax) {
+            elog_e(TAG, "Invalid channel: %d", ch);
+            return 0;
+        }
+        SendDACHex(ch, data);
+        return 0;
+    }
+    CmdDACSgm3533Help();
     return 0;
 }
 
