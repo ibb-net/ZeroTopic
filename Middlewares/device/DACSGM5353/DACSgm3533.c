@@ -30,9 +30,9 @@
 #endif
 /* ===================================================================================== */
 #define ARRAYSIZE 2
-__IO uint16_t spi_send_buffer[DACSgm3533ChannelMax][ARRAYSIZE] = {
-    {0xA5A5, 0xA5A5},  // Channel 0
-    {0x5a5a, 0x5a5a},  // Channel 1
+__IO uint8_t spi_send_buffer[DACSgm3533ChannelMax][ARRAYSIZE] = {
+    {0xA5, 0xA5},  // Channel 0
+    {0x5a, 0x5a},  // Channel 1
 };
 typedef struct
 {
@@ -231,7 +231,7 @@ void DACSgm3533DeviceInit(void) {
         spi_byte_access_enable(DACSgm3533BspCfg[i].spi_base);
         spi_nss_output_enable(DACSgm3533BspCfg[i].spi_base);
 
-        DACSgm3533DSPISend(i, 0x0000);  // Send initial data to clear the buffer
+        DACSgm3533DSPISend(i, 0xA5A6);  // Send initial data to clear the buffer
         elog_i(TAG, "DACSgm3533[%d] device_name: %s, spi_base: 0x%08X", i, DACSgm3533StatusHandle->device_name, DACSgm3533BspCfg[i].spi_base);
     }
 }
@@ -281,7 +281,7 @@ void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
 
     spi_byte_access_enable(DACSgm3533BspCfg[ch].spi_base);  // Enable byte access for SPI
     spi_nss_output_enable(DACSgm3533BspCfg[ch].spi_base);   // Enable NSS output for SPI
-    // SCB_CleanDCache_by_Addr((uint32_t *)spi_send_buffer[ch], ARRAYSIZE);
+    SCB_CleanDCache_by_Addr((uint32_t *)spi_send_buffer[ch], ARRAYSIZE);
     uint8_t i = ch;
     if (i >= DACSgm3533ChannelMax) {
         elog_e(TAG, "Invalid channel: %d", i);
@@ -300,6 +300,7 @@ void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
     elog_i(TAG, "spi dam buffer 0x%02x 0x%02x", *((uint8_t *)dma_fg->memory0_addr),
            *((uint8_t *)dma_fg->memory0_addr + 1));
     dma_deinit(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel);
+   SCB_CleanDCache_by_Addr((uint32_t *)spi_send_buffer[ch], ARRAYSIZE);
     dma_single_data_mode_init(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel, dma_fg);
     dma_channel_enable(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel);  // Enable DMA channel
 
