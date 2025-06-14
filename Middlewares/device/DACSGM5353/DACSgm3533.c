@@ -281,7 +281,7 @@ void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
 
     spi_byte_access_enable(DACSgm3533BspCfg[ch].spi_base);  // Enable byte access for SPI
     spi_nss_output_enable(DACSgm3533BspCfg[ch].spi_base);   // Enable NSS output for SPI
-    SCB_CleanDCache_by_Addr((uint32_t *)spi_send_buffer[ch], ARRAYSIZE);
+    // SCB_CleanDCache_by_Addr((uint32_t *)spi_send_buffer[ch], ARRAYSIZE);
     uint8_t i = ch;
     if (i >= DACSgm3533ChannelMax) {
         elog_e(TAG, "Invalid channel: %d", i);
