@@ -54,9 +54,9 @@ void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle) {
 
         } else if (ptrDevPinHandle->pin_mode == DevPinModeOutput) {
             /* 配置为普通输出 */
+            gpio_bit_write(ptrDevPinHandle->base, ptrDevPinHandle->pin, ptrDevPinHandle->bit_value ? SET : RESET);
             gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, ptrDevPinHandle->pin);
             gpio_output_options_set(ptrDevPinHandle->base, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, ptrDevPinHandle->pin);
-            gpio_bit_write(ptrDevPinHandle->base, ptrDevPinHandle->pin, ptrDevPinHandle->bit_value ? SET : RESET);
         } else {
             // do nothing
         }
