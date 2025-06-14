@@ -276,19 +276,26 @@ static void __DACSgm3533CycHandle(void) {
 #endif
 void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
     elog_i(TAG, "SendDACHex: ch=%d, data=0x%04X %d", ch, data, data);
+
+    // Set NSS high
+
     spi_byte_access_enable(DACSgm3533BspCfg[ch].spi_base);  // Enable byte access for SPI
     spi_nss_output_enable(DACSgm3533BspCfg[ch].spi_base);   // Enable NSS output for SPI
-    SCB_CleanDCache_by_Addr((uint32_t *)spi_send_buffer[ch], ARRAYSIZE);
+    // SCB_CleanDCache_by_Addr((uint32_t *)spi_send_buffer[ch], ARRAYSIZE);
     uint8_t i = ch;
     if (i >= DACSgm3533ChannelMax) {
         elog_e(TAG, "Invalid channel: %d", i);
         return;
     }
+    DevPinHandleStruct *nss_gpio_cfg = &DACSgm3533BspCfg[i].nss_gpio_cfg;
+
     memset(spi_send_buffer[i], 0, sizeof(spi_send_buffer[i]));  // Clear the buffer
     memcpy(spi_send_buffer[i], &data, sizeof(data));            // Copy data to the buffer
     elog_i(TAG, "spi_send_buffer[%d]: 0x%02X 0x%02X", i, spi_send_buffer[i][0], spi_send_buffer[i][1]);
+    spi_current_data_num_config(DACSgm3533BspCfg[i].spi_base, 0);  // Clear current data number
+    DevPinWrite(nss_gpio_cfg, 1);
+    DevPinWrite(nss_gpio_cfg, 0);   
     TypdefDACSgm3533Status *DACSgm3533StatusHandle = &DACSgm3533Status[i];
-    DevPinHandleStruct *nss_gpio_cfg               = &DACSgm3533BspCfg[i].nss_gpio_cfg;
     dma_single_data_parameter_struct *dma_fg       = (dma_single_data_parameter_struct *)&DACSgm3533BspCfg[i].dma_fg;
     elog_i(TAG, "spi dam buffer 0x%02x 0x%02x", *((uint8_t *)dma_fg->memory0_addr),
            *((uint8_t *)dma_fg->memory0_addr + 1));
@@ -296,20 +303,25 @@ void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
     dma_single_data_mode_init(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel, dma_fg);
     dma_channel_enable(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel);  // Enable DMA channel
 
-    // Set NSS high
-    spi_current_data_num_config(DACSgm3533BspCfg[i].spi_base, ARRAYSIZE * 2);                                         // Clear current data number
-    DevPinWrite(nss_gpio_cfg, 1);                                                                                     // Set NSS high (inactive state)
+    // Set NSS high (inactive state)
     spi_enable(DACSgm3533BspCfg[i].spi_base);                                                                         // Enable SPI
     DevPinWrite(nss_gpio_cfg, 0);                                                                                     // Set NSS low (active state)
     spi_dma_enable(DACSgm3533BspCfg[i].spi_base, SPI_DMA_TRANSMIT);                                                   // Enable DMA for SPI transmit
     spi_master_transfer_start(DACSgm3533BspCfg[i].spi_base, SPI_TRANS_START);                                         // Start SPI transfer
     while (dma_flag_get(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel, DMA_FLAG_FTF) == RESET);  // Wait for transfer complete
-    dma_flag_clear(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel, DMA_FLAG_FTF);                 // Clear transfer complete flag
+    dma_flag_clear(DACSgm3533BspCfg[i].dma_base_addr, DACSgm3533BspCfg[i].dma_channel, DMA_FLAG_FTF);
 
+    // while (RESET == spi_i2s_flag_get(DACSgm3533BspCfg[i].spi_base, SPI_FLAG_ET));
+
+    // spi_reload_data_num_config(DACSgm3533BspCfg[i].spi_base, ARRAYSIZE );
+    spi_master_transfer_start(DACSgm3533BspCfg[i].spi_base, SPI_TRANS_START);  // Clear current data number
+
+    while (RESET == spi_i2s_flag_get(DACSgm3533BspCfg[i].spi_base, SPI_STAT_TC));  // Wait until transmit buffer is empty
+    spi_i2s_data_transmit(DACSgm3533BspCfg[i].spi_base, 0x12);                     // Transmit first byte
     while (RESET == spi_i2s_flag_get(DACSgm3533BspCfg[i].spi_base, SPI_FLAG_TP));  // Wait until transmit buffer is empty
-    spi_i2s_data_transmit(DACSgm3533BspCfg[i].spi_base, spi_send_buffer[i][0]);    // Transmit first byte
-    while (RESET == spi_i2s_flag_get(DACSgm3533BspCfg[i].spi_base, SPI_FLAG_TP));  // Wait until transmit buffer is empty
-    spi_i2s_data_transmit(DACSgm3533BspCfg[i].spi_base, spi_send_buffer[i][1]);    // Transmit second byte
+    spi_i2s_data_transmit(DACSgm3533BspCfg[i].spi_base, 0x56);                     // Transmit second byte
+    while (RESET == spi_i2s_flag_get(DACSgm3533BspCfg[i].spi_base, SPI_STAT_TC));
+
     DevPinWrite(nss_gpio_cfg, 1);
     elog_i(TAG, "DACSgm3533[%d] device_name: %s, spi_base: 0x%08X", i, DACSgm3533StatusHandle->device_name, DACSgm3533BspCfg[i].spi_base);
     elog_i(TAG, "send data: 0x%04X to channel %d", data, ch);
