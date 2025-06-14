@@ -96,18 +96,6 @@ const TypdefDACSgm3533BSPCfg DACSgm3533BspCfg[DACSgm3533ChannelMax] = {
             .dam_tx = {
                 .base    = DMA0,
                 .channel = DMA_CH2,
-                .request = DMA_REQUEST_SPI2_TX,
-                .dma_cfg = {
-                    .direction           = DMA_MEMORY_TO_PERIPH,
-                    .memory0_addr        = (uint32_t)spi_send_buffer[0],  // To be set later
-                    .memory_inc          = DMA_MEMORY_INCREASE_ENABLE,
-                    .periph_memory_width = DMA_PERIPH_WIDTH_8BIT,
-                    .number              = ARRAYSIZE,  // Number of bytes to transfer
-                    .periph_addr         = (uint32_t)(&SPI_TDATA(SPI2)),
-                    .periph_inc          = DMA_PERIPH_INCREASE_DISABLE,
-                    .priority            = DMA_PRIORITY_HIGH,
-                    .circular_mode       = DMA_CIRCULAR_MODE_DISABLE,
-                },
 
             }},
 
@@ -151,18 +139,6 @@ const TypdefDACSgm3533BSPCfg DACSgm3533BspCfg[DACSgm3533ChannelMax] = {
                     .dam_tx = {
                         .base    = DMA1,
                         .channel = DMA_CH2,
-                        .request = DMA_REQUEST_SPI0_TX,
-                        .dma_cfg = {
-                            .direction           = DMA_MEMORY_TO_PERIPH,
-                            .memory0_addr        = (uint32_t)spi_send_buffer[1],  // To be set later
-                            .memory_inc          = DMA_MEMORY_INCREASE_ENABLE,
-                            .periph_memory_width = DMA_PERIPH_WIDTH_8BIT,
-                            .number              = ARRAYSIZE,  // Number of bytes to transfer
-                            .periph_addr         = (uint32_t)(&SPI_TDATA(SPI0)),
-                            .periph_inc          = DMA_PERIPH_INCREASE_DISABLE,
-                            .priority            = DMA_PRIORITY_HIGH,
-                            .circular_mode       = DMA_CIRCULAR_MODE_DISABLE,
-                        },
 
                     }},
 
@@ -210,8 +186,8 @@ void DACSgm3533DeviceInit(void) {
 
     for (size_t i = 0; i < DACSgm3533ChannelMax; i++) {
         TypdefDACSgm3533Status *DACSgm3533StatusHandle = &DACSgm3533Status[i];
-        DevSpiHandleStruct * spicfg= &DACSgm3533BspCfg[i].spi_cfg;
-        DACSgm3533StatusHandle->id = i;
+        DevSpiHandleStruct *spicfg                     = &DACSgm3533BspCfg[i].spi_cfg;
+        DACSgm3533StatusHandle->id                     = i;
         memset(DACSgm3533StatusHandle->device_name, 0, sizeof(DACSgm3533StatusHandle->device_name));
         snprintf(DACSgm3533StatusHandle->device_name, sizeof(DACSgm3533StatusHandle->device_name), "DACSgm3533%d", i);
         DACSgm3533StatusHandle->cfg = DACSgm3533BspCfg[i];  // Copy configuration

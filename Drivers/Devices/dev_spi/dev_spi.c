@@ -6,7 +6,6 @@
 #include "dev_basic.h"
 #include "dev_dma.h"
 #include "dev_pin.h"
-
 #include "string.h"
 typedef struct
 {
@@ -71,14 +70,11 @@ int DevSpiDMAWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, u
         printf("Error: DMA handle is NULL for SPI base %x.\r\n", ptrDevSpiHandle->base);
         return -1;
     }
-    if (dma_handle->request == 0) {
-        printf("Error: DMA request not configured for SPI\r\n");
-        return -1;
-    }
 
     dma_deinit(dma_handle->base, dma_handle->channel);
     dma_single_data_parameter_struct dma_init_struct;
-    memcpy(&dma_init_struct, &(dma_handle->dma_cfg), sizeof(dma_single_data_parameter_struct));
+    dma_single_data_para_struct_init(&dma_init_struct);
+
     // spi_dma_disable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);  // Disable DMA for SPI transmit
     SCB_CleanDCache_by_Addr((uint32_t *)buffer, length);
 
