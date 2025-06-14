@@ -89,17 +89,21 @@ int DevSpiDMAWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, u
     dma_init_struct.priority            = DMA_PRIORITY_HIGH;
     dma_single_data_mode_init(
         dma_handle->base, dma_handle->channel, &dma_init_struct);
-    DevPinWrite(&ptrDevSpiHandle->nss, 0);                      // Set NSS low (active state)
-    dma_channel_enable(dma_handle->base, dma_handle->channel);  // Enable DMA channel
-
+    // DevPinWrite(&ptrDevSpiHandle->nss, 0);                      // Set NSS low (active state)
+    // dma_channel_enable(dma_handle->base, dma_handle->channel);
     spi_enable(ptrDevSpiHandle->base);                                                   // Enable SPI
     spi_dma_enable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);                             // Enable DMA for SPI transmit
-    spi_master_transfer_start(ptrDevSpiHandle->base, SPI_TRANS_START);                   // Start SPI transfer
+    DevPinWrite(&ptrDevSpiHandle->nss, 0);                      // Set NSS low (active state)
+
+    spi_master_transfer_start(ptrDevSpiHandle->base, SPI_TRANS_START);                 
+    dma_channel_enable(dma_handle->base, dma_handle->channel);  // Enable DMA channel
+
     while (dma_flag_get(dma_handle->base, dma_handle->channel, DMA_FLAG_FTF) == RESET);  // Wait for transfer complete
     dma_flag_clear(dma_handle->base, dma_handle->channel, DMA_FLAG_FTF);
     while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) == RESET);  // Wait until transmit buffer is empty
 
     DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
+    spi_dma_disable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);  // Disable DMA for SPI transmit
     return 0;
 }
 // DevSpiWrite
