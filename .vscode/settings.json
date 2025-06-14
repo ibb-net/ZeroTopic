@@ -35,6 +35,7 @@
         "device.h": "c",
         "gpio.h": "c",
         "dev_pin.h": "c",
-        "dev_basic.h": "c"
+        "dev_basic.h": "c",
+        "dev_spi.h": "c"
     }
 }

@@ -75,4 +75,5 @@ void DevPinWrite(const DevPinHandleStruct *ptrDevPinHandle, uint8_t bit_value) {
 uint8_t DevPinRead(const DevPinHandleStruct *ptrDevPinHandle) {
     return (gpio_input_bit_get(ptrDevPinHandle->base, ptrDevPinHandle->pin) == SET) ? 1 : 0;
 }
+
 #endif

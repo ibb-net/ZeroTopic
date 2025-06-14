@@ -13,7 +13,14 @@ typedef struct {
     uint32_t base;
     uint32_t pin;
 } TypedefDevPinMap;
-
+typedef enum{
+    DEV_SPI0 = 0,
+    DEV_SPI1,
+    DEV_SPI2,
+    DEV_SPI3,
+    DEV_SPI4,
+    DEV_SPI5,
+}EnumDevMaps;
 typedef enum {
     DEV_PIN_START = 0,
     DEV_PIN_PE2   = 1,      // GPIOE_PIN2
