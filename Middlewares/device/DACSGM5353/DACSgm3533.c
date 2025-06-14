@@ -277,11 +277,8 @@ static void __DACSgm3533CycHandle(void) {
 void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
     elog_i(TAG, "SendDACHex: ch=%d, data=0x%04X %d", ch, data, data);
 
-    // Set NSS high
 
-    spi_byte_access_enable(DACSgm3533BspCfg[ch].spi_base);  // Enable byte access for SPI
-    spi_nss_output_enable(DACSgm3533BspCfg[ch].spi_base);   // Enable NSS output for SPI
-    // SCB_CleanDCache_by_Addr((uint32_t *)spi_send_buffer[ch], ARRAYSIZE);
+
     uint8_t i = ch;
     if (i >= DACSgm3533ChannelMax) {
         elog_e(TAG, "Invalid channel: %d", i);
