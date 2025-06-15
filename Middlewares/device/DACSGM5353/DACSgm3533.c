@@ -19,7 +19,7 @@
 #include "os_server.h"
 // #include "app_event.h"
 
-#define TAG              "DACSgm3533"
+#define TAG              "DAC"
 #define DACSgm3533LogLvl ELOG_LVL_INFO
 
 #define DACSgm3533Priority PriorityNormalEventGroup0
@@ -86,9 +86,9 @@ const TypdefDACSgm3533BSPCfg DACSgm3533BspCfg[DACSgm3533ChannelMax] = {
             },
             .spi_cfg = {
                 .device_mode          = SPI_MASTER,
-                .trans_mode           = SPI_TRANSMODE_BDTRANSMIT,
+                .trans_mode           = SPI_TRANSMODE_FULLDUPLEX,
                 .data_size            = SPI_DATASIZE_8BIT,
-                .clock_polarity_phase = SPI_CK_PL_HIGH_PH_1EDGE,//SPI_CK_PL_LOW_PH_1EDGE,
+                .clock_polarity_phase = SPI_CK_PL_LOW_PH_1EDGE,
                 .nss                  = SPI_NSS_SOFT,
                 .prescale             = SPI_PSC_256,
                 .endian               = SPI_ENDIAN_MSB,
@@ -194,7 +194,7 @@ void DACSgm3533DeviceInit(void) {
 
         DevSpiInit(spicfg);  // Initialize SPI
 
-        DACSgm3533DSPISend(i, 0xA5A6);  // Send initial data to clear the buffer
+        DACSgm3533DSPISend(i, 0x0000);  // Send initial data to clear the buffer
         elog_i(TAG, "DACSgm3533[%d] device_name: %s, spi_base: 0x%08X", i, DACSgm3533StatusHandle->device_name, DACSgm3533StatusHandle->cfg.spi_cfg.base);
     }
 }
@@ -248,8 +248,8 @@ void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
     // Prepare the data to send
     spi_send_buffer[i][0] = (data >> 8) & 0xFF;  // High byte
     spi_send_buffer[i][1] = data & 0xFF;         // Low byte
-    DevSpiDMAWrite(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), ARRAYSIZE);
-    // DevSpiWrite(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), ARRAYSIZE);
+    // DevSpiDMAWrite(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), ARRAYSIZE);
+    DevSpiWrite(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), ARRAYSIZE);
     elog_i(TAG, "spi_send_buffer[%d][0]: 0x%02X, spi_send_buffer[%d][1]: 0x%02X", i, spi_send_buffer[i][0], i, spi_send_buffer[i][1]);
     elog_i(TAG, "send data: 0x%04X to channel %d", data, ch);
     elog_i(TAG, "Send done");
@@ -263,7 +263,52 @@ static void CmdDACSgm3533Help(void) {
     printf("  help          Show this help message\r\n");
     printf("  data <ch> <data>  Set DAC data for channel <ch> in hex format (e.g., 0x1234)\r\n");
 }
+#define NEW_ARRAYSIZE 10
+int send_n = 0, receive_n = 0;
+uint8_t spi0_send_array[NEW_ARRAYSIZE]    = {0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA};
+uint8_t spi1_send_array[NEW_ARRAYSIZE]    = {0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA};
+uint8_t spi0_receive_array[NEW_ARRAYSIZE] = {0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA};
+uint8_t spi1_receive_array[NEW_ARRAYSIZE] = {0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA};
 
+void spi_rcv_send_test(void) {
+    DevPinWrite(&DACSgm3533BspCfg[0].spi_cfg.nss, 1);  // Set NSS low (active state)
+    spi_current_data_num_config(SPI0, NEW_ARRAYSIZE);
+    spi_current_data_num_config(SPI2, NEW_ARRAYSIZE);
+    spi_enable(SPI0);
+    spi_enable(SPI2);
+
+    DevPinWrite(&DACSgm3533BspCfg[0].spi_cfg.nss, 0);  // Set NSS low (active state)
+    spi_master_transfer_start(SPI2, SPI_TRANS_START);
+    send_n    = 0;
+    receive_n = 0;
+    printf("start send\r\n");
+    while (send_n < NEW_ARRAYSIZE) {
+        // while (RESET == spi_i2s_flag_get(SPI0, SPI_FLAG_TP));
+        // spi_i2s_data_transmit(SPI0, spi0_send_array[send_n]);
+        while (RESET == spi_i2s_flag_get(SPI2, SPI_FLAG_TP));
+        spi_i2s_data_transmit(SPI2, spi1_send_array[send_n++]);
+
+        // while (RESET == spi_i2s_flag_get(SPI0, SPI_FLAG_RP));
+        // spi0_receive_array[receive_n] = spi_i2s_data_receive(SPI0);
+
+        while (RESET == spi_i2s_flag_get(SPI2, SPI_FLAG_RP));
+        spi1_receive_array[receive_n++] = spi_i2s_data_receive(SPI2);
+
+    }
+    while (RESET == spi_i2s_flag_get(SPI2, SPI_FLAG_TC));
+    // while (RESET == spi_i2s_flag_get(SPI0, SPI_FLAG_TC));
+    log_i(TAG, "send_n = %d, receive_n = %d", send_n, receive_n);
+
+    DevPinWrite(&DACSgm3533BspCfg[0].spi_cfg.nss, 1);  // Set NSS high (inactive state)
+    log_i(TAG, "spi0_send_array: ");
+    elog_hexdump(TAG, 16, spi0_send_array, NEW_ARRAYSIZE);
+    log_i(TAG, "spi1_send_array: ");
+    elog_hexdump(TAG, 16, spi1_send_array, NEW_ARRAYSIZE);
+    log_i(TAG, "spi0_receive_array: ");
+    elog_hexdump(TAG, 16, spi0_receive_array, NEW_ARRAYSIZE);
+    log_i(TAG, "spi1_receive_array: ");
+    elog_hexdump(TAG, 16, spi1_receive_array, NEW_ARRAYSIZE);
+}
 static int CmdDACSgm3533Handle(int argc, char *argv[]) {
     if (argc < 2) {
         CmdDACSgm3533Help();
@@ -271,6 +316,10 @@ static int CmdDACSgm3533Handle(int argc, char *argv[]) {
     }
     if (strcmp(argv[1], "help") == 0) {
         CmdDACSgm3533Help();
+        return 0;
+    }
+    if (strcmp(argv[1], "test") == 0) {
+        spi_rcv_send_test();
         return 0;
     }
     if (strcmp(argv[1], "data") == 0) {
