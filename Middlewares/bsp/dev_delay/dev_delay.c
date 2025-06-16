@@ -1,5 +1,4 @@
 #include "dev_basic.h"
-#include "gd32h757z_start.h"
 #define TIM_MSEC_DELAY        0x01U
 #define TIM_USEC_DELAY        0x02U
 #define DELAY_TIMER           TIMER50
@@ -126,21 +125,11 @@ void DevDelayMs(uint32_t ntime) {
     hw_delay(ntime, TIM_MSEC_DELAY);
 }
 
-void delay_timer_irq(void) {
-    // SCB_CleanDCache_by_Addr((uint32_t *)&delay_time, sizeof(delay_time));
-
-    // if (delay_time > 0x00U) {
-    //     delay_time--;
-    // } else {
-    //     timer_disable(DELAY_TIMER);
-    // }
-}
 
 void TIMER50_IRQHandler(void) {
     if (SET == timer_interrupt_flag_get(TIMER50, TIMER_INT_FLAG_UP)) {
         /* clear update interrupt bit */
         timer_interrupt_flag_clear(TIMER50, TIMER_INT_FLAG_UP);
-        // delay_timer_irq();
         timeout_flg = 0;
     }
 }
