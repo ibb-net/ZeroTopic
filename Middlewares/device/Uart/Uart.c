@@ -196,7 +196,6 @@ void UartDeviceInit(void) {
         }
         DevUarStart(&(UartBspCfg[i].uart_cfg));
     }
-
 }
 // SYSTEM_REGISTER_INIT(MCUInitStage, UartPriority, UartDeviceInit, UartDeviceInit);
 
@@ -257,6 +256,7 @@ static void UartRcvHandle(void *msg) {
         } break;
         case UartRcv: {
             elog_i(TAG, "Uart Com Recive :%s", (char *)MSG_GET_PAYLOAD(tmp_msg));
+            elog_hexdump(TAG, 8, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
 
         } break;
         default:
@@ -267,9 +267,10 @@ static void UartRcvHandle(void *msg) {
 
 // 超时处理的回调函数
 static void UartCycHandle(void) {
+#if 0
     static uint8_t cnt   = 0;
     static uint8_t cnt_1 = 0;
-    #if 0
+
     if (cnt % 20 == 0) {
         if (cnt_1) {
             elog_i(TAG, "Backlight 30%%");
@@ -283,7 +284,7 @@ static void UartCycHandle(void) {
     }
 
     cnt++;
-    #endif
+#endif
 }
 // UartStreamRcvTask
 void UartStreamRcvTask(void *arg) {
@@ -307,19 +308,19 @@ static void __UartRXISRHandle(void *arg) {
     channelx                     = uart_handle->UartBspCfg->uart_cfg.rx_dma_channel;
     uint32_t dma_transfer_number = dma_transfer_number_get(dma_periph, channelx);
     if (dma_transfer_number == 0) {
-        elog_e(TAG, "DMA transfer number is zero, no data received.\r\n");
+        printf("\r\n[ERROR]DMA transfer number is zero, no data received.\r\n");
     }
     int rx_count = uart_handle->buffer_size - dma_transfer_number;
     // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count, uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
-        elog_e(TAG, "RX count is zero or negative, no data received.\r\n");
+        printf("\r\n[ERROR]RX count is zero or negative, no data received.\r\n");
     } else {
         /* BaseType_t xQueueSendFromISR( QueueHandle_t xQueue,
 const void *pvItemToQueue,
 BaseType_t *pxHigherPriorityTaskWoken ); */
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         if (xStreamBufferSendFromISR(uart_handle->rx_stream_buffer, uart_handle->rx_buffer, rx_count, &xHigherPriorityTaskWoken) == 0) {
-            elog_e(TAG, "Failed to send data to stream buffer from ISR\r\n");
+            printf("\r\n[ERROR]Failed to send data to stream buffer from ISR\r\n");
         }
         DevUartDMARecive(&(uart_handle->UartBspCfg->uart_cfg), uart_handle->rx_buffer, uart_handle->buffer_size);
     }

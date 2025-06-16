@@ -6,7 +6,7 @@
 
 #define Uart_UART_BASE         UART6
 #define Uart_UART_BAUDRATE     115200
-#define Uart_UART_IDLE_TIMEOUT 100  // 单位：ms
+#define Uart_UART_IDLE_TIMEOUT 10  // 单位：ms
 
 // TX GPIO 配置
 #define Uart_TX_GPIO_PORT GPIOE
