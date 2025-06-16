@@ -2,10 +2,11 @@
 #include "timer_decoder_cfg.h"
 
 #if CONFIG_TIMER_DECODER_EN
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
+
 #include "elog.h"
 #include "gd32h7xx.h"
 #include "os_server.h"
@@ -220,14 +221,21 @@ static void ENCODER_TIMER_INIT_HANDLE(void *msg) {
     elog_i(TAG, "ENCODER_TIMER_INIT_HANDLE\r\n");
     // 发布事件，表示计时器已准备就绪
     // vfb_publish(ENCODER_TIMER_READY);
+    vfb_send(ENCODER_TIMER_START, DECODER_CHANNEL1, NULL, 0);  // 启动计时器
     vfb_send(ENCODER_TIMER_START, DECODER_CHANNEL0, NULL, 0);  // 启动计时器
-
     VFBMsgDecoderStruct msg_decoder = {
         .channel   = DECODER_CHANNEL0,
         .phy_value = 0,
-        .mode      = DECODER_MODE_STEP,
+        .mode      = DECODER_MODE_CONTINUOUS,
     };
+
     vfb_send(ENCODER_TIMER_SET_MODE, 0, &msg_decoder, sizeof(VFBMsgDecoderStruct));  // 设置计时器模式为步进模式
+    VFBMsgDecoderStruct msg_decoder1 = {
+        .channel   = DECODER_CHANNEL1,
+        .phy_value = 0,
+        .mode      = DECODER_MODE_CONTINUOUS,
+    };
+    vfb_send(ENCODER_TIMER_SET_MODE, 0, &msg_decoder1, sizeof(VFBMsgDecoderStruct));  // 设置计时器模式为步进模式
 }
 // 接收消息的回调函数
 static void ENCODER_TIMER_RCV_HANDLE(void *msg) {

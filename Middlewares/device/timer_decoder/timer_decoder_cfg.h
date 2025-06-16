@@ -64,7 +64,7 @@
 // 0~40mv
 #define MAX_PHY_VALUE_CH0 (40000)  //uV
 #define DEF_PHY_VALUE_CH0 (20000)  // 默认物理值
-#define MIN_PHY_VALUE_CH0 (-4)
+#define MIN_PHY_VALUE_CH0 (0)
 #define STEP_PHY_VALUE_CH0 (10)  // 每步物理值
 
 #define MAX_PHY_VALUE_CH1 (9000)   // mV
