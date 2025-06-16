@@ -38,6 +38,7 @@ typedef enum {
     DACSgm3533Start,
     DACSgm3533Stop,
     DACSgm3533Get,
+    DACSgm3533Set,
     /************************************************* */
     SDK_EVENT_NUM,
     SDK_EVENT_LIST_MAX = SDK_EVENT_LIST_APP_START - 1

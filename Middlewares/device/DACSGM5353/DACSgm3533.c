@@ -161,6 +161,7 @@ static const vfb_event_t DACSgm3533EventList[] = {
     DACSgm3533Start,
     DACSgm3533Stop,
     DACSgm3533Get,
+    DACSgm3533Set,
 
 };
 
@@ -221,6 +222,17 @@ static void __DACSgm3533RcvHandle(void *msg) {
     switch (tmp_msg->frame->head.event) {
         case DACSgm3533Start: {
             elog_i(TAG, "DACSgm3533StartTask %d", tmp_msg->frame->head.data);
+        } break;
+        case DACSgm3533Set: {
+            // Set DAC data for a specific channel
+            uint8_t ch = (uint8_t)(tmp_msg->frame->head.data & 0xFF);
+            uint16_t data = (uint16_t)((tmp_msg->frame->head.data >> 8) & 0xFFFF);
+            if (ch < DACSgm3533ChannelMax) {
+                elog_i(TAG, "Set DAC channel %d to data 0x%04X", ch, data);
+                SendDACHex(ch, data);
+            } else {
+                elog_e(TAG, "Invalid channel: %d", ch);
+            }
         } break;
         default:
             elog_e(TAG, "TASK %s RCV: unknown event: %d", taskName, tmp_msg->frame->head.event);
