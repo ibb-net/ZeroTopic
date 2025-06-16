@@ -129,7 +129,7 @@ const TypdefDACSgm3533BSPCfg DACSgm3533BspCfg[DACSgm3533ChannelMax] = {
                     },
                     .spi_cfg = {
                         .device_mode          = SPI_MASTER,
-                        .trans_mode           = SPI_TRANSMODE_BDTRANSMIT,
+                        .trans_mode           = SPI_TRANSMODE_FULLDUPLEX,
                         .data_size            = SPI_DATASIZE_8BIT,
                         .clock_polarity_phase = SPI_CK_PL_LOW_PH_1EDGE,
                         .nss                  = SPI_NSS_SOFT,
@@ -249,7 +249,9 @@ void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
     spi_send_buffer[i][0] = (data >> 8) & 0xFF;  // High byte
     spi_send_buffer[i][1] = data & 0xFF;         // Low byte
     // DevSpiDMAWrite(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), ARRAYSIZE);
-    DevSpiWrite(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), ARRAYSIZE);
+    // DevSpiWrite(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), ARRAYSIZE);
+    
+    DevSpiWriteRead(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]),NULL, ARRAYSIZE);
     elog_i(TAG, "spi_send_buffer[%d][0]: 0x%02X, spi_send_buffer[%d][1]: 0x%02X", i, spi_send_buffer[i][0], i, spi_send_buffer[i][1]);
     elog_i(TAG, "send data: 0x%04X to channel %d", data, ch);
     elog_i(TAG, "Send done");
@@ -293,7 +295,6 @@ void spi_rcv_send_test(void) {
 
         while (RESET == spi_i2s_flag_get(SPI2, SPI_FLAG_RP));
         spi1_receive_array[receive_n++] = spi_i2s_data_receive(SPI2);
-
     }
     while (RESET == spi_i2s_flag_get(SPI2, SPI_FLAG_TC));
     // while (RESET == spi_i2s_flag_get(SPI0, SPI_FLAG_TC));
@@ -319,7 +320,11 @@ static int CmdDACSgm3533Handle(int argc, char *argv[]) {
         return 0;
     }
     if (strcmp(argv[1], "test") == 0) {
-        spi_rcv_send_test();
+        // spi_rcv_send_test();
+        printf("Testing SPI send/receive\r\n");
+        DevSpiWriteRead(&DACSgm3533BspCfg[0].spi_cfg, spi0_send_array, spi0_receive_array, NEW_ARRAYSIZE);
+        elog_hexdump(TAG, 16, spi0_send_array, NEW_ARRAYSIZE);
+        elog_hexdump(TAG, 16, spi0_receive_array, NEW_ARRAYSIZE);
         return 0;
     }
     if (strcmp(argv[1], "data") == 0) {
