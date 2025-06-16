@@ -165,10 +165,10 @@ static void __Ds18b20CycHandle(void) {
                 Ds18b20StatusTmp->temperature =
                     CmdDs18b20Read(0);  // Read temperature
                 Ds18b20StatusTmp->step = 0;
-                elog_i(TAG, "Ds18b20 temperature: %.2f", Ds18b20StatusTmp->temperature);
+                elog_d(TAG, "Ds18b20 temperature: %.2f", Ds18b20StatusTmp->temperature);
                 // Send temperature to HMI
                 vfb_send(Ds18b20GetTemperature, 0, &Ds18b20StatusTmp->temperature, sizeof(Ds18b20StatusTmp->temperature));
-                elog_i(TAG, "Send Ds18b20GetTemperature done %u ", conter);
+                elog_d(TAG, "Send Ds18b20GetTemperature done %u ", conter);
             }
 
         } else {
@@ -244,7 +244,7 @@ static void CmdDs18b20ReadRom(void) {
     }
 }
 static void CmdDs18b20Covert(uint8_t state) {
-    elog_i(TAG, "Starting DS18B20 conversion...");
+    elog_d(TAG, "Starting DS18B20 conversion...");
 
     DevOneWireHandleStruct *handle = &(Ds18b20BspCfg[0].one_wire);
     vTaskSuspendAll();
@@ -257,7 +257,7 @@ static void CmdDs18b20Covert(uint8_t state) {
 }
 static float CmdDs18b20Read(uint8_t state) {
     DevOneWireHandleStruct *handle = &(Ds18b20BspCfg[0].one_wire);
-    elog_i(TAG, "Reading DS18B20 temperature...");
+    elog_d(TAG, "Reading DS18B20 temperature...");
     uint8_t scratchpad[9] = {0};
     vTaskSuspendAll();
     DevOneWireReset(handle);  // Reset the bus before reading ROM
@@ -279,7 +279,7 @@ static float CmdDs18b20Read(uint8_t state) {
         f_tem = (~temp + 1) * 0.0625;
     else
         f_tem = temp * 0.0625;
-    elog_i(TAG, "DS18B20 Temperature: %.2f C", f_tem);
+    elog_d(TAG, "DS18B20 Temperature: %.2f C", f_tem);
     return f_tem;
 }
 static int CmdDs18b20Handle(int argc, char *argv[]) {
@@ -304,9 +304,11 @@ static int CmdDs18b20Handle(int argc, char *argv[]) {
         CmdDs18b20ReadRom();
         return 0;
     } else if (strcmp(argv[1], "read") == 0) {
-        CmdDs18b20Read(1);
+        float temp = CmdDs18b20Read(1);
+        elog_i(TAG, "Read temperature: %.2f C", temp);
         return 0;
     } else if (strcmp(argv[1], "convert") == 0) {
+        elog_i(TAG, "Converting DS18B20 temperature...");
         CmdDs18b20Covert(1);
         return 0;
     }

@@ -239,11 +239,11 @@ static void UartRcvHandle(void *msg) {
         } break;
         case UartSend: {
             if (tmp_msg->frame->head.length == 0 || tmp_msg->frame->head.payload_offset == NULL) {
-                elog_i(TAG, "[ERROR]UartSend: payload is NULL or length is 0\r\n");
+                elog_e(TAG, "[ERROR]UartSend: payload is NULL or length is 0\r\n");
                 return;
             }
-            elog_i(TAG, "UartSend: length: %d", MSG_GET_LENGTH(tmp_msg));
-            elog_hexdump(TAG, 16, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
+            elog_d(TAG, "UartSend: length: %d", MSG_GET_LENGTH(tmp_msg));
+            //elog_hexdump(TAG, 16, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
             DevUartDMASend(&UartBspCfg[0].uart_cfg, (const uint8_t *)MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
             // wait for TX DMA complete lock_tx
             if (uart_handle->lock_tx != NULL) {
@@ -255,8 +255,8 @@ static void UartRcvHandle(void *msg) {
             }
         } break;
         case UartRcv: {
-            elog_i(TAG, "Uart Com Recive :%s", (char *)MSG_GET_PAYLOAD(tmp_msg));
-            elog_hexdump(TAG, 8, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
+            elog_d(TAG, "Uart Com Recive :%s", (char *)MSG_GET_PAYLOAD(tmp_msg));
+            //elog_hexdump(TAG, 8, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
 
         } break;
         default:
