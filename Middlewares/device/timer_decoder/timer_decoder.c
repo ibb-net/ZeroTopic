@@ -3,12 +3,15 @@
 
 #if CONFIG_TIMER_DECODER_EN
 #include <stdio.h>
-
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
 #include "elog.h"
 #include "gd32h7xx.h"
 #include "os_server.h"
+#include "shell.h"
 #include "timer_decoder.h"
-#define TAG "ENCODER"
+#define TAG                 "ENCODER"
 #define TimerEcoderPriority PriorityOperationGroup0
 
 typedef struct
@@ -21,6 +24,23 @@ typedef struct
     uint32_t gpio_pin_a;
     uint32_t gpio_pin_b;
 } TypdefDecoderBSPCfg;
+const float max_pyh[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+    MAX_PHY_VALUE_CH0,
+    MAX_PHY_VALUE_CH1,
+};
+const float min_pyh[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+    MIN_PHY_VALUE_CH0,
+    MIN_PHY_VALUE_CH1,
+};
+const float def_phy[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+    DEF_PHY_VALUE_CH0,
+    DEF_PHY_VALUE_CH1,
+};
+const float step_phy[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+    STEP_PHY_VALUE_CH0,
+    STEP_PHY_VALUE_CH1,
+};
+
 const TypdefDecoderBSPCfg decoder_bsp_cfg[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
 
     {
@@ -45,7 +65,7 @@ const TypdefDecoderBSPCfg decoder_bsp_cfg[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
 #endif
 };
 #if CONFIG_TIMER_DECODER_CHANNEL_MAX == 1
-const int64_t decoder_step_map[1][16] = {
+const float decoder_step_map[1][16] = {
     {CONFIG_TIMER_DECODER_CH0_STEP0, CONFIG_TIMER_DECODER_CH0_STEP1, CONFIG_TIMER_DECODER_CH0_STEP2,
      CONFIG_TIMER_DECODER_CH0_STEP3, CONFIG_TIMER_DECODER_CH0_STEP4, CONFIG_TIMER_DECODER_CH0_STEP5,
      CONFIG_TIMER_DECODER_CH0_STEP6, CONFIG_TIMER_DECODER_CH0_STEP7, CONFIG_TIMER_DECODER_CH0_STEP8,
@@ -53,7 +73,7 @@ const int64_t decoder_step_map[1][16] = {
      CONFIG_TIMER_DECODER_CH0_STEP12, CONFIG_TIMER_DECODER_CH0_STEP13, CONFIG_TIMER_DECODER_CH0_STEP14,
      CONFIG_TIMER_DECODER_CH0_STEP15}};
 #elif CONFIG_TIMER_DECODER_CHANNEL_MAX == 2
-const int64_t decoder_step_map[2][16] = {
+const float decoder_step_map[2][16] = {
     {CONFIG_TIMER_DECODER_CH0_STEP0, CONFIG_TIMER_DECODER_CH0_STEP1, CONFIG_TIMER_DECODER_CH0_STEP2,
      CONFIG_TIMER_DECODER_CH0_STEP3, CONFIG_TIMER_DECODER_CH0_STEP4, CONFIG_TIMER_DECODER_CH0_STEP5,
      CONFIG_TIMER_DECODER_CH0_STEP6, CONFIG_TIMER_DECODER_CH0_STEP7, CONFIG_TIMER_DECODER_CH0_STEP8,
@@ -76,11 +96,12 @@ typedef struct
     uint32_t timer_handle;
     uint8_t channel_ctr;  // 0 stop 1:start
     uint8_t mode;         // 0:连续模式 1:步进模式
-    uint32_t phy_value;
-    uint32_t phy_value_last;  // 上次物理值
-    uint32_t phy_value_max;   // 最大物理值
-    uint32_t phy_value_min;   // 最小物理值
-    uint64_t diff;            // 上次计数值和当前计数值的差值
+    float phy_value;
+    float phy_value_last;  // 上次物理值
+    float phy_value_max;   // 最大物理值
+    float phy_value_min;   // 最小物理值
+    float phy_value_step;
+    uint64_t diff;  // 上次计数值和当前计数值的差值
 
     uint8_t is_turning;             // 是否正在旋转
     uint64_t last_encoder_counter;  // 上次计数值
@@ -123,9 +144,9 @@ void device_timer_encoder_init(void) {
         timer_initpara.repetitioncounter = 0;
         timer_init(decoder_bsp_cfg[i].timer_base, &timer_initpara);                                                                                         // 初始化计时器
         timer_quadrature_decoder_mode_config(decoder_bsp_cfg[i].timer_base, TIMER_QUAD_DECODER_MODE2, TIMER_IC_POLARITY_RISING, TIMER_IC_POLARITY_RISING);  // 配置计时器为四分频解码模式
-        timer_auto_reload_shadow_enable(ENCODER_CH0_TIMER);
-        timer_counter_value_config(ENCODER_CH0_TIMER, DEFAULT_TIMER_VALUE);
-        timer_enable(ENCODER_CH0_TIMER);  // 使能计时器
+        timer_auto_reload_shadow_enable(decoder_bsp_cfg[i].timer_base);
+        timer_counter_value_config(decoder_bsp_cfg[i].timer_base, DEFAULT_TIMER_VALUE);
+        timer_enable(decoder_bsp_cfg[i].timer_base);  // 使能计时器
 
         encoder_struct[i].timer_handle = decoder_bsp_cfg[i].timer_base;  // 设置计时器句柄
         encoder_struct[i].channel      = i;                              // 设置通道号
@@ -133,7 +154,6 @@ void device_timer_encoder_init(void) {
     }
 }
 SYSTEM_REGISTER_INIT(BoardInitStage, TimerEcoderPriority, device_timer_encoder_init, device_timer_encoder_init);
-
 
 // 函数声明
 static void ENCODER_TIMER_RCV_HANDLE(void *msg);
@@ -167,11 +187,12 @@ static const VFBTaskStruct ENCODER_TIMER_task_cfg = {
 // 任务初始化函数
 void ENCODER_TIMER_CREATE_HANDLE(void) {
     for (size_t i = 0; i < CONFIG_TIMER_DECODER_CHANNEL_MAX; i++) {
-        encoder_struct[i].phy_value     = DEF_PHY_VALUE;            // 初始化物理值
-        encoder_struct[i].phy_value_max = MAX_PHY_VALUE;            // 设置最大物理值
-        encoder_struct[i].phy_value_min = MIN_PHY_VALUE;            // 设置最小物理值
-        encoder_struct[i].mode          = DECODER_MODE_CONTINUOUS;  // 设置默认模式为连续模式
-        __encoder_timer_clear(&encoder_struct[i]);                  // 初始化每个通道的计时器
+        encoder_struct[i].phy_value      = def_phy[i];               // 设置默认物理值
+        encoder_struct[i].phy_value_max  = max_pyh[i];               // 设置最大物理值
+        encoder_struct[i].phy_value_min  = min_pyh[i];               // 设置最小物理值
+        encoder_struct[i].phy_value_step = step_phy[i];              // 设置物理值步进
+        encoder_struct[i].mode           = DECODER_MODE_CONTINUOUS;  // 设置默认模式为连续模式
+        __encoder_timer_clear(&encoder_struct[i]);                   // 初始化每个通道的计时器
     }
 
     xTaskCreate(VFBTaskFrame, "Encoder", configMINIMAL_STACK_SIZE, (void *)&ENCODER_TIMER_task_cfg, TimerEcoderPriority, NULL);
@@ -192,7 +213,7 @@ static void __encoder_timer_clear(TypdefEncoderStruct *encoder) {
     encoder->pluse_gain           = CONFIG_ENCODER_PULSE_GAIN_DEFAULT;          // 重置旋转速度增益
     encoder->duration_gain        = CONFIG_ENCODER_DURATION_GAIN_DEFAULT;       // 重置旋转时间增益
     encoder->pluse_cnt            = CONFIG_ENCODER_ONE_PULSE_CNT;               // 重置旋转单次触发的个数
-    encoder->step_index           = 0;                                          // elog_i(TAG, "Encoder channel %d Clear", encoder->channel);
+    // encoder->step_index           = 0;                                          // elog_i(TAG, "Encoder channel %d Clear", encoder->channel);
 }
 
 static void ENCODER_TIMER_INIT_HANDLE(void *msg) {
@@ -206,7 +227,7 @@ static void ENCODER_TIMER_INIT_HANDLE(void *msg) {
         .phy_value = 0,
         .mode      = DECODER_MODE_STEP,
     };
-    vfb_send(ENCODER_TIMER_SET_MODE, 0, &msg_decoder,sizeof(VFBMsgDecoderStruct));  // 设置计时器模式为步进模式
+    vfb_send(ENCODER_TIMER_SET_MODE, 0, &msg_decoder, sizeof(VFBMsgDecoderStruct));  // 设置计时器模式为步进模式
 }
 // 接收消息的回调函数
 static void ENCODER_TIMER_RCV_HANDLE(void *msg) {
@@ -335,29 +356,34 @@ static void __decoder_handle(void) {
             if (encoder->mode == DECODER_MODE_STEP) {
                 if (tmp_pluse_cnt) {
                     if (diff > 0) {
-                        encoder->step_index++;
-                        if (encoder->step_index > 15) {
-                            encoder->step_index = 0;  // 重置步进索引
-                        }
-                        while (decoder_step_map[i][encoder->step_index] == -1) {
-                            // 如果步进索引对应的值为-1，表示没有更多步进，继续查找下一个有效步进
+                        if (decoder_step_map[i][encoder->step_index + 1] == (-1)) {
+                            // do nothing
+                        } else {
                             encoder->step_index++;
-                            if (encoder->step_index > 15) {
-                                encoder->step_index = 0;  // 重置步进索引
-                            }
                         }
+                        // if (encoder->step_index > 15) {
+                        //     encoder->step_index = 0;  // 重置步进索引
+                        // }
+                        // while (decoder_step_map[i][encoder->step_index] == -1) {
+                        //     // 如果步进索引对应的值为-1，表示没有更多步进，继续查找下一个有效步进
+                        //     encoder->step_index++;
+                        //     if (encoder->step_index > 15) {
+                        //         encoder->step_index = 0;  // 重置步进索引
+                        //     }
+                        // }
                     } else {
-                        encoder->step_index--;
                         if (encoder->step_index < 0) {
-                            encoder->step_index = 15;  // 重置步进索引
-                        }
-                        while (decoder_step_map[i][encoder->step_index] == -1) {
-                            // 如果步进索引对应的值为-1，表示没有更多步进，继续查找下一个有效步进
+                            // donothing
+                        } else {
                             encoder->step_index--;
-                            if (encoder->step_index == 0) {
-                                encoder->step_index = 15;  // 重置步进索引
-                            }
                         }
+                        // while (decoder_step_map[i][encoder->step_index] == -1) {
+                        //     // 如果步进索引对应的值为-1，表示没有更多步进，继续查找下一个有效步进
+                        //     encoder->step_index--;
+                        //     if (encoder->step_index == 0) {
+                        //         encoder->step_index = 15;  // 重置步进索引
+                        //     }
+                        // }
                     }
 
                     encoder->phy_value = decoder_step_map[i][encoder->step_index];
@@ -369,19 +395,19 @@ static void __decoder_handle(void) {
             } else {
                 uint64_t tmp_gain = encoder->pluse_gain * encoder->duration_gain;
                 if (diff > 0) {
-                    encoder->phy_value += tmp_pluse_cnt * tmp_gain;  // 更新物理值，正向旋转
+                    encoder->phy_value += tmp_pluse_cnt * tmp_gain * encoder->phy_value_step;  // 更新物理值，正向旋转
                 } else {
                     if (encoder->phy_value < tmp_pluse_cnt * tmp_gain) {
-                        encoder->phy_value = MIN_PHY_VALUE;  // 如果物理值小于增益值，重置为0
+                        encoder->phy_value = encoder->phy_value_min;
                     } else
-                        encoder->phy_value -= tmp_pluse_cnt * tmp_gain;  // 更新物理值，反向旋转
+                        encoder->phy_value -= tmp_pluse_cnt * tmp_gain * encoder->phy_value_step;  // 更新物理值，反向旋转
                 }
             }
 
-            if (encoder->phy_value > MAX_PHY_VALUE) {
-                encoder->phy_value = MAX_PHY_VALUE;  // 限制物理值最大值
-            } else if (encoder->phy_value < MIN_PHY_VALUE) {
-                encoder->phy_value = MIN_PHY_VALUE;  // 限制物理值最小值
+            if (encoder->phy_value > encoder->phy_value_max) {
+                encoder->phy_value = encoder->phy_value_max;  // 限制物理值最大值
+            } else if (encoder->phy_value < encoder->phy_value_min) {
+                encoder->phy_value = encoder->phy_value_min;  // 限制物理值最小值
             }
             if (encoder->phy_value != encoder->phy_value_last) {
                 encoder->phy_value_last         = encoder->phy_value;  // 更新上次物理值
@@ -407,4 +433,47 @@ static void __decoder_handle(void) {
         }
     }
 }
+static int mode_change(int argc, char *argv[]) {
+    if (argc < 3) {
+        elog_e(TAG, "Invalid arguments. Usage: decoder mode <channel> <mode>");
+        return -1;
+    }
+    int channel = atoi(argv[2]);
+    int mode    = atoi(argv[3]);
+    if (channel >= CONFIG_TIMER_DECODER_CHANNEL_MAX || channel < 0) {
+        elog_e(TAG, "Invalid channel: %d", channel);
+        return -1;
+    }
+    if (mode != 0 && mode != 1) {
+        elog_e(TAG, "Invalid mode: %d. Use 0 for continuous mode, 1 for step mode.", mode);
+        return -1;
+    }
+    VFBMsgDecoderStruct msg_decoder = {
+        .channel = channel,
+        .mode    = (mode == 0) ? DECODER_MODE_CONTINUOUS : DECODER_MODE_STEP,
+    };
+    vfb_send(ENCODER_TIMER_SET_MODE, 0, &msg_decoder, sizeof(VFBMsgDecoderStruct));
+    elog_i(TAG, "Set channel %d to mode %d", channel, mode);
+}
+static void CmddecoderHelp(void) {
+    elog_i(TAG, "\r\nUsage: decoder <state>");
+    elog_i(TAG, "       decoder mode <channel 0/1> <mode 0/1> 0: CONTINUOUS 1Step mode");
+}
+static int CmddecoderHandle(int argc, char *argv[]) {
+    if (argc < 2) {
+        CmddecoderHelp();
+        return 0;
+    }
+    if (strcmp(argv[1], "help") == 0) {
+        CmddecoderHelp();
+        return 0;
+    } else if (strcmp(argv[1], "mode") == 0) {
+        mode_change(argc, argv);
+        return 0;
+    }
+
+    return 0;
+}
+
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), decoder, CmddecoderHandle, decoder command);
 #endif  // CONFIG_TIMER_DECODER_EN
