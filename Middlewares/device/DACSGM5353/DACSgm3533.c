@@ -204,7 +204,7 @@ SYSTEM_REGISTER_INIT(MCUInitStage, DACSgm3533Priority, DACSgm3533DeviceInit, DAC
 static void __DACSgm3533CreateTaskHandle(void) {
     for (size_t i = 0; i < DACSgm3533ChannelMax; i++) {
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskDACSgm3533", configMINIMAL_STACK_SIZE, (void *)&DACSgm3533_task_cfg, PriorityNormalEventGroup0, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskDACSgm3533", configMINIMAL_STACK_SIZE*2, (void *)&DACSgm3533_task_cfg, PriorityNormalEventGroup0, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerInitStage, DACSgm3533Priority, __DACSgm3533CreateTaskHandle, __DACSgm3533CreateTaskHandle init);
 
@@ -229,7 +229,7 @@ static void __DACSgm3533RcvHandle(void *msg) {
             uint16_t data = (uint16_t)((tmp_msg->frame->head.data >> 8) & 0xFFFF);
             if (ch < DACSgm3533ChannelMax) {
                 elog_i(TAG, "Set DAC channel %d to data 0x%04X", ch, data);
-                SendDACHex(ch, data);
+                DACSgm3533DSPISend(ch, data);
             } else {
                 elog_e(TAG, "Invalid channel: %d", ch);
             }
@@ -250,7 +250,7 @@ static void __DACSgm3533CycHandle(void) {
 
 #endif
 void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
-    elog_i(TAG, "SendDACHex: ch=%d, data=0x%04X %d", ch, data, data);
+    elog_i(TAG, "DACSgm3533DSPISend: ch=%d, data=0x%04X %d", ch, data, data);
 
     uint8_t i = ch;
     if (i >= DACSgm3533ChannelMax) {
@@ -265,9 +265,7 @@ void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
     elog_i(TAG, "send data: 0x%04X to channel %d", data, ch);
     elog_i(TAG, "Send done");
 }
-static void SendDACHex(uint8_t ch, uint16_t data) {
-    DACSgm3533DSPISend(ch, data);
-}
+
 static void CmdDACSgm3533Help(void) {
     printf("Usage: sgm3533 <command>\r\n");
     printf("Commands:\r\n");
@@ -348,7 +346,7 @@ static int CmdDACSgm3533Handle(int argc, char *argv[]) {
             elog_e(TAG, "Invalid channel: %d", ch);
             return 0;
         }
-        SendDACHex(ch, data);
+        DACSgm3533DSPISend(ch, data);
         return 0;
     }
     CmdDACSgm3533Help();

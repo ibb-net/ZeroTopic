@@ -37,6 +37,7 @@
         "dev_pin.h": "c",
         "dev_basic.h": "c",
         "dev_spi.h": "c",
-        "cstdint": "c"
+        "cstdint": "c",
+        "dacsgm3533cfg.h": "c"
     }
 }

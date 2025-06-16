@@ -28,7 +28,9 @@
 #endif
 #endif
 
+// #define VFB_I(...) elog_i(TAG, __VA_ARGS__)
 #define VFB_I printf
+
 #define VFB_E printf
 #define VFB_W printf
 #define VFB_D 
