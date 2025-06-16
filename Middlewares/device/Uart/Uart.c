@@ -229,7 +229,8 @@ static void UartRcvHandle(void *msg) {
     switch (tmp_msg->frame->head.event) {
         case UartStart: {
             elog_i(TAG, "UartStart %d", tmp_msg->frame->head.data);
-            vfb_send(UartSend, 0, buzzer_1s, sizeof(buzzer_1s));  // 测试蜂鸣器
+            // vfb_send(UartSend, 0, buzzer_1s, sizeof(buzzer_1s));  // 测试蜂鸣器
+            vfb_send(UartSend, 0, bl_30, sizeof(bl_30));
         } break;
         case UartStop: {
         } break;
@@ -243,7 +244,7 @@ static void UartRcvHandle(void *msg) {
                 return;
             }
             elog_d(TAG, "UartSend: length: %d", MSG_GET_LENGTH(tmp_msg));
-            //elog_hexdump(TAG, 16, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
+            // elog_hexdump(TAG, 16, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
             DevUartDMASend(&UartBspCfg[0].uart_cfg, (const uint8_t *)MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
             // wait for TX DMA complete lock_tx
             if (uart_handle->lock_tx != NULL) {
@@ -256,7 +257,7 @@ static void UartRcvHandle(void *msg) {
         } break;
         case UartRcv: {
             elog_d(TAG, "Uart Com Recive :%s", (char *)MSG_GET_PAYLOAD(tmp_msg));
-            //elog_hexdump(TAG, 8, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
+            // elog_hexdump(TAG, 8, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
 
         } break;
         default:
