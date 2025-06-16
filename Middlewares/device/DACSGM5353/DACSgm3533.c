@@ -248,9 +248,6 @@ void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
     // Prepare the data to send
     spi_send_buffer[i][0] = (data >> 8) & 0xFF;  // High byte
     spi_send_buffer[i][1] = data & 0xFF;         // Low byte
-    // DevSpiDMAWrite(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), ARRAYSIZE);
-    // DevSpiWrite(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), ARRAYSIZE);
-    
     DevSpiWriteRead(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]),NULL, ARRAYSIZE);
     elog_i(TAG, "spi_send_buffer[%d][0]: 0x%02X, spi_send_buffer[%d][1]: 0x%02X", i, spi_send_buffer[i][0], i, spi_send_buffer[i][1]);
     elog_i(TAG, "send data: 0x%04X to channel %d", data, ch);
