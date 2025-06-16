@@ -225,7 +225,14 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
 
     usart_receiver_timeout_enable(ptrDevUartHandle->base);
     usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_RT);
-    usart_receiver_timeout_threshold_config(ptrDevUartHandle->base, ptrDevUartHandle->idle_timeout);
+    if (ptrDevUartHandle->base == USART0 || ptrDevUartHandle->base == USART1 || 
+        ptrDevUartHandle->base == USART2 || ptrDevUartHandle->base == USART5) {
+            usart_receiver_timeout_threshold_config(ptrDevUartHandle->base, ptrDevUartHandle->idle_timeout);
+        }
+    else
+    {
+        usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_IDLE);  // Enable error interrupt for other UARTs
+    }
 
     usart_enable(ptrDevUartHandle->base);
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
@@ -389,6 +396,12 @@ void UART6_IRQHandler(void) {
     }
     if (RESET != usart_interrupt_flag_get(UART6, USART_INT_FLAG_RT)) {
         usart_interrupt_flag_clear(UART6, USART_INT_FLAG_RT);
+        if (status && status->dev_cfg->rx_isr_cb) {
+            status->dev_cfg->rx_isr_cb((void *)status->handle);
+        }
+    }
+    if (RESET != usart_interrupt_flag_get(UART6, USART_INT_FLAG_IDLE)) {
+        usart_interrupt_flag_clear(UART6, USART_INT_FLAG_IDLE);
         if (status && status->dev_cfg->rx_isr_cb) {
             status->dev_cfg->rx_isr_cb((void *)status->handle);
         }
