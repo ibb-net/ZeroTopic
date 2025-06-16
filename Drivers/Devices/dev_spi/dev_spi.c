@@ -149,15 +149,14 @@ uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd,
     spi_enable(ptrDevSpiHandle->base);
     DevPinWrite(&ptrDevSpiHandle->nss, 0);
     spi_master_transfer_start(ptrDevSpiHandle->base, SPI_TRANS_START);
-    printf("size  = %d\r\n", size);
-
+    // printf("size  = %d\r\n", size);
     while (count < size) {
         while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_FLAG_TP));  // Wait until transmit buffer is empty
         if (snd == NULL) {
             spi_i2s_data_transmit(ptrDevSpiHandle->base, 0x00);
         } else {
             spi_i2s_data_transmit(ptrDevSpiHandle->base, snd[count]);
-            printf("Sending     data[%d]: %02X\r\n", count, snd[count]);
+            // printf("Sending     data[%d]: %02X\r\n", count, snd[count]);
         }
         // while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_FLAG_TC));
         while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_FLAG_RP));
@@ -165,7 +164,7 @@ uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd,
             spi_i2s_data_receive(ptrDevSpiHandle->base);  // Read data to clear the flag
         } else {
             rcv[count] = spi_i2s_data_receive(ptrDevSpiHandle->base);
-            printf("Receiving   data[%d]: %02X\r\n", count, rcv[count]);
+            // printf("Receiving   data[%d]: %02X\r\n", count, rcv[count]);
         }
         count++;
     }
