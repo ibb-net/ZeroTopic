@@ -135,7 +135,7 @@ static void __DemoCycHandle(void) {
 #endif
 
 static void CmdDemoHelp(void) {
-    elog_i(TAG, "Usage: demo <state>");
+    elog_i(TAG, "\r\nUsage: demo <state>");
     elog_i(TAG, "  <state>: 0 for off, 1 for on");
     elog_i(TAG, "Example: demo 1");
 }
