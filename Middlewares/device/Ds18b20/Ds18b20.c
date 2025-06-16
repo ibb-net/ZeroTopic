@@ -23,9 +23,9 @@
 #define TAG           "Ds18b20"
 #define Ds18b20LogLvl ELOG_LVL_INFO
 
-#define Ds18b20Priority PriorityNormalEventGroup4
+#define Ds18b20Priority PrioritySpecialGroup0
 #ifndef Ds18b20ChannelMax
-#define Ds18b20ChannelMax 2
+#define Ds18b20ChannelMax 1
 #endif
 #ifndef CONFIG_DS18B20_CYCLE_TIMER_MS
 #define CONFIG_DS18B20_CYCLE_TIMER_MS 100
@@ -43,6 +43,8 @@ static void __Ds18b20RcvHandle(void *msg);
 static void __Ds18b20CycHandle(void);
 static void __Ds18b20InitHandle(void *msg);
 static void CmdDs18b20Reset(void);
+static float CmdDs18b20Read(uint8_t state);
+static void CmdDs18b20Covert(uint8_t state);
 const TypdefDs18b20BSPCfg Ds18b20BspCfg[Ds18b20ChannelMax] = {
     {
         .one_wire = {
@@ -50,12 +52,12 @@ const TypdefDs18b20BSPCfg Ds18b20BspCfg[Ds18b20ChannelMax] = {
             .dev_pin_id  = DEV_PIN_PA1,  // Example pin, change as needed
         },
     },
-    {
-        .one_wire = {
-            .device_name = "NOT_USED",
-            .dev_pin_id  = DEV_PIN_PA0,  // Example pin, change as needed
-        },
-    },
+    // {
+    //     .one_wire = {
+    //         .device_name = "NOT_USED",
+    //         .dev_pin_id  = DEV_PIN_PA0,  // Example pin, change as needed
+    //     },
+    // },
 };
 
 typedef struct
@@ -64,6 +66,7 @@ typedef struct
     uint8_t rom[8];
     uint32_t id;        // ID
     uint8_t status;     // Status of the sensor
+    uint8_t step;       // Step in the conversion process
     float temperature;  // Temperature in Celsius
 
 } TypdefDs18b20Status;
@@ -73,9 +76,9 @@ TypdefDs18b20Status Ds18b20Status[Ds18b20ChannelMax] = {0};
 
 static const vfb_event_t Ds18b20EventList[] = {
     Ds18b20Start,
-    Ds18b20Stop,
-    Ds18b20Covert,
-    Ds18b20GetTemperature,
+    // Ds18b20Stop,
+    // Ds18b20Covert,
+    // Ds18b20GetTemperature,
 };
 
 static const VFBTaskStruct Ds18b20_task_cfg = {
@@ -115,15 +118,14 @@ SYSTEM_REGISTER_INIT(MCUInitStage, Ds18b20Priority, Ds18b20DeviceInit, Ds18b20De
 static void __Ds18b20CreateTaskHandle(void) {
     for (size_t i = 0; i < Ds18b20ChannelMax; i++) {
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskDs18b20", configMINIMAL_STACK_SIZE * 2, (void *)&Ds18b20_task_cfg, PriorityNormalEventGroup0, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskDs18b20", configMINIMAL_STACK_SIZE * 2, (void *)&Ds18b20_task_cfg, Ds18b20Priority, NULL);
 }
-SYSTEM_REGISTER_INIT(AppInitStage, Ds18b20Priority, __Ds18b20CreateTaskHandle, __Ds18b20CreateTaskHandle init);
+SYSTEM_REGISTER_INIT(BoardInitStage, Ds18b20Priority, __Ds18b20CreateTaskHandle, __Ds18b20CreateTaskHandle init);
 
 static void __Ds18b20InitHandle(void *msg) {
     elog_i(TAG, "__Ds18b20InitHandle");
     elog_set_filter_tag_lvl(TAG, Ds18b20LogLvl);
-    vTaskDelay(pdMS_TO_TICKS(100));  // Delay to ensure all devices are initialized before starting the task
-
+    vTaskDelay(pdMS_TO_TICKS(500));  // Delay to ensure all devices are initialized before starting the task
     vfb_send(Ds18b20Start, 0, NULL, 0);
 }
 // 接收消息的回调函数
@@ -134,32 +136,10 @@ static void __Ds18b20RcvHandle(void *msg) {
     vfb_message_t tmp_msg                 = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
         case Ds18b20Start: {
-            int status = 0;
+            Ds18b20StatusTmp->status = 1;
+            Ds18b20StatusTmp->step   = 0;
+            elog_i(TAG, "TASK %s RCV: Ds18b20Start", taskName);
             CmdDs18b20Reset();
-            // vTaskSuspendAll();
-            // status = DevOneWireReset(&(Ds18b20BspCfg[0].one_wire));
-            // xTaskResumeAll();
-            // elog_i(TAG, "Ds18b20StartTask DS18B20 status: %s", (status == 0) ? "OK" : "FAIL");
-            // if (status != 0) {
-            //     elog_e(TAG, "Failed to reset DS18B20 Status %d", status);
-            // } else {
-            //     // vfb_send(Ds18b20Covert, 0, NULL, 0);  // Start conversion
-            // }
-#if 0
-            vTaskDelay(pdMS_TO_TICKS(100));  // Delay to ensure all devices are initialized before starting the task
-            vTaskSuspendAll();               // Suspend task scheduling
-            status = DevOneWireReadRom(&(Ds18b20BspCfg[0].one_wire), Ds18b20StatusTmp->rom);
-            xTaskResumeAll();  // Resume task scheduling
-
-            if (status != 0) {
-                elog_e(TAG, "Failed to read ROM code from DS18B20 Status %d", status);
-            } else {
-                elog_i(TAG, "DS18B20 ROM code: %02X%02X%02X%02X%02X%02X%02X%02X",
-                       Ds18b20StatusTmp->rom[0], Ds18b20StatusTmp->rom[1], Ds18b20StatusTmp->rom[2],
-                       Ds18b20StatusTmp->rom[3], Ds18b20StatusTmp->rom[4], Ds18b20StatusTmp->rom[5],
-                       Ds18b20StatusTmp->rom[6], Ds18b20StatusTmp->rom[7]);
-            }
-#endif
         } break;
         default:
             elog_e(TAG, "TASK %s RCV: unknown event: %d", taskName, tmp_msg->frame->head.event);
@@ -168,11 +148,34 @@ static void __Ds18b20RcvHandle(void *msg) {
 }
 
 static void __Ds18b20CycHandle(void) {
-    TypdefDs18b20Status *Ds18b20StatusHandle = &Ds18b20Status[0];
-    if (Ds18b20StatusHandle == NULL) {
+    TypdefDs18b20Status *Ds18b20StatusTmp = &Ds18b20Status[0];
+    static uint8_t step                   = 0;
+    static uint32_t conter                = 0;
+    if (Ds18b20StatusTmp == NULL) {
         elog_e(TAG, "[ERROR]Ds18b20StatusHandle NULL");
         return;
     }
+    if (conter % 10 == 0) {
+        if (Ds18b20StatusTmp->status) {
+            if (Ds18b20StatusTmp->step == 0) {
+                // convert
+                CmdDs18b20Covert(0);
+                Ds18b20StatusTmp->step = 1;
+            } else {
+                Ds18b20StatusTmp->temperature =
+                    CmdDs18b20Read(0);  // Read temperature
+                Ds18b20StatusTmp->step = 0;
+                elog_i(TAG, "Ds18b20 temperature: %.2f", Ds18b20StatusTmp->temperature);
+                // Send temperature to HMI
+                vfb_send(Ds18b20GetTemperature, 0, &Ds18b20StatusTmp->temperature, sizeof(Ds18b20StatusTmp->temperature));
+                elog_i(TAG, "Send Ds18b20GetTemperature done %u ", conter);
+            }
+
+        } else {
+            Ds18b20StatusTmp->step = 0;
+        }
+    }
+    conter++;
 }
 
 #endif
@@ -244,25 +247,29 @@ static void CmdDs18b20Covert(uint8_t state) {
     elog_i(TAG, "Starting DS18B20 conversion...");
 
     DevOneWireHandleStruct *handle = &(Ds18b20BspCfg[0].one_wire);
+    vTaskSuspendAll();
     DevOneWireReset(handle);
     DevOneWireWriteByte(handle, 0xCC);
     DevOneWireWriteByte(handle, 0x44);
+    xTaskResumeAll();
     // delay 100ms
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    // vTaskDelay(pdMS_TO_TICKS(1000));
 }
-static void CmdDs18b20Read(uint8_t state) {
+static float CmdDs18b20Read(uint8_t state) {
     DevOneWireHandleStruct *handle = &(Ds18b20BspCfg[0].one_wire);
     elog_i(TAG, "Reading DS18B20 temperature...");
+    uint8_t scratchpad[9] = {0};
+    vTaskSuspendAll();
     DevOneWireReset(handle);  // Reset the bus before reading ROM
     DevOneWireWriteByte(handle, 0xCC);
     DevOneWireWriteByte(handle, 0xBE);  // Read Scratchpad command
-    uint8_t scratchpad[9] = {0};
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < 2; i++) {
         scratchpad[i] = DevOneWireReadByte(handle);
     }
-    elog_i(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-           scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3],
-           scratchpad[4], scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
+    xTaskResumeAll();
+    // elog_i(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+    //        scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3],
+    //        scratchpad[4], scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
 
     uint16_t temp = 0;
     float f_tem   = 0.0f;
@@ -273,6 +280,7 @@ static void CmdDs18b20Read(uint8_t state) {
     else
         f_tem = temp * 0.0625;
     elog_i(TAG, "DS18B20 Temperature: %.2f C", f_tem);
+    return f_tem;
 }
 static int CmdDs18b20Handle(int argc, char *argv[]) {
     if (argc < 2) {
