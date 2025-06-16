@@ -99,7 +99,7 @@ SYSTEM_REGISTER_INIT(PreStartupInitStage, DemoPriority, DemoDeviceInit, DemoDevi
 static void __DemoCreateTaskHandle(void) {
     for (size_t i = 0; i < DemoChannelMax; i++) {
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskDemo", configMINIMAL_STACK_SIZE, (void *)&Demo_task_cfg, PriorityNormalEventGroup0, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskDemo", configMINIMAL_STACK_SIZE, (void *)&Demo_task_cfg, DemoPriority, NULL);
 }
 SYSTEM_REGISTER_INIT(AppInitStage, DemoPriority, __DemoCreateTaskHandle, __DemoCreateTaskHandle init);
 
