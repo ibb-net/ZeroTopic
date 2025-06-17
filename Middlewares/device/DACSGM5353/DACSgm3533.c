@@ -17,6 +17,7 @@
 #include "dev_uart.h"
 #include "elog.h"
 #include "os_server.h"
+#include "timer_decoder.h"
 // #include "app_event.h"
 
 #define TAG              "DAC"
@@ -150,6 +151,7 @@ typedef struct
     char device_name[DEVICE_NAME_MAX];
     uint32_t id;  // ID
     TypdefDACSgm3533BSPCfg cfg;
+    uint16_t dac_data;  // DAC data
 
 } TypdefDACSgm3533Status;
 TypdefDACSgm3533Status DACSgm3533Status[DACSgm3533ChannelMax] = {0};
@@ -162,6 +164,7 @@ static const vfb_event_t DACSgm3533EventList[] = {
     DACSgm3533Stop,
     DACSgm3533Get,
     DACSgm3533Set,
+    ENCODER_TIMER_GET_PHY,
 
 };
 
@@ -204,7 +207,7 @@ SYSTEM_REGISTER_INIT(MCUInitStage, DACSgm3533Priority, DACSgm3533DeviceInit, DAC
 static void __DACSgm3533CreateTaskHandle(void) {
     for (size_t i = 0; i < DACSgm3533ChannelMax; i++) {
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskDACSgm3533", configMINIMAL_STACK_SIZE*2, (void *)&DACSgm3533_task_cfg, PriorityNormalEventGroup0, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskDACSgm3533", configMINIMAL_STACK_SIZE * 2, (void *)&DACSgm3533_task_cfg, PriorityNormalEventGroup0, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerInitStage, DACSgm3533Priority, __DACSgm3533CreateTaskHandle, __DACSgm3533CreateTaskHandle init);
 
@@ -225,7 +228,7 @@ static void __DACSgm3533RcvHandle(void *msg) {
         } break;
         case DACSgm3533Set: {
             // Set DAC data for a specific channel
-            uint8_t ch = (uint8_t)(tmp_msg->frame->head.data & 0xFF);
+            uint8_t ch    = (uint8_t)(tmp_msg->frame->head.data & 0xFF);
             uint16_t data = (uint16_t)((tmp_msg->frame->head.data >> 8) & 0xFFFF);
             if (ch < DACSgm3533ChannelMax) {
                 elog_i(TAG, "Set DAC channel %d to data 0x%04X", ch, data);
@@ -233,6 +236,48 @@ static void __DACSgm3533RcvHandle(void *msg) {
             } else {
                 elog_e(TAG, "Invalid channel: %d", ch);
             }
+        } break;
+        case ENCODER_TIMER_GET_PHY: {
+            if (tmp_msg->frame->head.length != sizeof(VFBMsgDecoderStruct)) {
+                elog_e(TAG, "ENCODER_TIMER_GET_PHY: Invalid length %d", tmp_msg->frame->head.length);
+                return;
+            }
+            VFBMsgDecoderStruct *msg_decoder = (VFBMsgDecoderStruct *)MSG_GET_PAYLOAD(tmp_msg);
+            if (msg_decoder == NULL) {
+                elog_e(TAG, "ENCODER_TIMER_GET_PHY: msg_decoder is NULL");
+                return;
+            }
+            if (msg_decoder->channel >= DACSgm3533ChannelMax) {
+                elog_e(TAG, "ENCODER_TIMER_GET_PHY: Invalid channel %d", msg_decoder->channel);
+                return;
+            }
+            uint16_t dac_data = 0;
+            float phy_value   = msg_decoder->phy_value;
+            if (msg_decoder->channel == 0) {
+                phy_value = phy_value / 1000 / 1000;
+                phy_value = ((phy_value * 24 + 1.2) * 65536 / 2.5);
+                dac_data  = (uint16_t)phy_value;
+                elog_i(TAG, "ENCODER_TIMER_GET_PHY: channel %d, phy_value %.3f mV, dac_data 0x%04X", msg_decoder->channel,
+                       msg_decoder->phy_value / 1000, DACSgm3533Status[msg_decoder->channel].dac_data);
+
+            } else if (msg_decoder->channel == 1) {
+                phy_value = phy_value / 1000;
+                phy_value = ((phy_value / 8.2 + 1.2) * 65536 / 2.5);
+                dac_data  = (uint16_t)phy_value;
+                elog_i(TAG, "ENCODER_TIMER_GET_PHY: channel %d, phy_value %.3f V, dac_data 0x%04X", msg_decoder->channel,
+                       msg_decoder->phy_value / 1000, DACSgm3533Status[msg_decoder->channel].dac_data);
+
+            } else {
+                elog_e(TAG, "ENCODER_TIMER_GET_PHY: Unsupported channel %d", msg_decoder->channel);
+                return;
+            }
+            if (DACSgm3533Status[msg_decoder->channel].dac_data != dac_data) {
+                DACSgm3533Status[msg_decoder->channel].dac_data = dac_data;  // Update the DAC dat
+                DACSgm3533DSPISend(msg_decoder->channel, DACSgm3533Status[msg_decoder->channel].dac_data);
+            }
+            // elog_i(TAG, "tmp: channel %d, phy_value %.2f, dac_data 0x%04X", msg_decoder->channel,
+            //     phy_value, DACSgm3533Status[msg_decoder->channel].dac_data);
+
         } break;
         default:
             elog_e(TAG, "TASK %s RCV: unknown event: %d", taskName, tmp_msg->frame->head.event);
@@ -260,10 +305,10 @@ void DACSgm3533DSPISend(uint8_t ch, uint16_t data) {
     // Prepare the data to send
     spi_send_buffer[i][0] = (data >> 8) & 0xFF;  // High byte
     spi_send_buffer[i][1] = data & 0xFF;         // Low byte
-    DevSpiWriteRead(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]),NULL, ARRAYSIZE);
-    elog_i(TAG, "spi_send_buffer[%d][0]: 0x%02X, spi_send_buffer[%d][1]: 0x%02X", i, spi_send_buffer[i][0], i, spi_send_buffer[i][1]);
+    DevSpiWriteRead(&DACSgm3533BspCfg[i].spi_cfg, &(spi_send_buffer[i][0]), NULL, ARRAYSIZE);
+    // elog_i(TAG, "spi_send_buffer[%d][0]: 0x%02X, spi_send_buffer[%d][1]: 0x%02X", i, spi_send_buffer[i][0], i, spi_send_buffer[i][1]);
     elog_i(TAG, "send data: 0x%04X to channel %d", data, ch);
-    elog_i(TAG, "Send done");
+    // elog_i(TAG, "Send done");
 }
 
 static void CmdDACSgm3533Help(void) {
