@@ -174,11 +174,12 @@ static void __sgm5860xCreateTaskHandle(void) {
     }
     xTaskCreate(VFBTaskFrame, "VFBTasksgm5860x", configMINIMAL_STACK_SIZE*2, (void *)&sgm5860x_task_cfg, PriorityNormalEventGroup0, NULL);
 }
-// SYSTEM_REGISTER_INIT(ServerInitStage, sgm5860xPriority, __sgm5860xCreateTaskHandle, __sgm5860xCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(BoardInitStage, sgm5860xPriority, __sgm5860xCreateTaskHandle, __sgm5860xCreateTaskHandle init);
 
 static void __sgm5860xInitHandle(void *msg) {
     elog_i(TAG, "__sgm5860xInitHandle");
     elog_set_filter_tag_lvl(TAG, sgm5860xLogLvl);
+    //TODO init ADC
     vfb_send(sgm5860xStart, 0, NULL, 0);
 }
 // 接收消息的回调函数

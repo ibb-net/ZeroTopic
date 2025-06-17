@@ -32,6 +32,7 @@ typedef enum {
     UartSend,
     UartRcv,
     Ds18b20Start,
+
     Ds18b20Stop,
     Ds18b20Covert,
     Ds18b20GetTemperature,
@@ -43,6 +44,10 @@ typedef enum {
     sgm5860xStop,
     sgm5860xGet,
     sgm5860xSet,
+    sgm5860xCH1,
+    sgm5860xCH2,
+    sgm5860xCH3,
+    sgm5860xCH4,
     ADCUpdate,
     /************************************************* */
     SDK_EVENT_NUM,
