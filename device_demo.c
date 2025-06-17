@@ -20,14 +20,13 @@
 
 #define TAG        "Demo"
 #define DemoLogLvl ELOG_LVL_INFO
-#define
 
 #define DemoPriority PriorityNormalEventGroup0
 #ifndef DemoChannelMax
 #define DemoChannelMax 1
 #endif
 #ifndef CONFIG_Demo_CYCLE_TIMER_MS
-#define CONFIG_Deni_CYCLE_TIMER_MS 5
+#define CONFIG_Demo_CYCLE_TIMER_MS 5
 #endif
 /* ===================================================================================== */
 typedef struct

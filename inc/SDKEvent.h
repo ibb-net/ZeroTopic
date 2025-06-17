@@ -43,6 +43,7 @@ typedef enum {
     sgm5860xStop,
     sgm5860xGet,
     sgm5860xSet,
+    ADCUpdate,
     /************************************************* */
     SDK_EVENT_NUM,
     SDK_EVENT_LIST_MAX = SDK_EVENT_LIST_APP_START - 1
