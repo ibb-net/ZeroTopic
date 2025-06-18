@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #include "gd32h7xx.h"
-#define GD32H7XXZ_PIN_MAP_MAX 144
+#define GD32H7XXZ_PIN_MAP_MAX DEV_PIN_MAX
 #define DEVICE_NAME_MAX       32
 typedef void (*dev_isr_cb)(void *arg);
 typedef struct {
@@ -167,6 +167,7 @@ typedef enum {
     DEV_PIN_PE1,            // GPIOE_PIN1
     DEV_PIN_PDR_ON,         // PDR_ON
     DEV_PIN_VDD_11,         // VDD (duplicate for clarity)
+    DEV_PIN_MAX
 } EnumKeyPinMapID;
 extern const TypedefDevPinMap DevPinMap[GD32H7XXZ_PIN_MAP_MAX];
 

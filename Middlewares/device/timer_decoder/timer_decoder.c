@@ -462,6 +462,7 @@ static int mode_change(int argc, char *argv[]) {
     };
     vfb_send(ENCODER_TIMER_SET_MODE, 0, &msg_decoder, sizeof(VFBMsgDecoderStruct));
     elog_i(TAG, "Set channel %d to mode %d", channel, mode);
+    return 0;
 }
 static void CmddecoderHelp(void) {
     elog_i(TAG, "\r\nUsage: decoder <state>");

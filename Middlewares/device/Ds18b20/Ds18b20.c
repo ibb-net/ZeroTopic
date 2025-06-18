@@ -107,7 +107,7 @@ void Ds18b20DeviceInit(void) {
         Ds18b20StatusHandle->id = i;
         memset(Ds18b20StatusHandle->device_name, 0, sizeof(Ds18b20StatusHandle->device_name));
         snprintf(Ds18b20StatusHandle->device_name, sizeof(Ds18b20StatusHandle->device_name), "Ds18b20%d", i);
-        DevOneWireInit(&(Ds18b20BspCfg[i].one_wire));
+        DevOneWireInit((DevOneWireHandleStruct *)&(Ds18b20BspCfg[i].one_wire));
         // extern const TypedefDevPinMap DevPinMap[GD32H7XXZ_PIN_MAP_MAX];
         elog_i(TAG, "Ds18b20 Channel %d initialized with pin %s %s", i, Ds18b20BspCfg[i].one_wire.device_name, DevPinMap[Ds18b20BspCfg[i].one_wire.dev_pin_id].pin_name);
     }
@@ -153,7 +153,6 @@ static void __Ds18b20RcvHandle(void *msg) {
 
 static void __Ds18b20CycHandle(void) {
     TypdefDs18b20Status *Ds18b20StatusTmp = &Ds18b20Status[0];
-    static uint8_t step                   = 0;
     static uint32_t conter                = 0;
     if (Ds18b20StatusTmp == NULL) {
         elog_e(TAG, "[ERROR]Ds18b20StatusHandle NULL");
@@ -250,7 +249,7 @@ static void CmdDs18b20ReadRom(void) {
 static void CmdDs18b20Covert(uint8_t state) {
     elog_d(TAG, "Starting DS18B20 conversion...");
 
-    DevOneWireHandleStruct *handle = &(Ds18b20BspCfg[0].one_wire);
+    DevOneWireHandleStruct *handle = (DevOneWireHandleStruct *)&(Ds18b20BspCfg[0].one_wire);
     vTaskSuspendAll();
     DevOneWireReset(handle);
     DevOneWireWriteByte(handle, 0xCC);
@@ -260,7 +259,7 @@ static void CmdDs18b20Covert(uint8_t state) {
     // vTaskDelay(pdMS_TO_TICKS(1000));
 }
 static float CmdDs18b20Read(uint8_t state) {
-    DevOneWireHandleStruct *handle = &(Ds18b20BspCfg[0].one_wire);
+    DevOneWireHandleStruct *handle = (DevOneWireHandleStruct *)&(Ds18b20BspCfg[0].one_wire);
     elog_d(TAG, "Reading DS18B20 temperature...");
     uint8_t scratchpad[9] = {0};
     vTaskSuspendAll();

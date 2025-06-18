@@ -147,7 +147,7 @@ static void __McuadcInitHandle(void *msg) {
 // 接收消息的回调函数
 static void __McuadcRcvHandle(void *msg) {
     TaskHandle_t curTaskHandle          = xTaskGetCurrentTaskHandle();
-    TypdefMcuadcStatus *McuadcStatusTmp = &McuadcStatus[0];
+    // TypdefMcuadcStatus *McuadcStatusTmp = (TypdefMcuadcStatus *)&McuadcStatus[0];
     char *taskName                      = pcTaskGetName(curTaskHandle);
     vfb_message_t tmp_msg               = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
@@ -191,7 +191,7 @@ static void __McuadcCycHandle(void) {
     }
     if (counter == 10) {
         // 第10次采样，打印平均值
-        float average_voltage = voltage_sum / 10.0f *22;
+        float average_voltage = voltage_sum / 10.0f * 22;
         elog_d(TAG, "ADC Channel 15 Average Voltage: %.2f V", average_voltage);
         voltage_sum = 0.0f;  // 重置电压和计数器
         counter     = 0;

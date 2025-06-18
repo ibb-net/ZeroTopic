@@ -17,7 +17,7 @@
 #define ONEWIRE_READ_ROM_CMD 0x33
 int DevOneWireReleaseBus(const DevOneWireHandleStruct *handle);
 void DevOneWireInit(DevOneWireHandleStruct *handle) {
-    TypedefDevPinMap *ptrDevPinMap = &DevPinMap[handle->dev_pin_id];
+    TypedefDevPinMap *ptrDevPinMap = (TypedefDevPinMap *)&DevPinMap[handle->dev_pin_id];
     rcu_periph_clock_enable(ptrDevPinMap->rcu_clock);
     gpio_mode_set(ptrDevPinMap->base, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, ptrDevPinMap->pin);
     gpio_output_options_set(ptrDevPinMap->base, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, ptrDevPinMap->pin);
@@ -25,12 +25,12 @@ void DevOneWireInit(DevOneWireHandleStruct *handle) {
     DevOneWireReleaseBus(handle);
 }
 void __DevOneWireInputMode(const DevOneWireHandleStruct *handle) {
-    TypedefDevPinMap *ptrDevPinMap = &DevPinMap[handle->dev_pin_id];
+    TypedefDevPinMap *ptrDevPinMap = (TypedefDevPinMap *)&DevPinMap[handle->dev_pin_id];
     gpio_mode_set(ptrDevPinMap->base, GPIO_MODE_INPUT, GPIO_PUPD_NONE, ptrDevPinMap->pin);
     // gpio_output_options_set(ptrDevPinMap->base, GPIO_OTYPE_OD, GPIO_OSPEED_100_220MHZ, ptrDevPinMap->pin);
 }
 void __DevOneWireOutputMode(const DevOneWireHandleStruct *handle) {
-    TypedefDevPinMap *ptrDevPinMap = &DevPinMap[handle->dev_pin_id];
+    TypedefDevPinMap *ptrDevPinMap = (TypedefDevPinMap *)&DevPinMap[handle->dev_pin_id];
     gpio_mode_set(ptrDevPinMap->base, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, ptrDevPinMap->pin);
     gpio_output_options_set(ptrDevPinMap->base, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, ptrDevPinMap->pin);
 }
@@ -38,7 +38,7 @@ void __DevOneWireDelayUs(uint32_t ntime) {
     DevDelayUs(ntime);
 }
 void DevOneWirePinWrite(const DevOneWireHandleStruct *handle, uint8_t bit_value) {
-    TypedefDevPinMap *ptrDevPinMap = &DevPinMap[handle->dev_pin_id];
+    TypedefDevPinMap *ptrDevPinMap = (TypedefDevPinMap *)&DevPinMap[handle->dev_pin_id];
     __DevOneWireOutputMode(handle);
     if (bit_value) {
         gpio_bit_write(ptrDevPinMap->base, ptrDevPinMap->pin, 1);
@@ -48,9 +48,9 @@ void DevOneWirePinWrite(const DevOneWireHandleStruct *handle, uint8_t bit_value)
 }
 
 int DevOneWireReset(const DevOneWireHandleStruct *handle) {
-    uint8_t ack                    = 1;
+    // uint8_t ack                    = 1;
     uint8_t ack_reset              = 0;
-    TypedefDevPinMap *ptrDevPinMap = &DevPinMap[handle->dev_pin_id];
+    TypedefDevPinMap *ptrDevPinMap = (TypedefDevPinMap *)&DevPinMap[handle->dev_pin_id];
     __DevOneWireOutputMode(handle);
     gpio_bit_write(ptrDevPinMap->base, ptrDevPinMap->pin, RESET);
     __DevOneWireDelayUs(ONEWIRE_RESET_TIME);
@@ -77,7 +77,7 @@ int DevOneWireReset(const DevOneWireHandleStruct *handle) {
 }
 int DevOneWireReleaseBus(const DevOneWireHandleStruct *handle) {
     int ack                        = 0;
-    TypedefDevPinMap *ptrDevPinMap = &DevPinMap[handle->dev_pin_id];
+    TypedefDevPinMap *ptrDevPinMap = (TypedefDevPinMap*)&DevPinMap[handle->dev_pin_id];
     __DevOneWireOutputMode(handle);
     gpio_bit_write(ptrDevPinMap->base, ptrDevPinMap->pin, SET);  // Release bus
     while (gpio_input_bit_get(ptrDevPinMap->base, ptrDevPinMap->pin) == RESET) {
@@ -92,13 +92,13 @@ int DevOneWireReleaseBus(const DevOneWireHandleStruct *handle) {
     return 0;  // Release bus successful
 }
 int DevOneWireStop(const DevOneWireHandleStruct *handle) {
-    TypedefDevPinMap *ptrDevPinMap = &DevPinMap[handle->dev_pin_id];
+    // TypedefDevPinMap *ptrDevPinMap =(TypedefDevPinMap*) &DevPinMap[handle->dev_pin_id];
     __DevOneWireInputMode(handle);
     return 0;  // Stop successful
 }
 
 void __DevOneWireWriteBit(const DevOneWireHandleStruct *handle, uint8_t bit_value) {
-    TypedefDevPinMap *ptrDevPinMap = &DevPinMap[handle->dev_pin_id];
+    TypedefDevPinMap *ptrDevPinMap = (TypedefDevPinMap*)&DevPinMap[handle->dev_pin_id];
 
     gpio_bit_write(ptrDevPinMap->base, ptrDevPinMap->pin, SET);
     __DevOneWireOutputMode(handle);
@@ -120,7 +120,7 @@ void __DevOneWireWriteBit(const DevOneWireHandleStruct *handle, uint8_t bit_valu
 }
 uint8_t __DevOneWireReadBit(const DevOneWireHandleStruct *handle) {
     uint8_t bit_value              = 0;
-    TypedefDevPinMap *ptrDevPinMap = &DevPinMap[handle->dev_pin_id];
+    TypedefDevPinMap *ptrDevPinMap = (TypedefDevPinMap *)&DevPinMap[handle->dev_pin_id];
     gpio_bit_write(ptrDevPinMap->base, ptrDevPinMap->pin, RESET);
     __DevOneWireOutputMode(handle);
 
@@ -143,7 +143,7 @@ uint8_t __DevOneWireReadBit(const DevOneWireHandleStruct *handle) {
 
 void DevOneWireWriteByte(const DevOneWireHandleStruct *handle, uint8_t byte_value) {
     for (int i = 0; i < 8; i++) {
-        __DevOneWireWriteBit(handle, (byte_value >>i )& 0x01);
+        __DevOneWireWriteBit(handle, (byte_value >> i) & 0x01);
     }
     // unsigned char i;
     // unsigned char wr               = byte_value;

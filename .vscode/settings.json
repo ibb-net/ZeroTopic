@@ -38,6 +38,17 @@
         "dev_basic.h": "c",
         "dev_spi.h": "c",
         "cstdint": "c",
-        "dacsgm3533cfg.h": "c"
+        "dacsgm3533cfg.h": "c",
+        "array": "c",
+        "deque": "c",
+        "list": "c",
+        "string": "c",
+        "unordered_map": "c",
+        "vector": "c",
+        "string_view": "c",
+        "format": "c",
+        "initializer_list": "c",
+        "span": "c",
+        "text_encoding": "c"
     }
 }

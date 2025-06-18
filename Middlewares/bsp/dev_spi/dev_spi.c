@@ -71,7 +71,7 @@ int DevSpiDMAWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, u
         printf("Error: SPI base %x not found in spi_basic_map.\r\n", ptrDevSpiHandle->base);
         return -1;
     }
-    DevDMAHandleStruct *dma_handle = &ptrDevSpiHandle->dam_tx;
+    DevDMAHandleStruct *dma_handle =( DevDMAHandleStruct *) &ptrDevSpiHandle->dam_tx;
     if (dma_handle == NULL) {
         printf("Error: DMA handle is NULL for SPI base %x.\r\n", ptrDevSpiHandle->base);
         return -1;

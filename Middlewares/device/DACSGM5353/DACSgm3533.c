@@ -218,7 +218,7 @@ static void __DACSgm3533InitHandle(void *msg) {
 // 接收消息的回调函数
 static void __DACSgm3533RcvHandle(void *msg) {
     TaskHandle_t curTaskHandle                  = xTaskGetCurrentTaskHandle();
-    TypdefDACSgm3533Status *DACSgm3533StatusTmp = (TypdefDACSgm3533Status *)&DACSgm3533Status[0];
+    // TypdefDACSgm3533Status *DACSgm3533StatusTmp = (TypdefDACSgm3533Status *)&DACSgm3533Status[0];
     char *taskName                              = pcTaskGetName(curTaskHandle);
     vfb_message_t tmp_msg                       = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
