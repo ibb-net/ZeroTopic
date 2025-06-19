@@ -167,7 +167,7 @@ QueueHandle_t vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, u
         VFB_E("Failed to take semaphore");
         return NULL;
     }
-    VFB_I("Task %s subscribe Event Success,valid %d,invalid %d\r\n", taskName, valiad_counter, invalid_counter);
+    // VFB_I("Task %s subscribe Event Success,valid %d,invalid %d\r\n", taskName, valiad_counter, invalid_counter);
     return queue_handle;
 }
 uint8_t __vfb_takelock(vfb_msg_mode_t mode) {

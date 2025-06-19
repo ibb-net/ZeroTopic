@@ -110,22 +110,22 @@ const TypdefDACSgm3533BSPCfg DACSgm3533BspCfg[DACSgm3533ChannelMax] = {
                     .clk = {
                         .device_name = "DACSgm3533_SCK",
                         .base        = GPIOG,
-                        .af          = GPIO_AF_6,
+                        .af          = GPIO_AF_5,
                         .pin         = GPIO_PIN_11,
                         .pin_mode    = DevPinModeAF,
                     },
                     .mosi = {
                         .device_name = "DACSgm3533_MOSI",
                         .base        = GPIOD,
-                        .af          = GPIO_AF_6,
+                        .af          = GPIO_AF_5,
                         .pin         = GPIO_PIN_7,
                         .pin_mode    = DevPinModeAF,
                     },
                     .miso = {
                         .device_name = "DACSgm3533_MISO",
-                        .base        = GPIOD,
-                        .af          = GPIO_AF_6,
-                        .pin         = GPIO_PIN_6,
+                        .base        = GPIOG,
+                        .af          = GPIO_AF_5,
+                        .pin         = GPIO_PIN_9,
                         .pin_mode    = DevPinModeAF,
                     },
                     .spi_cfg = {

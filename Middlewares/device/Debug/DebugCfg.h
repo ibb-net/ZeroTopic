@@ -7,7 +7,7 @@
 #define DEBUG_UART_BASE          USART0
 #define DEBUG_UART_BAUDRATE      115200
 #define DEBUG_UART_IDLE_TIMEOUT  100  // 单位：ms
-
+#if 0
 // TX GPIO 配置
 #define DEBUG_TX_GPIO_PORT       GPIOB
 #define DEBUG_TX_GPIO_AF         GPIO_AF_4
@@ -17,8 +17,17 @@
 #define DEBUG_RX_GPIO_PORT       GPIOB
 #define DEBUG_RX_GPIO_AF         GPIO_AF_4
 #define DEBUG_RX_GPIO_PIN        GPIO_PIN_15
+// TX GPIO 配置
+#else
+#define DEBUG_TX_GPIO_PORT       GPIOB
+#define DEBUG_TX_GPIO_AF         GPIO_AF_7
+#define DEBUG_TX_GPIO_PIN        GPIO_PIN_6
 
-
+// RX GPIO 配置
+#define DEBUG_RX_GPIO_PORT       GPIOB
+#define DEBUG_RX_GPIO_AF         GPIO_AF_7
+#define DEBUG_RX_GPIO_PIN        GPIO_PIN_7
+#endif
 
 // RX DMA 配置
 #define DEBUG_RX_DMA_BASE_ADDR   DMA0
