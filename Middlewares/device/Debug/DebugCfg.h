@@ -7,7 +7,8 @@
 #define DEBUG_UART_BASE          USART0
 #define DEBUG_UART_BAUDRATE      115200
 #define DEBUG_UART_IDLE_TIMEOUT  100  // 单位：ms
-#if 0
+// UART 配置
+#if 0           //kaifaban
 // TX GPIO 配置
 #define DEBUG_TX_GPIO_PORT       GPIOB
 #define DEBUG_TX_GPIO_AF         GPIO_AF_4
