@@ -29,8 +29,7 @@
 #define CONFIG_Mcuadc_CYCLE_TIMER_MS 100
 #endif
 /* ===================================================================================== */
-typedef struct
-{
+typedef struct {
     uint32_t id;
 } TypdefMcuadcBSPCfg;
 
@@ -43,9 +42,9 @@ const TypdefMcuadcBSPCfg McuadcBspCfg[McuadcChannelMax] = {
 
 };
 
-typedef struct
-{
+typedef struct {
     char device_name[DEVICE_NAME_MAX];
+    float value;  // ADC value
     uint32_t id;  // ID
 
 } TypdefMcuadcStatus;
@@ -68,16 +67,17 @@ static const vfb_event_t McuadcEventList[] = {
 static const VFBTaskStruct Mcuadc_task_cfg = {
     .name         = "VFBTaskMcuadc",  // Task name
     .pvParameters = NULL,
-    // .uxPriority = 10,											  // Task parameters
-    .queue_num               = 8,                                              // Number of queues to subscribe
-    .event_list              = McuadcEventList,                                // Event list to subscribe
-    .event_num               = sizeof(McuadcEventList) / sizeof(vfb_event_t),  // Number of events to subscribe
-    .startup_wait_event_list = NULL,                                           // Events to wait for at startup
-    .startup_wait_event_num  = 0,                                              // Number of startup events to wait for
-    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_Mcuadc_CYCLE_TIMER_MS),    // Wait indefinitely
-    .init_msg_cb             = __McuadcInitHandle,                             // Callback for initialization messages
-    .rcv_msg_cb              = __McuadcRcvHandle,                              // Callback for received messages
-    .rcv_timeout_cb          = __McuadcCycHandle,                              // Callback for timeout
+    // .uxPriority = 10,
+    // // Task parameters
+    .queue_num  = 8,                                              // Number of queues to subscribe
+    .event_list = McuadcEventList,                                // Event list to subscribe
+    .event_num  = sizeof(McuadcEventList) / sizeof(vfb_event_t),  // Number of events to subscribe
+    .startup_wait_event_list = NULL,                              // Events to wait for at startup
+    .startup_wait_event_num  = 0,  // Number of startup events to wait for
+    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_Mcuadc_CYCLE_TIMER_MS),  // Wait indefinitely
+    .init_msg_cb             = __McuadcInitHandle,  // Callback for initialization messages
+    .rcv_msg_cb              = __McuadcRcvHandle,   // Callback for received messages
+    .rcv_timeout_cb          = __McuadcCycHandle,   // Callback for timeout
 };
 
 /* ===================================================================================== */
@@ -90,7 +90,8 @@ void McuadcDeviceInit(void) {
 
         McuadcStatusHandle->id = i;
         memset(McuadcStatusHandle->device_name, 0, sizeof(McuadcStatusHandle->device_name));
-        snprintf(McuadcStatusHandle->device_name, sizeof(McuadcStatusHandle->device_name), "Mcuadc%d", i);
+        snprintf(McuadcStatusHandle->device_name, sizeof(McuadcStatusHandle->device_name),
+                 "Mcuadc%d", i);
     }
     rcu_periph_clock_enable(RCU_GPIOA);
 
@@ -102,9 +103,11 @@ SYSTEM_REGISTER_INIT(MCUInitStage, McuadcPriority, McuadcDeviceInit, McuadcDevic
 static void __McuadcCreateTaskHandle(void) {
     for (size_t i = 0; i < McuadcChannelMax; i++) {
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskMcuadc", configMINIMAL_STACK_SIZE, (void *)&Mcuadc_task_cfg, McuadcPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskMcuadc", configMINIMAL_STACK_SIZE, (void *)&Mcuadc_task_cfg,
+                McuadcPriority, NULL);
 }
-SYSTEM_REGISTER_INIT(ServerInitStage, McuadcPriority, __McuadcCreateTaskHandle, __McuadcCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(ServerInitStage, McuadcPriority, __McuadcCreateTaskHandle,
+                     __McuadcCreateTaskHandle init);
 
 static void __McuadcInitHandle(void *msg) {
     elog_i(TAG, "__McuadcInitHandle");
@@ -146,10 +149,10 @@ static void __McuadcInitHandle(void *msg) {
 }
 // 接收消息的回调函数
 static void __McuadcRcvHandle(void *msg) {
-    TaskHandle_t curTaskHandle          = xTaskGetCurrentTaskHandle();
+    TaskHandle_t curTaskHandle = xTaskGetCurrentTaskHandle();
     // TypdefMcuadcStatus *McuadcStatusTmp = (TypdefMcuadcStatus *)&McuadcStatus[0];
-    char *taskName                      = pcTaskGetName(curTaskHandle);
-    vfb_message_t tmp_msg               = (vfb_message_t)msg;
+    char *taskName        = pcTaskGetName(curTaskHandle);
+    vfb_message_t tmp_msg = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
         // case McuadcStart: {
         //     elog_i(TAG, "McuadcStartTask %d", tmp_msg->frame->head.data);
@@ -196,24 +199,40 @@ static void __McuadcCycHandle(void) {
         voltage_sum = 0.0f;  // 重置电压和计数器
         counter     = 0;
         // ADCUpdate
+        McuadcStatusHandle->value = average_voltage;  // 更新ADC状态值
+        // 发送ADC更新事件
         vfb_send(ADCUpdate, 0, &average_voltage, sizeof(average_voltage));
     }
 }
 
 #endif
 
+static void CmdMcuadcPrint(void) {
+    printf("\r\n===================================================\r\n");
+    printf("MCU ADC Device Status:\r\n");
+    printf("Power Supply: %.2f V\r\n", McuadcStatus[0].value);
+    printf("===================================================\r\n");
+}
 static void CmdMcuadcHelp(void) {
-    elog_i(TAG, "\r\nUsage: Mcuadc <state>");
-    elog_i(TAG, "  <state>: 0 for off, 1 for on");
-    elog_i(TAG, "Example: Mcuadc 1");
+    printf("\r\n===================================================\r\n");
+    printf("MCU ADC Command Help:\r\n");
+    printf(" adc power   - Print the current ADC value\r\n");
+    printf("===================================================\r\n");
+
 }
 static int CmdMcuadcHandle(int argc, char *argv[]) {
     if (argc < 2) {
         CmdMcuadcHelp();
         return 0;
     }
+    // value
+    if (memcmp(argv[1], "power", 5) == 0) {
+        CmdMcuadcPrint();
+        return 0;
+    }
 
     return 0;
 }
 
-SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), Mcuadc, CmdMcuadcHandle, Mcuadc command);
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), adc,
+                 CmdMcuadcHandle, Mcuadc command);
