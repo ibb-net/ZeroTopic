@@ -169,7 +169,7 @@ void SGM58601_Gpio_Init(void);												//SGM58601 GPIO初始化
 void sgm5860xWriteReg(unsigned char regaddr,unsigned char databyte);			//SGM58601A 写寄存器
 void SGM58601BWREG(unsigned char regaddr,unsigned char databyte);			//SGM58601B 写寄存器
 
-signed int sgm5860xReadReg(unsigned char channel);						//SGM58601 读数据
+// signed int sgm5860xReadReg(unsigned char channel);						//SGM58601 读数据
 signed int SGM58601BReadData(unsigned char channel);						//SGM58601 读数据
 
 void sgm5860xInit(void);													//SGM58601A 单端采集初始化
