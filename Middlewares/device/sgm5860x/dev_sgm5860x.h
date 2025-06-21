@@ -1,117 +1,260 @@
-/***********************************************************************************
-*说 明：此C文件为圣邦威58601-AD驱动头文件
-*创 建：MaJinWen
-*时 间：2023-03-09
-*版 本：V_1.0.0
-*修 改：none
-************************************************************************************/
-#ifndef __SGM58601_H__
-#define __SGM58601_H__
+#ifndef __DEV_Sgm5860x_H
+#define __DEV_Sgm5860x_H
+// #include "semphr.h"
+#include "dev_basic.h"
+#include "dev_dma.h"
+#include "dev_pin.h"
+#include "dev_Sgm5860x.h"
+#include "dev_spi.h"
+
+typedef struct {
+    DevPinHandleStruct drdy;
+    DevPinHandleStruct nest;
+    DevPinHandleStruct sync;
+    DevSpiHandleStruct spi;  // Sgm5860x 配置
+} DevSgm5860xHandleStruct;
+typedef union {
+    struct {
+        uint8_t nDRDY : 1;  // Bit 0: Data Ready (Active Low)
+        uint8_t BUFEN : 1;  // Bit 1: Buffer Enable
+        uint8_t ACAL : 1;   // Bit 2: Auto Calibration Enable
+        uint8_t ORDER : 1;  // Bit 3: Data Order (0: MSB First, 1: LSB First)
+        uint8_t ID : 4;     // Bits 4-7: Device ID
+    } bits;                 // 位域结构体
+    uint8_t raw;            // 原始寄存器值
+} SGM5860xStatusReg_t;      // 0x00 STATUS: Status Register
+
+typedef union {
+    struct {
+        uint8_t NSEL : 4;  // Bits 0-3: Negative Input Channel Selection
+        uint8_t PSEL : 4;  // Bits 4-7: Positive Input Channel Selection
+    } bits;                // Bit-field structure
+    uint8_t raw;           // Raw register value
+} SGM5860xMuxReg_t;        // 0x01 MUX: Input Multiplexer Control Register
+
+typedef union {
+    struct {
+        uint8_t CLK : 2;       // Bits 0-1: Clock Output Frequency
+        uint8_t SDCS : 2;      // Bits 2-3: Sensor Detection Current Source
+        uint8_t PGA : 3;       // Bits 4-6: Programmable Gain Amplifier
+        uint8_t reserved : 1;  // Bit 7: Reserved
+    } bits;                    // Bit-field structure
+    uint8_t raw;               // Raw register value
+} SGM5860xAdconReg_t;          // 0x02 ADCON: A/D Control Register
+
+typedef union {
+    struct {
+        uint8_t DR : 8;  // Bits 0-7: Data Rate
+    } bits;              // Bit-field structure
+    uint8_t raw;         // Raw register value
+} SGM5860xDrateReg_t;    // 0x03 DRATE: A/D Data Rate Register
+
+typedef union {
+    struct {
+        uint8_t DIO : 4;  // Bits 0-3: Digital Input/Output State
+        uint8_t DIR : 4;  // Bits 4-7: Digital Input/Output Direction
+    } bits;               // Bit-field structure
+    uint8_t raw;          // Raw register value
+} SGM5860xIoReg_t;        // 0x04 IO: GPIO Control Register
+
+typedef union {
+    struct {
+        uint8_t OFC : 8;  // Bits 0-7: Offset Calibration Byte 0 (Least Significant Byte)
+    } bits;               // Bit-field structure
+    uint8_t raw;          // Raw register value
+} SGM5860xOfc0Reg_t;      // 0x05 OFC0: Offset Calibration Byte 0
+
+typedef union {
+    struct {
+        uint8_t OFC : 8;  // Bits 0-7: Offset Calibration Byte 1
+    } bits;               // Bit-field structure
+    uint8_t raw;          // Raw register value
+} SGM5860xOfc1Reg_t;      // 0x06 OFC1: Offset Calibration Byte 1
+
+typedef union {
+    struct {
+        uint8_t OFC : 8;  // Bits 0-7: Offset Calibration Byte 2 (Most Significant Byte)
+    } bits;               // Bit-field structure
+    uint8_t raw;          // Raw register value
+} SGM5860xOfc2Reg_t;      // 0x07 OFC2: Offset Calibration Byte 2
+typedef union {
+    struct {
+        uint8_t FSC : 8;  // Bits 0-7: Full-Scale Calibration Byte 0 (Least Significant Byte)
+    } bits;               // Bit-field structure
+    uint8_t raw;          // Raw register value
+} SGM5860xFsc0Reg_t;      // 0x08 FSC0: Full-Scale Calibration Byte 0
+typedef union {
+    struct {
+        uint8_t FSC : 8;  // Bits 0-7: Full-Scale Calibration Byte 2 (Most Significant Byte)
+    } bits;               // Bit-field structure
+    uint8_t raw;          // Raw register value
+} SGM5860xFsc2Reg_t;      // 0x0A FSC2: Full-Scale Calibration Byte 2
 
 
-#define  SET_CS1_HIGH       do{GPIO_BOP(GPIOA) = GPIO_PIN_4;}while(0)       
-#define  SET_CS1_LOW        do{GPIO_BC(GPIOA) = GPIO_PIN_4;}while(0)        
-#define  SET_RESET1_HIGH    do{GPIO_BOP(GPIOB) = GPIO_PIN_1;}while(0)       //pull up RESET1
-#define  SET_RESET1_LOW     do{GPIO_BC(GPIOB) = GPIO_PIN_1;}while(0)        //pull down RESET1
 
-#define  SET_CS2_HIGH       do{GPIO_BOP(GPIOC) = GPIO_PIN_6;}while(0)     
-#define  SET_CS2_LOW        do{GPIO_BC(GPIOC) = GPIO_PIN_6;}while(0)       
-#define  SET_RESET2_HIGH    do{GPIO_BOP(GPIOB) = GPIO_PIN_2;}while(0)       //pull up RESET2
-#define  SET_RESET2_LOW     do{GPIO_BC(GPIOB) = GPIO_PIN_2;}while(0)        //pull down RESET2
+// define commands
+#define SGM58601_CMD_WAKEUP   0x00
+#define SGM58601_CMD_RDATA    0x01
+#define SGM58601_CMD_RDATAC   0x03
+#define SGM58601_CMD_SDATAC   0x0f
+#define SGM58601_CMD_RREG     0x10
+#define SGM58601_CMD_WREG     0x50
+#define SGM58601_CMD_SELFCAL  0xf0
+#define SGM58601_CMD_SELFOCAL 0xf1
+#define SGM58601_CMD_SELFGCAL 0xf2
+#define SGM58601_CMD_SYSOCAL  0xf3
+#define SGM58601_CMD_SYSGCAL  0xf4
+#define SGM58601_CMD_SYNC     0xfc
+#define SGM58601_CMD_STANDBY  0xfd
+#define SGM58601_CMD_REST     0xfe
 
-#define  READ_REG(regAddr)      ((uint32_t)0x00100000 | ((uint32_t)regAddr<<8))   //读寄存器地址
-#define  WRITE_REG(regAddr)     ((uint32_t)0x00500000 | ((uint32_t)regAddr<<8))   //写寄存器地址
+// define the SGM58601 register values
+#define SGM58601_STATUS 0x00
+#define SGM58601_MUX    0x01
+#define SGM58601_ADCON  0x02
+#define SGM58601_DRATE  0x03
+#define SGM58601_IO     0x04
+#define SGM58601_OFC0   0x05
+#define SGM58601_OFC1   0x06
+#define SGM58601_OFC2   0x07
+#define SGM58601_FSC0   0x08
+#define SGM58601_FSC1   0x09
+#define SGM58601_FSC2   0x0A
 
-/*The number of operation registers*/
-#define  OPREATION_REG_NUM_1            0x01        //操作一个寄存器
-#define  OPREATION_REG_NUM_2            0x02        //操作两个寄存器
-#define  OPREATION_REG_NUM_3            0x03        //操作三个寄存器
-#define  OPREATION_REG_NUM_4            0x04        //操作四个寄存器
+// define multiplexer codes
+#define SGM58601_MUXP_AIN0   0x00
+#define SGM58601_MUXP_AIN1   0x10
+#define SGM58601_MUXP_AIN2   0x20
+#define SGM58601_MUXP_AIN3   0x30
+#define SGM58601_MUXP_AIN4   0x40
+#define SGM58601_MUXP_AIN5   0x50
+#define SGM58601_MUXP_AIN6   0x60
+#define SGM58601_MUXP_AIN7   0x70
+#define SGM58601_MUXP_AINCOM 0x80
 
-/*SGM58601寄存器地址*/
-#define  STATUS_REG                     0x00         //状态寄存器
-#define  MUX_REG                        0x01         //多路输入复用控制器寄存器
-#define  ADCON_REG                      0x02         //A/D控制器寄存器
-#define  DRATE_REG                      0x03         //A/D速率控制器
-#define  IO_REG                         0x04         //GPIO控制寄存器
-#define  OFC0_REG                       0x05         //偏移校准字节0-最小显著字节寄存器
-#define  OFC1_REG                       0x06         //偏移校准字节1
-#define  OFC2_REG                       0x07         //偏移校准字节2-最高显著字节寄存器
-#define  FSC0_REG                       0x08         //全缩放校准字节0-最小显著字节
-#define  FSC1_REG                       0x09         //全缩放校准字节1
-#define  FSC2_REG                       0x0A         //全缩放校准字节2-最高显著字节
-#define  STATUS1_REG                    0x0B         //状态1寄存器
+#define SGM58601_MUXN_AIN0   0x00
+#define SGM58601_MUXN_AIN1   0x01
+#define SGM58601_MUXN_AIN2   0x02
+#define SGM58601_MUXN_AIN3   0x03
+#define SGM58601_MUXN_AIN4   0x04
+#define SGM58601_MUXN_AIN5   0x05
+#define SGM58601_MUXN_AIN6   0x06
+#define SGM58601_MUXN_AIN7   0x07
+#define SGM58601_MUXN_AINCOM 0x08
 
-/*SGM58601命令*/
-#define  WAKEUP                         0x00         //完成同步模式并退出备用模式
-#define  RDATA                          0x01         //read data
-#define  RDATAC                         0x03         //continuous read data
-#define  SDATAC                         0x0F         //stop continuous read data
-#define  RREG                           0x10         //读reg寄存器
-#define  WREG                           0x50         //写reg寄存器
-#define  SELFCAL                        0xF0         //偏移和增益自校准
-#define  SELFOCAL                       0xF1         //偏移量自校准
-#define  SELFGCAL                       0xF2         //增益自校准
-#define  SYSOCAL                        0xF3         //系统偏移校准
-#define  SYSGCAL                        0xF4         //系统增益校准
-#define  SYNC                           0xFC         //同步A/D转换
-#define  STANDBY                        0xFD         //开始待机模式
-#define  CHIP_RESET                     0xFE         //重置为通电值
+// define gain codes
+#define SGM58601_GAIN_1  0x00
+#define SGM58601_GAIN_2  0x01
+#define SGM58601_GAIN_4  0x02
+#define SGM58601_GAIN_8  0x03
+#define SGM58601_GAIN_16 0x04
+#define SGM58601_GAIN_32 0x05
+#define SGM58601_GAIN_64 0x06
+// #define SGM58601_GAIN_64     0x07
 
-/*SGM58601 auto-Calibration bit*/
-#define AUTO_CALIBRATION_ENABLE         0x04
+// define drate codes
+#define SGM58601_DRATE_30000SPS 0xF0
+#define SGM58601_DRATE_15000SPS 0xE0
+#define SGM58601_DRATE_7500SPS  0xD0
+#define SGM58601_DRATE_3750SPS  0xC0
+#define SGM58601_DRATE_2000SPS  0xB0
+#define SGM58601_DRATE_1000SPS  0xA1
+#define SGM58601_DRATE_500SPS   0x92
+#define SGM58601_DRATE_100SPS   0x82
+#define SGM58601_DRATE_60SPS    0x72
+#define SGM58601_DRATE_50SPS    0x63
+#define SGM58601_DRATE_30SPS    0x53
+#define SGM58601_DRATE_25SPS    0x43
+#define SGM58601_DRATE_15SPS    0x33
+#define SGM58601_DRATE_10SPS    0x23
+#define SGM58601_DRATE_5SPS     0x13
+#define SGM58601_DRATE_2_5SPS   0x03
 
-/*SGM58601 analog input buffer enable bit*/
-#define ANALOG_INPUT_BUFFER_ENABLE      0x02
-/*SGM58601 buffer control*/
-#define REF_BUFP_ENABLE                 0x08        //Positive Reference Input Buffer Enable
-#define REF_BUFM_ENABLE                 0x04        //Negative Reference Input Buffer Enable
-#define AIN_BUFP_ENABLE                 0x02        //Positive Analog Input Buffer Enable
-#define AIN_BUFM_ENABLE                 0x01        //Negative Analog Input Buffer Enable
+// define commands
+#define SGM58601_CMD_WAKEUP   0x00
+#define SGM58601_CMD_RDATA    0x01
+#define SGM58601_CMD_RDATAC   0x03
+#define SGM58601_CMD_SDATAC   0x0f
+#define SGM58601_CMD_RREG     0x10
+#define SGM58601_CMD_WREG     0x50
+#define SGM58601_CMD_SELFCAL  0xf0
+#define SGM58601_CMD_SELFOCAL 0xf1
+#define SGM58601_CMD_SELFGCAL 0xf2
+#define SGM58601_CMD_SYSOCAL  0xf3
+#define SGM58601_CMD_SYSGCAL  0xf4
+#define SGM58601_CMD_SYNC     0xfc
+#define SGM58601_CMD_STANDBY  0xfd
+#define SGM58601_CMD_REST     0xfe
 
-/*SGM58601 PGA configuration*/
-#define SET_PGA_1                       0x00
-#define SET_PGA_2                       0x01
-#define SET_PGA_4                       0x02
-#define SET_PGA_8                       0x03
-#define SET_PGA_16                      0x04
-#define SET_PGA_32                      0x05
-#define SET_PGA_64                      0x06
-#define SET_PGA_128                     0x07
+// define the SGM58601 register values
+#define SGM58601_STATUS 0x00
+#define SGM58601_MUX    0x01
+#define SGM58601_ADCON  0x02
+#define SGM58601_DRATE  0x03
+#define SGM58601_IO     0x04
+#define SGM58601_OFC0   0x05
+#define SGM58601_OFC1   0x06
+#define SGM58601_OFC2   0x07
+#define SGM58601_FSC0   0x08
+#define SGM58601_FSC1   0x09
+#define SGM58601_FSC2   0x0A
 
-/*SGM58601 data rate configuration*/
-#define SET_DATA_RATE_60000SPS          0xF1
-#define SET_DATA_RATE_30000SPS          0xF0
-#define SET_DATA_RATE_15000SPS          0xE0
-#define SET_DATA_RATE_7500SPS           0xD0
-#define SET_DATA_RATE_3750SPS           0xC0
-#define SET_DATA_RATE_2000SPS           0xB0
-#define SET_DATA_RATE_1000SPS           0xA1
-#define SET_DATA_RATE_500SPS            0x92
-#define SET_DATA_RATE_100SPS            0x82
-#define SET_DATA_RATE_60SPS             0x72
-#define SET_DATA_RATE_50SPS             0x63
-#define SET_DATA_RATE_30SPS             0x53
-#define SET_DATA_RATE_25SPS             0x43
-#define SET_DATA_RATE_15SPS             0x33
-#define SET_DATA_RATE_10SPS             0x23
-#define SET_DATA_RATE_5SPS              0x13
-#define SET_DATA_RATE_2_5SPS            0x03
+// define multiplexer codes
+#define SGM58601_MUXP_AIN0   0x00
+#define SGM58601_MUXP_AIN1   0x10
+#define SGM58601_MUXP_AIN2   0x20
+#define SGM58601_MUXP_AIN3   0x30
+#define SGM58601_MUXP_AIN4   0x40
+#define SGM58601_MUXP_AIN5   0x50
+#define SGM58601_MUXP_AIN6   0x60
+#define SGM58601_MUXP_AIN7   0x70
+#define SGM58601_MUXP_AINCOM 0x80
 
-/*SGM58601 Register configuration*/
-#define  STATUS_REG_SET_VALUE           0x00    //status register
-#define  ADC_CONTORL_REG_SET_VALUE      0x00    //ADC control register(PGA=1)
-#define  AD_DATA_RATE_REG_SET_VALUE     0x00    //ADC data rate register(50SPS)
-#define  IO_CONTORL_REG_SET_VALUE       0xF0    //I/O contorl register
-#define  STATUS1_REG_SET_VALUE          0x00    //status1 register
+#define SGM58601_MUXN_AIN0   0x00
+#define SGM58601_MUXN_AIN1   0x01
+#define SGM58601_MUXN_AIN2   0x02
+#define SGM58601_MUXN_AIN3   0x03
+#define SGM58601_MUXN_AIN4   0x04
+#define SGM58601_MUXN_AIN5   0x05
+#define SGM58601_MUXN_AIN6   0x06
+#define SGM58601_MUXN_AIN7   0x07
+#define SGM58601_MUXN_AINCOM 0x08
 
-/*SGM58601 MUX register configuration*/
-#define  MUX_CHN1_SET_VALUE             0x78    //0x08 Indicates the conversion of AD channel 1
-#define  MUX_CHN2_SET_VALUE             0x68    //0x18 Indicates the conversion of AD channel 2
-#define  MUX_CHN3_SET_VALUE             0x58    //0x28 Indicates the conversion of AD channel 3
-#define  MUX_CHN4_SET_VALUE             0x48    //0x38 Indicates the conversion of AD channel 4
-#define  MUX_CHN5_SET_VALUE             0x38    //0x48 Indicates the conversion of AD channel 5
-#define  MUX_CHN6_SET_VALUE             0x28    //0x58 Indicates the conversion of AD channel 6
-#define  MUX_CHN7_SET_VALUE             0x18    //0x68 Indicates the conversion of AD channel 7
-#define  MUX_CHN8_SET_VALUE             0x08    //0x78 Indicates the conversion of AD channel 8
-#endif /*__SGM58601_H__*/
+// define gain codes
+#define SGM58601_GAIN_1  0x00
+#define SGM58601_GAIN_2  0x01
+#define SGM58601_GAIN_4  0x02
+#define SGM58601_GAIN_8  0x03
+#define SGM58601_GAIN_16 0x04
+#define SGM58601_GAIN_32 0x05
+#define SGM58601_GAIN_64 0x06
+// #define SGM58601_GAIN_64     0x07
+
+// define drate codes
+#define SGM58601_DRATE_30000SPS 0xF0
+#define SGM58601_DRATE_15000SPS 0xE0
+#define SGM58601_DRATE_7500SPS  0xD0
+#define SGM58601_DRATE_3750SPS  0xC0
+#define SGM58601_DRATE_2000SPS  0xB0
+#define SGM58601_DRATE_1000SPS  0xA1
+#define SGM58601_DRATE_500SPS   0x92
+#define SGM58601_DRATE_100SPS   0x82
+#define SGM58601_DRATE_60SPS    0x72
+#define SGM58601_DRATE_50SPS    0x63
+#define SGM58601_DRATE_30SPS    0x53
+#define SGM58601_DRATE_25SPS    0x43
+#define SGM58601_DRATE_15SPS    0x33
+#define SGM58601_DRATE_10SPS    0x23
+#define SGM58601_DRATE_5SPS     0x13
+#define SGM58601_DRATE_2_5SPS   0x03
+
+#define ORDER_MSB_FIRST 0  // Most significant bit first (default)
+#define ORDER_LSB_FIRST 1  // Least significant bit first
+
+int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) ;
+void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
+int DevSgm5860xReadRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg, uint8_t *data);
+int DevSgm5860xWriteRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg, uint8_t data);
+int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
+
+#endif  // __DEV_Sgm5860x_H
