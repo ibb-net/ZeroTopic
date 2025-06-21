@@ -247,8 +247,15 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
     }
     if (strcmp(argv[1], "data") == 0) {
         int32_t adc_data = 0;
+        uint8_t channel = 0;
+        if (argc < 3) {
+            elog_e(TAG, "Usage: sgm5860x data <channel>");
+            return 0;
+        }
+        channel = (uint8_t)strtol(argv[2], NULL, 10);
+
         printf("Testing ADC data read\r\n");
-        DevGetADCData(&sgm5860_cfg, &adc_data);  // Read ADC data
+        DevGetADCData(&sgm5860_cfg, &adc_data,channel);
         return 0;
     }
     // reset

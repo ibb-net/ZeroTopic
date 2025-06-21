@@ -34,9 +34,10 @@ typedef union {
 
 typedef union {
     struct {
-        uint8_t CLK : 2;       // Bits 0-1: Clock Output Frequency
-        uint8_t SDCS : 2;      // Bits 2-3: Sensor Detection Current Source
-        uint8_t PGA : 3;       // Bits 4-6: Programmable Gain Amplifier
+        uint8_t PGA : 3;       // Bits 0-2 Programmable Gain Amplifier
+        uint8_t SDCS : 2;      // Bits 3-4: Sensor Detection Current Source
+
+        uint8_t CLK : 2;       // Bits 5-6: Clock Output Frequency
         uint8_t reserved : 1;  // Bit 7: Reserved
     } bits;                    // Bit-field structure
     uint8_t raw;               // Raw register value
@@ -108,39 +109,7 @@ typedef union {
 #define SGM58601_CMD_STANDBY  0xfd
 #define SGM58601_CMD_REST     0xfe
 
-// define the SGM58601 register values
-#define SGM58601_STATUS 0x00
-#define SGM58601_MUX    0x01
-#define SGM58601_ADCON  0x02
-#define SGM58601_DRATE  0x03
-#define SGM58601_IO     0x04
-#define SGM58601_OFC0   0x05
-#define SGM58601_OFC1   0x06
-#define SGM58601_OFC2   0x07
-#define SGM58601_FSC0   0x08
-#define SGM58601_FSC1   0x09
-#define SGM58601_FSC2   0x0A
 
-// define multiplexer codes
-#define SGM58601_MUXP_AIN0   0x00
-#define SGM58601_MUXP_AIN1   0x10
-#define SGM58601_MUXP_AIN2   0x20
-#define SGM58601_MUXP_AIN3   0x30
-#define SGM58601_MUXP_AIN4   0x40
-#define SGM58601_MUXP_AIN5   0x50
-#define SGM58601_MUXP_AIN6   0x60
-#define SGM58601_MUXP_AIN7   0x70
-#define SGM58601_MUXP_AINCOM 0x80
-
-#define SGM58601_MUXN_AIN0   0x00
-#define SGM58601_MUXN_AIN1   0x01
-#define SGM58601_MUXN_AIN2   0x02
-#define SGM58601_MUXN_AIN3   0x03
-#define SGM58601_MUXN_AIN4   0x04
-#define SGM58601_MUXN_AIN5   0x05
-#define SGM58601_MUXN_AIN6   0x06
-#define SGM58601_MUXN_AIN7   0x07
-#define SGM58601_MUXN_AINCOM 0x08
 
 // define gain codes
 #define SGM58601_GAIN_1  0x00
@@ -150,7 +119,7 @@ typedef union {
 #define SGM58601_GAIN_16 0x04
 #define SGM58601_GAIN_32 0x05
 #define SGM58601_GAIN_64 0x06
-// #define SGM58601_GAIN_64     0x07
+#define SGM58601_GAIN_128     0x07
 
 // define drate codes
 #define SGM58601_DRATE_30000SPS 0xF0
@@ -170,21 +139,7 @@ typedef union {
 #define SGM58601_DRATE_5SPS     0x13
 #define SGM58601_DRATE_2_5SPS   0x03
 
-// define commands
-#define SGM58601_CMD_WAKEUP   0x00
-#define SGM58601_CMD_RDATA    0x01
-#define SGM58601_CMD_RDATAC   0x03
-#define SGM58601_CMD_SDATAC   0x0f
-#define SGM58601_CMD_RREG     0x10
-#define SGM58601_CMD_WREG     0x50
-#define SGM58601_CMD_SELFCAL  0xf0
-#define SGM58601_CMD_SELFOCAL 0xf1
-#define SGM58601_CMD_SELFGCAL 0xf2
-#define SGM58601_CMD_SYSOCAL  0xf3
-#define SGM58601_CMD_SYSGCAL  0xf4
-#define SGM58601_CMD_SYNC     0xfc
-#define SGM58601_CMD_STANDBY  0xfd
-#define SGM58601_CMD_REST     0xfe
+
 
 // define the SGM58601 register values
 #define SGM58601_STATUS 0x00
@@ -201,14 +156,14 @@ typedef union {
 
 // define multiplexer codes
 #define SGM58601_MUXP_AIN0   0x00
-#define SGM58601_MUXP_AIN1   0x10
-#define SGM58601_MUXP_AIN2   0x20
-#define SGM58601_MUXP_AIN3   0x30
-#define SGM58601_MUXP_AIN4   0x40
-#define SGM58601_MUXP_AIN5   0x50
-#define SGM58601_MUXP_AIN6   0x60
-#define SGM58601_MUXP_AIN7   0x70
-#define SGM58601_MUXP_AINCOM 0x80
+#define SGM58601_MUXP_AIN1   0x01
+#define SGM58601_MUXP_AIN2   0x02
+#define SGM58601_MUXP_AIN3   0x03
+#define SGM58601_MUXP_AIN4   0x04
+#define SGM58601_MUXP_AIN5   0x05
+#define SGM58601_MUXP_AIN6   0x06
+#define SGM58601_MUXP_AIN7   0x07
+#define SGM58601_MUXP_AINCOM 0x08
 
 #define SGM58601_MUXN_AIN0   0x00
 #define SGM58601_MUXN_AIN1   0x01
@@ -220,33 +175,8 @@ typedef union {
 #define SGM58601_MUXN_AIN7   0x07
 #define SGM58601_MUXN_AINCOM 0x08
 
-// define gain codes
-#define SGM58601_GAIN_1  0x00
-#define SGM58601_GAIN_2  0x01
-#define SGM58601_GAIN_4  0x02
-#define SGM58601_GAIN_8  0x03
-#define SGM58601_GAIN_16 0x04
-#define SGM58601_GAIN_32 0x05
-#define SGM58601_GAIN_64 0x06
-// #define SGM58601_GAIN_64     0x07
 
-// define drate codes
-#define SGM58601_DRATE_30000SPS 0xF0
-#define SGM58601_DRATE_15000SPS 0xE0
-#define SGM58601_DRATE_7500SPS  0xD0
-#define SGM58601_DRATE_3750SPS  0xC0
-#define SGM58601_DRATE_2000SPS  0xB0
-#define SGM58601_DRATE_1000SPS  0xA1
-#define SGM58601_DRATE_500SPS   0x92
-#define SGM58601_DRATE_100SPS   0x82
-#define SGM58601_DRATE_60SPS    0x72
-#define SGM58601_DRATE_50SPS    0x63
-#define SGM58601_DRATE_30SPS    0x53
-#define SGM58601_DRATE_25SPS    0x43
-#define SGM58601_DRATE_15SPS    0x33
-#define SGM58601_DRATE_10SPS    0x23
-#define SGM58601_DRATE_5SPS     0x13
-#define SGM58601_DRATE_2_5SPS   0x03
+
 
 #define ORDER_MSB_FIRST 0  // Most significant bit first (default)
 #define ORDER_LSB_FIRST 1  // Least significant bit first
@@ -256,5 +186,5 @@ void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 int DevSgm5860xReadRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg, uint8_t *data);
 int DevSgm5860xWriteRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg, uint8_t data);
 int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
-void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t *adc_data);
+void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t *adc_data,uint8_t channel);
 #endif  // __DEV_Sgm5860x_H
