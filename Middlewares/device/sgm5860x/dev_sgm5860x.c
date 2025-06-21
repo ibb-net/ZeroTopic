@@ -70,7 +70,7 @@ static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860
         timeout--;
         if (timeout == 0) {
             elog_e(TAG, "__DevSgm5860xWaitForDRDY: Timeout waiting for DRDY");
-           return -1;  // Timeout occurred
+            return -1;  // Timeout occurred
         }
     }
     return 1;
@@ -84,12 +84,35 @@ void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     elog_i(TAG, "DevSgm5860xReset: Device reset Started");
 
     DevPinWrite(&ptrDevSgm5860xHandle->nest, 0);  // Set NEST pin low
-    DevDelayUs(100);  // Wait for 100 microseconds
+    DevDelayUs(100);                              // Wait for 100 microseconds
     DevPinWrite(&ptrDevSgm5860xHandle->nest, 1);  // Set NEST pin high
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy)==0) ;
+    while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0);
     elog_i(TAG, "DevSgm5860xReset: Device reset completed");
 }
-
+int DevSgm5860xCMDReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t regaddr) {
+    uint8_t snd_data[16] = {0};
+    uint8_t rcv_data[16] = {0};
+    memset(snd_data, 0, sizeof(snd_data));
+    memset(rcv_data, 0, sizeof(rcv_data));
+    snd_data[0] = (regaddr & 0x0F);                  // Command to write register
+    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
+    if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
+        elog_e(TAG, "DevSgm5860xCMDReg: Wait for DRDY failed");
+        return -1;
+    }
+    DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 1);
+    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
+    // elog_d(TAG, "DevSgm5860xCMDReg regaddr: 0x%02X reglen: %d", regaddr, reglen);
+    char log_msg[128];
+    // snprintf(log_msg, sizeof(log_msg),
+    //          "DevSgm5860xCMDReg regaddr: 0x%02X, reglen: %d, data: ", regaddr, reglen);
+    // for (size_t i = 0; i < reglen; i++) {
+    //     snprintf(log_msg + strlen(log_msg), sizeof(log_msg) - strlen(log_msg), "0x%02X ",
+    //              snd_data[i + 2]);
+    // }
+    // elog_i(TAG, "%s", log_msg);
+    return 1;  // Success
+}
 int DevSgm5860xWriteReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t regaddr,
                         uint8_t *regvalue, uint8_t reglen) {
     if (ptrDevSgm5860xHandle == NULL || regvalue == NULL) {
@@ -219,4 +242,53 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&drate_reg,
                        sizeof(drate_reg));
     elog_i(TAG, "Read DRATE Register: 0x%02X", drate_reg.raw);
+}
+
+void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t *adc_data) {
+    if (ptrDevSgm5860xHandle == NULL || adc_data == NULL) {
+        elog_e(TAG, "DevGetADCData: ptrDevSgm5860xHandle or adc_data is NULL");
+        return;
+    }
+#define VREF_VOLTAGE  (5.0f)           // Reference voltage for ADC
+#define PGA_GAIN      1.0f            // Gain for PGA (Programmable Gain Amplifier)
+#define ADC_24BIT_MAX (8388608.0f)  // Maximum value for 24-bit ADC
+
+    uint8_t snd_data[16] = {0};
+    uint8_t rcv_data[16] = {0};
+    memset(snd_data, 0, sizeof(snd_data));
+    memset(rcv_data, 0, sizeof(rcv_data));
+    SGM5860xMuxReg_t mux_reg = {
+        .bits.NSEL = SGM58601_MUXN_AINCOM,   // Negative Input Channel Selection
+        .bits.PSEL = SGM58601_MUXP_AIN0  // Positive Input Channel Selection
+    };
+
+    snd_data[0] = SGM58601_CMD_WREG | SGM58601_MUX;  // Command to write register
+    snd_data[1] = 0;
+    snd_data[2] = mux_reg.raw;                       // Write data to register
+    snd_data[3] = SGM58601_CMD_RDATA;                // Command to read data
+    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
+    while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0) {
+    }
+    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
+    DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 4 + 3);
+    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
+    int hex_data =
+        (rcv_data[4] << 16) | (rcv_data[5] << 8) | rcv_data[6];  // Combine the received data
+    elog_d(TAG, "DevGetADCData: Received data: 0x%06X", hex_data);
+    float voltage = 0.0f;
+    // if (hex_data & 0x800000) {  // Check if the sign bit is set
+    //     voltage =
+    //         (-1) * VREF_VOLTAGE * 2 * (ADC_24BIT_MAX) / (PGA_GAIN * (ADC_24BIT_MAX - hex_data));
+    // } else {
+        // voltage = VREF_VOLTAGE * 2 / (PGA_GAIN * (ADC_24BIT_MAX- hex_data));
+        voltage=hex_data*VREF_VOLTAGE/ (PGA_GAIN* ADC_24BIT_MAX) *4.7;  // Calculate voltage
+    // }
+
+    printf("\r DevGetADCData: Calculated voltage: %.6f V", voltage);
+    elog_d(TAG,
+           "rcv_data 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X "
+           "0x%02X 0x%02X 0x%02X 0x%02X 0x%02X",
+           rcv_data[0], rcv_data[1], rcv_data[2], rcv_data[3], rcv_data[4], rcv_data[5],
+           rcv_data[6], rcv_data[7], rcv_data[8], rcv_data[9], rcv_data[10], rcv_data[11],
+           rcv_data[12], rcv_data[13], rcv_data[14], rcv_data[15]);
 }

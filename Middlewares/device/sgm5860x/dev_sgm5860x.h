@@ -256,5 +256,5 @@ void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 int DevSgm5860xReadRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg, uint8_t *data);
 int DevSgm5860xWriteRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg, uint8_t data);
 int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
-
+void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t *adc_data);
 #endif  // __DEV_Sgm5860x_H

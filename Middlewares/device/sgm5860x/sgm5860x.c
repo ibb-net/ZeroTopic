@@ -246,18 +246,9 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
         return 0;
     }
     if (strcmp(argv[1], "data") == 0) {
-        if (argc < 4) {
-            elog_e(TAG, "Usage: sgm5860x data <ch> <data>");
-            return 0;
-        }
-        printf("\r\nSetting ADC data for channel %s with data %s\r\n", argv[2], argv[3]);
-        uint8_t ch    = atoi(argv[2]);
-        uint16_t data = (uint16_t)strtol(argv[3], NULL, 16);  // Convert hex string to uint16_t
-        if (ch >= sgm5860xChannelMax) {
-            elog_e(TAG, "Invalid channel: %d", ch);
-            return 0;
-        }
-        // sgm5860xsend(ch, data);
+        int32_t adc_data = 0;
+        printf("Testing ADC data read\r\n");
+        DevGetADCData(&sgm5860_cfg, &adc_data);  // Read ADC data
         return 0;
     }
     // reset
