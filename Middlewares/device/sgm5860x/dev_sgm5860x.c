@@ -214,7 +214,7 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
         .bits.reserved = 0                 // Reserved
     };
     SGM5860xDrateReg_t drate_reg = {
-        .bits.DR = SGM58601_DRATE_500SPS  // Data Rate
+        .bits.DR = SGM58601_DRATE_100SPS  // Data Rate
     };
 
     SGM5860xIoReg_t io_reg = {
