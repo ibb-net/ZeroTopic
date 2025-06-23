@@ -49,6 +49,7 @@ typedef enum {
     sgm5860xCH3,                         // 1037
     sgm5860xCH4,                         // 1038
     ADCUpdate,                           // 1039
+                  
     /************************************************* */
     SDK_EVENT_NUM,
     SDK_EVENT_LIST_MAX = SDK_EVENT_LIST_APP_START - 1

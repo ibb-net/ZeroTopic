@@ -261,7 +261,7 @@ static void __sgm5860xCycHandle(void) {
                 sgm5860xStatus.sum[i] += last_voltage;  // Accumulate the voltage for averaging
                 sgm5860xStatus.vol_index[i]++;
                 if (sgm5860xStatus.vol_index[i] >= AVG_MAX_CNT) {
-                    sgm5860xStatus.average[i] = sgm5860xStatus.sum[i] / sgm5860xStatus.vol_index[i];
+                    sgm5860xStatus.average[i] = sgm5860xStatus.sum[i] / sgm5860xStatus.vol_index[i]*1000;
                     sgm5860xStatus.vol_index[i] = 0;  // Reset the index after averaging
                     sgm5860xStatus.sum[i]       = 0;  // Reset the sum after averaging
                     vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.average[i]),
