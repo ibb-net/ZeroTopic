@@ -62,7 +62,7 @@ static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860
         elog_e(TAG, "__DevSgm5860xWaitForDRDY: ptrDevSgm5860xHandle is NULL");
         return 0;
     }
-    uint32_t timeout = 10*1000*1000;//SGM5860_WAIT_TIME_US;
+    uint32_t timeout = SGM5860_WAIT_TIME_US;  // SGM5860_WAIT_TIME_US;
     while (DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
         // DevDelayUs(1);  // Wait for DRDY to go low
         vTaskDelay(pdMS_TO_TICKS(1));  // Wait for 1 millisecond
@@ -97,7 +97,7 @@ int DevSgm5860xCMDReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
     if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
         elog_e(TAG, "DevSgm5860xCMDReg: Wait for DRDY failed");
-        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1); 
+        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);
         return -1;
     }
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 1);
@@ -137,7 +137,7 @@ int DevSgm5860xWriteReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uin
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);
     if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
         elog_e(TAG, "DevSgm5860xWriteReg: Wait for DRDY failed");
-        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1); 
+        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);
         return -1;
     }
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, reglen + 2);
@@ -176,7 +176,7 @@ int DevSgm5860xReadReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);      // Set NEST pin low
     if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
         elog_e(TAG, "DevSgm5860xReadReg: Wait for DRDY failed");
-        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1); 
+        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);
         return -1;
     }
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, reglen + 2);
@@ -214,7 +214,7 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
         .bits.reserved = 0                 // Reserved
     };
     SGM5860xDrateReg_t drate_reg = {
-        .bits.DR = SGM58601_DRATE_100SPS  // Data Rate
+        .bits.DR = SGM58601_DRATE_500SPS  // Data Rate
     };
 
     SGM5860xIoReg_t io_reg = {
@@ -248,12 +248,12 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
 }
 
 int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *last_voltage,
-                   uint8_t *last_channel, uint8_t channel, uint8_t gain) {
+                  uint8_t *last_channel, uint8_t channel, uint8_t gain) {
     if (ptrDevSgm5860xHandle == NULL || last_voltage == NULL) {
         elog_e(TAG, "DevGetADCData: ptrDevSgm5860xHandle or last_voltage is NULL");
         return -1;
     }
-
+    static uint32_t cyc  = 0;
     uint8_t snd_data[16] = {0};
     uint8_t rcv_data[16] = {0};
     memset(snd_data, 0, sizeof(snd_data));
@@ -277,7 +277,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *la
     mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;
     mux_reg.bits.PSEL  = channel;
     adcon_reg.bits.PGA = gaim_map[gain];
-    elog_d(TAG, "DevGetADCData:Set channel %d PGA gain %d ,mux raw 0x%02x ", channel,
+    elog_d(TAG, "DevGetADCData[%u]:Set channel %d PGA gain %d ,mux raw 0x%02x ", cyc, channel,
            adcon_reg.bits.PGA, mux_reg.raw);
     SGM5860xMuxReg_t tmp_mux_reg;
     SGM5860xAdconReg_t tmp_adcon_reg;
@@ -290,10 +290,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *la
     float tmp_gain      = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
 
     // elog_i(TAG, "Last MUX Register: Channel %d", tmp_channel);
-    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
-                        sizeof(mux_reg));  // Write MUX register
-    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
-                        sizeof(adcon_reg));  // Write ADCON register    //
+
     // Write data to register
     elog_d(TAG, "DevGetADCData: MUX Register get to 0x%02X", mux_reg.raw);
     snd_data[0] = SGM58601_CMD_RDATA;                // Command to read data
@@ -314,7 +311,10 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *la
     } else {
         voltage = hex_data * VREF_VOLTAGE / (ADC_24BIT_MAX) / tmp_gain;  // Calculate voltage
     }
-
+    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
+                        sizeof(mux_reg));  // Write MUX register
+    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
+                        sizeof(adcon_reg));  // Write ADCON register    //
     elog_d(TAG, "DevGetADCData: Calculated voltage: %.6f V %.3f mv  Gain: %.2f", voltage,
            voltage * 1000, gain);
     elog_d(TAG,
@@ -325,7 +325,8 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *la
            rcv_data[12], rcv_data[13], rcv_data[14], rcv_data[15]);
     *last_channel = tmp_mux_reg.bits.PSEL & 0x0F;  // Update last channel
     *last_voltage = voltage;                       // Update last voltage
-    elog_d(TAG, "DevGetADCData: Last channel %d, last voltage %.6f V", *last_channel,
+    elog_d(TAG, "DevGetADCData[%u]:Get channel %d, last voltage %.6f V", cyc, *last_channel,
            *last_voltage);
+    cyc++;
     return 1;  // Success
 }

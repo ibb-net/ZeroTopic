@@ -28,12 +28,11 @@
 #define sgm5860xChannelMax 4
 #endif
 #ifndef CONFIG_sgm5860x_CYCLE_TIMER_MS
-#define CONFIG_sgm5860x_CYCLE_TIMER_MS 50
+#define CONFIG_sgm5860x_CYCLE_TIMER_MS 10
 #endif
+#define AVG_MAX_CNT (10)
 
-#define SPI_CS1_ENABLE  DevPinWrite(&sgm5860xBspCfg.spi_cfg.nss, 0)  // Set NEST pin low
-#define SPI_CS1_DISABLE DevPinWrite(&sgm5860xBspCfg.spi_cfg.nss, 1)  // Set NEST pin high
-#define SGM58601_DRDY   DevPinRead(&sgm5860xBspCfg.drdy)             // Read DRDY pin status
+
 
 const float f_gain_map[] = {
     [SGM58601_GAIN_1] = 1.0f,   [SGM58601_GAIN_2] = 2.0f,     [SGM58601_GAIN_4] = 4.0f,
@@ -261,7 +260,7 @@ static void __sgm5860xCycHandle(void) {
                 sgm5860xStatus.last_voltage[i] = last_voltage;
                 sgm5860xStatus.sum[i] += last_voltage;  // Accumulate the voltage for averaging
                 sgm5860xStatus.vol_index[i]++;
-                if (sgm5860xStatus.vol_index[i] >= 10) {
+                if (sgm5860xStatus.vol_index[i] >= AVG_MAX_CNT) {
                     sgm5860xStatus.average[i] = sgm5860xStatus.sum[i] / sgm5860xStatus.vol_index[i];
                     sgm5860xStatus.vol_index[i] = 0;  // Reset the index after averaging
                     sgm5860xStatus.sum[i]       = 0;  // Reset the sum after averaging
