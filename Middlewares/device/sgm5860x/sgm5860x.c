@@ -28,13 +28,29 @@
 #define sgm5860xChannelMax 4
 #endif
 #ifndef CONFIG_sgm5860x_CYCLE_TIMER_MS
-#define CONFIG_sgm5860x_CYCLE_TIMER_MS 100
+#define CONFIG_sgm5860x_CYCLE_TIMER_MS 50
 #endif
 
 #define SPI_CS1_ENABLE  DevPinWrite(&sgm5860xBspCfg.spi_cfg.nss, 0)  // Set NEST pin low
 #define SPI_CS1_DISABLE DevPinWrite(&sgm5860xBspCfg.spi_cfg.nss, 1)  // Set NEST pin high
 #define SGM58601_DRDY   DevPinRead(&sgm5860xBspCfg.drdy)             // Read DRDY pin status
 
+const float f_gain_map[] = {
+    [SGM58601_GAIN_1] = 1.0f,   [SGM58601_GAIN_2] = 2.0f,     [SGM58601_GAIN_4] = 4.0f,
+    [SGM58601_GAIN_8] = 8.0f,   [SGM58601_GAIN_16] = 16.0f,   [SGM58601_GAIN_32] = 32.0f,
+    [SGM58601_GAIN_64] = 64.0f, [SGM58601_GAIN_128] = 128.0f,
+};
+typedef struct {
+    uint8_t channel;  // Channel number
+    uint8_t gain;     // Gain setting for the channel
+} ChannelCfg_t;
+ChannelCfg_t sgm5860_channelcfg[sgm5860xChannelMax] = {
+    {0, SGM58601_GAIN_1},    // Channel 0: Gain 1
+    {2, SGM58601_GAIN_1},    // Channel 2: Gain 1
+    {4, SGM58601_GAIN_1},    // Channel 4: Gain 1
+    {6, SGM58601_GAIN_128},  // Channel 6: Gain 128
+
+};
 /* ===================================================================================== */
 const DevSgm5860xHandleStruct sgm5860_cfg = {
     .drdy =
@@ -132,6 +148,12 @@ typedef struct {
     char device_name[DEVICE_NAME_MAX];
     uint32_t id;  // ID
     DevSgm5860xHandleStruct *cfg;
+    uint8_t status;                          // Status of the device
+    uint8_t scan_index;                      // Channel to scan
+    float last_voltage[sgm5860xChannelMax];  // Last voltage read from each channel
+    float sum[sgm5860xChannelMax];
+    float average[sgm5860xChannelMax];    // Average voltage for each channel
+    float vol_index[sgm5860xChannelMax];  // Voltage index for each channel
 
 } Typdefsgm5860xStatus;
 Typdefsgm5860xStatus sgm5860xStatus = {0};
@@ -178,10 +200,11 @@ SYSTEM_REGISTER_INIT(MCUInitStage, sgm5860xPriority, sgm5860xDeviceInit, sgm5860
 
 static void __sgm5860xCreateTaskHandle(void) {
     elog_i(TAG, "__sgm5860xCreateTaskHandle");
-    xTaskCreate(VFBTaskFrame, "VFBTasksgm5860x", configMINIMAL_STACK_SIZE * 2, (void *)&sgm5860x_task_cfg,
-                PriorityNormalEventGroup0, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTasksgm5860x", configMINIMAL_STACK_SIZE * 2,
+                (void *)&sgm5860x_task_cfg, PriorityNormalEventGroup0, NULL);
 }
-SYSTEM_REGISTER_INIT(BoardInitStage, sgm5860xPriority, __sgm5860xCreateTaskHandle,__sgm5860xCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(BoardInitStage, sgm5860xPriority, __sgm5860xCreateTaskHandle,
+                     __sgm5860xCreateTaskHandle init);
 
 static void __sgm5860xInitHandle(void *msg) {
     elog_i(TAG, "__sgm5860xInitHandle");
@@ -194,13 +217,13 @@ static void __sgm5860xInitHandle(void *msg) {
 
 static void __sgm5860xRcvHandle(void *msg) {
     TaskHandle_t curTaskHandle = xTaskGetCurrentTaskHandle();
-    // Typdefsgm5860xStatus *sgm5860xStatusTmp = (Typdefsgm5860xStatus *)&sgm5860xStatus[0];
-    char *taskName        = pcTaskGetName(curTaskHandle);
-    vfb_message_t tmp_msg = (vfb_message_t)msg;
+    char *taskName             = pcTaskGetName(curTaskHandle);
+    vfb_message_t tmp_msg      = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
         case sgm5860xStart: {
             elog_i(TAG, "sgm5860xStartTask %d", tmp_msg->frame->head.data);
-             DevSgm5860xConfig(&sgm5860_cfg);  // Configure the SGM5860x device
+            DevSgm5860xConfig(&sgm5860_cfg);  // Configure the SGM5860x device
+            sgm5860xStatus.status = 1;        // Set status to indicate the device is started
 
         } break;
         case sgm5860xSet: {
@@ -218,6 +241,48 @@ static void __sgm5860xCycHandle(void) {
         elog_e(TAG, "[ERROR]sgm5860xStatusHandle NULL");
         return;
     }
+    if (sgm5860xStatus.status == 1) {
+        // sgm5860xStatus.scan_index
+        float last_voltage   = 0;
+        uint8_t last_channel = 0;
+        uint8_t last_index   = 0;
+        float last_gain      = 0;
+        uint8_t channel =
+            sgm5860_channelcfg[sgm5860xStatus.scan_index].channel;  // Get the current channel
+        uint8_t gain = sgm5860_channelcfg[sgm5860xStatus.scan_index]
+                           .gain;  // Get the gain for the current channel
+        DevGetADCData(&sgm5860_cfg, &last_voltage, &last_channel, channel, gain);
+
+        for (int i = 0; i < sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]); i++) {
+            if (sgm5860_channelcfg[i].channel == last_channel) {
+                last_index = i;
+                last_gain =
+                    f_gain_map[sgm5860_channelcfg[i].gain];  // Get the gain for the last channel
+                sgm5860xStatus.last_voltage[i] = last_voltage;
+                sgm5860xStatus.sum[i] += last_voltage;  // Accumulate the voltage for averaging
+                sgm5860xStatus.vol_index[i]++;
+                if (sgm5860xStatus.vol_index[i] >= 10) {
+                    sgm5860xStatus.average[i] = sgm5860xStatus.sum[i] / sgm5860xStatus.vol_index[i];
+                    sgm5860xStatus.vol_index[i] = 0;  // Reset the index after averaging
+                    sgm5860xStatus.sum[i]       = 0;  // Reset the sum after averaging
+                    vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.average[i]),
+                             sizeof(last_voltage));
+                    elog_d(TAG, " Index %d Channel %d, Gain %.0f, Voltage: %.7f V", last_index,
+                           last_channel, last_gain, sgm5860xStatus.average[i]);
+                }
+
+                break;
+            }
+        }
+
+        sgm5860xStatus.scan_index++;
+        if (sgm5860xStatus.scan_index >
+            sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]) - 1) {
+            sgm5860xStatus.scan_index = 0;  // Reset channel to 0 after reaching the last channel
+        }
+    } else {
+        // elog_e(TAG, "[ERROR]sgm5860xCycHandle: Device not started");
+    }
 }
 
 #endif
@@ -229,6 +294,7 @@ static void Cmdsgm5860xHelp(void) {
     printf("  config        Configure the SGM5860x device\r\n");
     printf("  reset         Reset the SGM5860x device\r\n");
     printf("  init          Initialize the SGM5860x device\r\n");
+    printf("  data          Read data from the SGM5860x device\r\n");
 }
 
 static int Cmdsgm5860xHandle(int argc, char *argv[]) {
@@ -246,16 +312,13 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
         return 0;
     }
     if (strcmp(argv[1], "data") == 0) {
-        int32_t adc_data = 0;
-        uint8_t channel = 0;
-        if (argc < 3) {
-            elog_e(TAG, "Usage: sgm5860x data <channel>");
-            return 0;
+        elog_i(TAG, "SGM5860x data readout\r\n");
+        for (int i = 0; i < sgm5860xChannelMax; i++) {
+            elog_i(TAG, "Index %d Channel %d: Voltage = %.7f V %.4f mV, %.1f uV", i,
+                   sgm5860_channelcfg[i].channel, sgm5860xStatus.average[i],
+                   sgm5860xStatus.average[i] * 1000.0f,
+                   sgm5860xStatus.average[i] * 1000000.0f);
         }
-        channel = (uint8_t)strtol(argv[2], NULL, 10);
-
-        printf("Testing ADC data read\r\n");
-        DevGetADCData(&sgm5860_cfg, &adc_data,channel);
         return 0;
     }
     // reset

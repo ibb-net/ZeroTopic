@@ -39,7 +39,7 @@ static List_t *__vfb_list_get_head(vfb_event_t event) {
     /* Event首次注册 */
     EventList_t *new_event_item = (EventList_t *)pvPortMalloc(sizeof(EventList_t));
     if (new_event_item == NULL) {
-        VFB_E("Failed to malloc memory for event %u", event);
+        VFB_E("Failed to malloc memory for event %u\r\n", event);
         xSemaphoreGive(__vfb_info.xFDSemaphore);
         return NULL;
     }
@@ -48,7 +48,7 @@ static List_t *__vfb_list_get_head(vfb_event_t event) {
 
     ListItem_t *item = (ListItem_t *)pvPortMalloc(sizeof(ListItem_t));
     if (item == NULL) {
-        VFB_E("Failed to malloc memory for ListItem_t");
+        VFB_E("Failed to malloc memory for ListItem_t\r\n");
         vPortFree(new_event_item);
         xSemaphoreGive(__vfb_info.xFDSemaphore);
         return NULL;
@@ -79,18 +79,18 @@ ListItem_t *__vfb_list_find_queue(List_t *queue_list, QueueHandle_t queue_handle
 }
 static int __vfb_list_add_queue(List_t *queue_list, QueueHandle_t queue_handle) {
     if (queue_list == NULL || queue_handle == NULL) {
-        VFB_E("Queue list or queue handle is NULL");
+        VFB_E("Queue list or queue handle is NULL\r\n");
         return -1;
     }
     // Check if the queue already exists in the list
     ListItem_t *existing_item = __vfb_list_find_queue(queue_list, queue_handle);
     if (existing_item != NULL) {
-        VFB_W("Queue %p already exists in the list\n", queue_handle);
+        VFB_W("Queue %p already exists in the list\r\n", queue_handle);
         return 0;  // Queue already exists, no need to add again
     }
     ListItem_t *item = (ListItem_t *)pvPortMalloc(sizeof(ListItem_t));
     if (item == NULL) {
-        VFB_E("Failed to malloc memory for ListItem_t");
+        VFB_E("Failed to malloc memory for ListItem_t\r\n");
         return -1;
     }
     vListInitialiseItem(item);
@@ -141,7 +141,7 @@ QueueHandle_t vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, u
     if (curTaskHandle != NULL) {
         taskName = pcTaskGetName(curTaskHandle);
     } else {
-        VFB_E("[ERROR]Failed to get current task handle");
+        VFB_E("[ERROR]Failed to get current task handle\r\n");
         return NULL;
     }
     QueueHandle_t queue_handle = xQueueCreate(queue_num, sizeof(vfb_message_t));
@@ -164,7 +164,7 @@ QueueHandle_t vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, u
         }
         xSemaphoreGive(__vfb_info.xFDSemaphore);
     } else {
-        VFB_E("Failed to take semaphore");
+        VFB_E("Failed to take semaphore\r\n");
         return NULL;
     }
     // VFB_I("Task %s subscribe Event Success,valid %d,invalid %d\r\n", taskName, valiad_counter, invalid_counter);
@@ -263,7 +263,7 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
         ListItem_t *item = listGET_HEAD_ENTRY(event_list);
         for (uint16_t i = 0; i < listCURRENT_LIST_LENGTH(event_list); i++) {
             if (item == listGET_END_MARKER(event_list)) {
-                VFB_W("No queue found for event %u", event);
+                VFB_W("No queue found for event %u\r\n", event);
                 break;
             }
             QueueHandle_t queue_handle = (QueueHandle_t)listGET_LIST_ITEM_VALUE(item);
@@ -271,7 +271,7 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
                 VFB_E("Queue handle is NULL for event %u", event);
                 tmp_msg.frame->head.use_cnt--;
                 if (tmp_msg.frame->head.use_cnt == 0) {
-                    VFB_W("No queue found for event %u, use count is 0", event);
+                    VFB_W("No queue found for event %u, use count is 0\r\n", event);
                     vPortFree(tmp_msg.frame);
                 }
                 while (1) {
@@ -285,7 +285,7 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
                 VFB_E("Failed to send message to queue for event %u", event);
                 tmp_msg.frame->head.use_cnt--;
                 if (tmp_msg.frame->head.use_cnt == 0) {
-                    VFB_W("No queue found for event %u, use count is 0", event);
+                    VFB_W("No queue found for event %u, use count is 0\r\n", event);
                     vPortFree(tmp_msg.frame);
                 }
                 while (1) {
@@ -305,7 +305,7 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
         __vfb_givelock(mode);
         return FD_PASS;
     } else {
-        VFB_E("Failed to take semaphore");
+        VFB_E("Failed to take semaphore,event %u\r\n",event);
         return FD_FAIL;
     }
 }

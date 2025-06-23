@@ -23,19 +23,19 @@
 
 #define sgm5860xPriority PriorityNormalEventGroup0
 #ifndef sgm5860xChannelMax
-#define sgm5860xChannelMax 4
+#define sgm5860xChannelMax 8
 #endif
 #endif
 
 /* =====================================================================================
  */
-#define SET_RESET1_HIGH
-#define SET_RESET1_LOW
-
-#define SET_CS1_HIGH
-#define SET_CS1_LOW
-
+#define VREF_VOLTAGE         (5.0f)        // Reference voltage for ADC 2*2.5V
+#define PGA_GAIN             1.0f          // Gain for PGA (Programmable Gain Amplifier)
+#define ADC_24BIT_MAX        (8388608.0f)  // Maximum value for 24-bit ADC
 #define SGM5860_WAIT_TIME_US 1000
+
+const float gaim_map[SGM58601_GAIN_MAX] = {1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0};
+
 /*SGM58601初始化*/
 static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 
@@ -62,15 +62,14 @@ static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860
         elog_e(TAG, "__DevSgm5860xWaitForDRDY: ptrDevSgm5860xHandle is NULL");
         return 0;
     }
-    uint32_t timeout = SGM5860_WAIT_TIME_US;  // Timeout in microseconds
-    // Wait for DRDY pin to go low
+    uint32_t timeout = 10*1000*1000;//SGM5860_WAIT_TIME_US;
     while (DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
         // DevDelayUs(1);  // Wait for DRDY to go low
         vTaskDelay(pdMS_TO_TICKS(1));  // Wait for 1 millisecond
         timeout--;
         if (timeout == 0) {
-            elog_e(TAG, "__DevSgm5860xWaitForDRDY: Timeout waiting for DRDY");
-            return -1;  // Timeout occurred
+            // elog_e(TAG, "__DevSgm5860xWaitForDRDY: Timeout waiting for DRDY");
+            return -1;
         }
     }
     return 1;
@@ -98,12 +97,13 @@ int DevSgm5860xCMDReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
     if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
         elog_e(TAG, "DevSgm5860xCMDReg: Wait for DRDY failed");
+        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1); 
         return -1;
     }
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 1);
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
     // elog_d(TAG, "DevSgm5860xCMDReg regaddr: 0x%02X reglen: %d", regaddr, reglen);
-    char log_msg[128];
+    // char log_msg[128];
     // snprintf(log_msg, sizeof(log_msg),
     //          "DevSgm5860xCMDReg regaddr: 0x%02X, reglen: %d, data: ", regaddr, reglen);
     // for (size_t i = 0; i < reglen; i++) {
@@ -131,12 +131,13 @@ int DevSgm5860xWriteReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uin
     uint8_t rcv_data[16] = {0};
     memset(snd_data, 0, sizeof(snd_data));
     memset(rcv_data, 0, sizeof(rcv_data));
-    snd_data[0] = SGM58601_CMD_WREG | (regaddr & 0x0F);  // Command to write register
-    snd_data[1] = reglen - 1;                            // Number of bytes to
-    memcpy(&snd_data[2], regvalue, reglen);              // Write data to register
-    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);      // Set NEST pin low
+    snd_data[0] = SGM58601_CMD_WREG | (regaddr & 0x0F);
+    snd_data[1] = reglen - 1;
+    memcpy(&snd_data[2], regvalue, reglen);
+    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);
     if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
         elog_e(TAG, "DevSgm5860xWriteReg: Wait for DRDY failed");
+        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1); 
         return -1;
     }
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, reglen + 2);
@@ -149,7 +150,7 @@ int DevSgm5860xWriteReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uin
         snprintf(log_msg + strlen(log_msg), sizeof(log_msg) - strlen(log_msg), "0x%02X ",
                  snd_data[i + 2]);
     }
-    elog_i(TAG, "%s", log_msg);
+    elog_d(TAG, "%s", log_msg);
     return 1;  // Success
 }
 int DevSgm5860xReadReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t regaddr,
@@ -175,6 +176,7 @@ int DevSgm5860xReadReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);      // Set NEST pin low
     if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
         elog_e(TAG, "DevSgm5860xReadReg: Wait for DRDY failed");
+        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1); 
         return -1;
     }
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, reglen + 2);
@@ -188,7 +190,7 @@ int DevSgm5860xReadReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint
         snprintf(log_msg + strlen(log_msg), sizeof(log_msg) - strlen(log_msg), "0x%02X ",
                  rcv_data[i + 2]);
     }
-    elog_i(TAG, "%s", log_msg);
+    elog_d(TAG, "%s", log_msg);
     return 1;  // Success
 }
 int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
@@ -245,15 +247,12 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     elog_i(TAG, "Read DRATE Register: 0x%02X", drate_reg.raw);
 }
 
-void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t *adc_data,
-                   uint8_t channel) {
-    if (ptrDevSgm5860xHandle == NULL || adc_data == NULL) {
-        elog_e(TAG, "DevGetADCData: ptrDevSgm5860xHandle or adc_data is NULL");
-        return;
+int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *last_voltage,
+                   uint8_t *last_channel, uint8_t channel, uint8_t gain) {
+    if (ptrDevSgm5860xHandle == NULL || last_voltage == NULL) {
+        elog_e(TAG, "DevGetADCData: ptrDevSgm5860xHandle or last_voltage is NULL");
+        return -1;
     }
-#define VREF_VOLTAGE  (5.0f)        // Reference voltage for ADC
-#define PGA_GAIN      1.0f          // Gain for PGA (Programmable Gain Amplifier)
-#define ADC_24BIT_MAX (8388608.0f)  // Maximum value for 24-bit ADC
 
     uint8_t snd_data[16] = {0};
     uint8_t rcv_data[16] = {0};
@@ -267,40 +266,18 @@ void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t 
         .bits.PGA      = SGM58601_GAIN_1,  // Programmable Gain Amplifier
         .bits.reserved = 0                 // Reserved
     };
-    switch (channel) {
-        case 0:
-            elog_d(TAG, "DevGetADCData: Channel 0 selected");
-
-            mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;  // Negative Input Channel Selection
-            mux_reg.bits.PSEL  = SGM58601_MUXP_AIN0;    // Positive Input Channel Selection
-            adcon_reg.bits.PGA = SGM58601_GAIN_1;       // Set PGA gain to 1
-            break;
-        case 2:
-            elog_d(TAG, "DevGetADCData: Channel 2 selected");
-
-            mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;  // Negative Input Channel Selection
-            mux_reg.bits.PSEL  = SGM58601_MUXP_AIN2;    // Positive Input Channel Selection
-            adcon_reg.bits.PGA = SGM58601_GAIN_1;       // Set PGA gain to 1
-
-            break;
-        case 4:
-            elog_d(TAG, "DevGetADCData: Channel 4 selected ,current");
-            mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;  // Negative Input Channel Selection
-            mux_reg.bits.PSEL  = SGM58601_MUXP_AIN4;    // Positive Input Channel Selection
-            adcon_reg.bits.PGA = SGM58601_GAIN_1;       // Set PGA gain to 1
-
-            break;
-        case 6:
-            elog_d(TAG, "DevGetADCData: Channel 6 selected, current raw 0x%02x", mux_reg.raw);
-            mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;  // Negative Input Channel Selection
-            mux_reg.bits.PSEL  = SGM58601_MUXP_AIN6;    // Positive Input Channel Selection
-            adcon_reg.bits.PGA = SGM58601_GAIN_128;     // Set PGA gain to 1
-            break;
-        default:
-            elog_e(TAG, "DevGetADCData: Invalid channel %d", channel);
-            return;
+    if (channel < 0 || channel > SGM58601_MUXP_AIN7) {
+        elog_e(TAG, "DevGetADCData: Invalid channel %d", channel);
+        return -1;
     }
-    elog_i(TAG, "DevGetADCData:Set channel %d PGA gain %d ,mux raw 0x%02x ", channel,
+    if (gain >= SGM58601_GAIN_MAX) {
+        elog_e(TAG, "DevGetADCData: Invalid gain %d", gain);
+        return -1;
+    }
+    mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;
+    mux_reg.bits.PSEL  = channel;
+    adcon_reg.bits.PGA = gaim_map[gain];
+    elog_d(TAG, "DevGetADCData:Set channel %d PGA gain %d ,mux raw 0x%02x ", channel,
            adcon_reg.bits.PGA, mux_reg.raw);
     SGM5860xMuxReg_t tmp_mux_reg;
     SGM5860xAdconReg_t tmp_adcon_reg;
@@ -309,29 +286,8 @@ void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t 
 
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&tmp_adcon_reg,
                        sizeof(tmp_adcon_reg));  // Read ADCON register
-    uint8_t tmp_channel = 0;                    // Get current channel
-
-    switch (tmp_mux_reg.bits.PSEL & 0x0F) {
-        case SGM58601_MUXP_AIN0:
-            tmp_channel = 0;  // Channel 0
-            break;
-        case SGM58601_MUXP_AIN2:
-            tmp_channel = 2;  // Channel 2
-            break;
-        case SGM58601_MUXP_AIN4:
-            tmp_channel = 4;  // Channel 4
-            break;
-        case SGM58601_MUXP_AIN6:
-            tmp_channel = 6;  // Channel 6
-            break;
-        case SGM58601_MUXP_AINCOM:
-            tmp_channel = 8;  // Channel COM
-            break;
-
-        default:
-            elog_e(TAG, "DevGetADCData: Invalid channel %d", tmp_mux_reg.bits.PSEL & 0x0F);
-            return;
-    }
+    uint8_t tmp_channel = tmp_mux_reg.bits.PSEL & 0x0F;
+    float tmp_gain      = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
 
     // elog_i(TAG, "Last MUX Register: Channel %d", tmp_channel);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
@@ -342,7 +298,7 @@ void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t 
     elog_d(TAG, "DevGetADCData: MUX Register get to 0x%02X", mux_reg.raw);
     snd_data[0] = SGM58601_CMD_RDATA;                // Command to read data
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
-    elog_i(TAG, "Last MUX Register: Channel %d", tmp_channel);
+    elog_d(TAG, "Last MUX Register: Channel %d", tmp_channel);
     while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0) {
     }
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
@@ -352,50 +308,24 @@ void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t 
         (rcv_data[1] << 16) | (rcv_data[2] << 8) | rcv_data[3];  // Combine the received data
     elog_d(TAG, "DevGetADCData: Received data: 0x%06X", hex_data);
     float voltage = 0.0f;
-    float gain    = 0.0;  // Get the gain from ADCON register
-    switch (tmp_adcon_reg.bits.PGA) {
-        case SGM58601_GAIN_1:
-            gain = 1.0f;  // Gain 1
-            /* code */
-            break;
-        case SGM58601_GAIN_2:
-            gain = 2.0f;  // Gain 2
-            break;
-        case SGM58601_GAIN_4:
-            gain = 4.0f;  // Gain 4
-            break;
-        case SGM58601_GAIN_8:
-            gain = 8.0f;  // Gain 8
-            break;
-        case SGM58601_GAIN_16:
-            gain = 16.0f;  // Gain 16
-            break;
-        case SGM58601_GAIN_32:
-            gain = 32.0f;  // Gain 32
-            break;
-        case SGM58601_GAIN_64:
-            gain = 64.0f;  // Gain 64
-            break;
-        case SGM58601_GAIN_128:
-            gain = 128.0f;  // Gain 128
-            break;
-        default:
-            break;
-    }
-    // gain=1;
     if (hex_data & 0x800000) {                             // Check if the sign bit is set
         hex_data = ADC_24BIT_MAX - (hex_data - 0x800000);  // Convert to positive value
-        voltage  = (-1)  * hex_data * VREF_VOLTAGE / (ADC_24BIT_MAX) / gain  ;
+        voltage  = (-1) * hex_data * VREF_VOLTAGE / (ADC_24BIT_MAX) / tmp_gain;
     } else {
-        voltage =hex_data * VREF_VOLTAGE / (ADC_24BIT_MAX) /gain;  // Calculate voltage
+        voltage = hex_data * VREF_VOLTAGE / (ADC_24BIT_MAX) / tmp_gain;  // Calculate voltage
     }
 
-    elog_i(TAG, "DevGetADCData: Calculated voltage: %.6f V %.3f mv  Gain: %.2f",
-           voltage,voltage*1000, gain);
+    elog_d(TAG, "DevGetADCData: Calculated voltage: %.6f V %.3f mv  Gain: %.2f", voltage,
+           voltage * 1000, gain);
     elog_d(TAG,
            "rcv_data 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X "
            "0x%02X 0x%02X 0x%02X 0x%02X 0x%02X",
            rcv_data[0], rcv_data[1], rcv_data[2], rcv_data[3], rcv_data[4], rcv_data[5],
            rcv_data[6], rcv_data[7], rcv_data[8], rcv_data[9], rcv_data[10], rcv_data[11],
            rcv_data[12], rcv_data[13], rcv_data[14], rcv_data[15]);
+    *last_channel = tmp_mux_reg.bits.PSEL & 0x0F;  // Update last channel
+    *last_voltage = voltage;                       // Update last voltage
+    elog_d(TAG, "DevGetADCData: Last channel %d, last voltage %.6f V", *last_channel,
+           *last_voltage);
+    return 1;  // Success
 }

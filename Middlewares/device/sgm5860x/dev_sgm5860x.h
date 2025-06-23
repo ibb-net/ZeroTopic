@@ -1,10 +1,10 @@
 #ifndef __DEV_Sgm5860x_H
 #define __DEV_Sgm5860x_H
 // #include "semphr.h"
+#include "dev_Sgm5860x.h"
 #include "dev_basic.h"
 #include "dev_dma.h"
 #include "dev_pin.h"
-#include "dev_Sgm5860x.h"
 #include "dev_spi.h"
 
 typedef struct {
@@ -34,8 +34,8 @@ typedef union {
 
 typedef union {
     struct {
-        uint8_t PGA : 3;       // Bits 0-2 Programmable Gain Amplifier
-        uint8_t SDCS : 2;      // Bits 3-4: Sensor Detection Current Source
+        uint8_t PGA : 3;   // Bits 0-2 Programmable Gain Amplifier
+        uint8_t SDCS : 2;  // Bits 3-4: Sensor Detection Current Source
 
         uint8_t CLK : 2;       // Bits 5-6: Clock Output Frequency
         uint8_t reserved : 1;  // Bit 7: Reserved
@@ -91,8 +91,6 @@ typedef union {
     uint8_t raw;          // Raw register value
 } SGM5860xFsc2Reg_t;      // 0x0A FSC2: Full-Scale Calibration Byte 2
 
-
-
 // define commands
 #define SGM58601_CMD_WAKEUP   0x00
 #define SGM58601_CMD_RDATA    0x01
@@ -109,18 +107,16 @@ typedef union {
 #define SGM58601_CMD_STANDBY  0xfd
 #define SGM58601_CMD_REST     0xfe
 
-
-
 // define gain codes
-#define SGM58601_GAIN_1  0x00
-#define SGM58601_GAIN_2  0x01
-#define SGM58601_GAIN_4  0x02
-#define SGM58601_GAIN_8  0x03
-#define SGM58601_GAIN_16 0x04
-#define SGM58601_GAIN_32 0x05
-#define SGM58601_GAIN_64 0x06
-#define SGM58601_GAIN_128     0x07
-
+#define SGM58601_GAIN_1   0x00
+#define SGM58601_GAIN_2   0x01
+#define SGM58601_GAIN_4   0x02
+#define SGM58601_GAIN_8   0x03
+#define SGM58601_GAIN_16  0x04
+#define SGM58601_GAIN_32  0x05
+#define SGM58601_GAIN_64  0x06
+#define SGM58601_GAIN_128 0x07
+#define SGM58601_GAIN_MAX 0x08
 // define drate codes
 #define SGM58601_DRATE_30000SPS 0xF0
 #define SGM58601_DRATE_15000SPS 0xE0
@@ -138,8 +134,6 @@ typedef union {
 #define SGM58601_DRATE_10SPS    0x23
 #define SGM58601_DRATE_5SPS     0x13
 #define SGM58601_DRATE_2_5SPS   0x03
-
-
 
 // define the SGM58601 register values
 #define SGM58601_STATUS 0x00
@@ -175,16 +169,16 @@ typedef union {
 #define SGM58601_MUXN_AIN7   0x07
 #define SGM58601_MUXN_AINCOM 0x08
 
-
-
-
 #define ORDER_MSB_FIRST 0  // Most significant bit first (default)
 #define ORDER_LSB_FIRST 1  // Least significant bit first
 
-int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) ;
+int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
-int DevSgm5860xReadRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg, uint8_t *data);
-int DevSgm5860xWriteRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg, uint8_t data);
+int DevSgm5860xReadRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg,
+                            uint8_t *data);
+int DevSgm5860xWriteRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg,
+                             uint8_t data);
 int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
-void DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, int32_t *adc_data,uint8_t channel);
+int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *last_voltage,
+                  uint8_t *last_channel, uint8_t channel, uint8_t gain);
 #endif  // __DEV_Sgm5860x_H
