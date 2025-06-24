@@ -62,10 +62,10 @@
 
 #define CONFIG_ENCODER_CYCLE_TIMER_MS 100
 // 0~40mv
-#define MAX_PHY_VALUE_CH0  (0.4f)  // V
-#define DEF_PHY_VALUE_CH0  (0.2f)  // 默认物理值
-#define MIN_PHY_VALUE_CH0  (0)
-#define STEP_PHY_VALUE_CH0 (10.0 / 1000.0 / 1000.0f)  // 每步物理值
+#define MAX_PHY_VALUE_CH0  (0.04f)  // V
+#define DEF_PHY_VALUE_CH0  (0.02f)  // 默认物理值
+#define MIN_PHY_VALUE_CH0  (-0.004f)
+#define STEP_PHY_VALUE_CH0 (10.0 / 1000.0 / 1000.0f)  // 每步物理值10uv
 
 #define MAX_PHY_VALUE_CH1  (9.0f)  // V
 #define DEF_PHY_VALUE_CH1  (4.5f)  // 默认物理值
