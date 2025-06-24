@@ -208,7 +208,7 @@ void ENCODER_TIMER_CREATE_HANDLE(void) {
         __encoder_timer_clear(&encoder_struct[i]);                   // 初始化每个通道的计时器
     }
 
-    xTaskCreate(VFBTaskFrame, "Encoder", configMINIMAL_STACK_SIZE, (void *)&ENCODER_TIMER_task_cfg,
+    xTaskCreate(VFBTaskFrame, "Encoder", configMINIMAL_STACK_SIZE*2, (void *)&ENCODER_TIMER_task_cfg,
                 TimerEcoderPriority, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerInitStage, TimerEcoderPriority, ENCODER_TIMER_CREATE_HANDLE,

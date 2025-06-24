@@ -202,7 +202,7 @@ void UartDeviceInit(void) {
 static void UartCreateTaskHandle(void) {
     UartDeviceInit();
 
-    xTaskCreate(VFBTaskFrame, "VFBTaskUart", configMINIMAL_STACK_SIZE, (void *)&Uart_task_cfg, UartPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskUart", configMINIMAL_STACK_SIZE*2, (void *)&Uart_task_cfg, UartPriority, NULL);
     xTaskCreate(UartStreamRcvTask, "UartRx", configMINIMAL_STACK_SIZE, (void *)&Uart_task_cfg, UartPriority - 1, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerInitStage, UartPriority, UartCreateTaskHandle, UartCreateTaskHandle init);

@@ -194,7 +194,7 @@ void DebugDeviceInit(void) {
 static void DebugCreateTaskHandle(void) {
     DebugDeviceInit();
 
-    xTaskCreate(VFBTaskFrame, "VFBTaskDebug", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg, DebugPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskDebug", configMINIMAL_STACK_SIZE*2, (void *)&Debug_task_cfg, DebugPriority, NULL);
     xTaskCreate(DebugStreamRcvTask, "DebugRx", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg, DebugPriority - 1, NULL);
 }
 SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugCreateTaskHandle, DebugCreateTaskHandle init);

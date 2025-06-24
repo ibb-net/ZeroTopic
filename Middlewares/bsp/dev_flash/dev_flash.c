@@ -63,10 +63,5 @@ void dev_flash_read(uint32_t address, uint32_t *data, uint32_t size) {
     }
 }
 
-TypedefLCFG *dev_read_cfg(void) {
-    return (TypedefLCFG *)CFG_ADDR;
-}
-void dev_write_cfg(TypedefLCFG *cfg) {
-    dev_flash_write(CFG_ADDR, (uint32_t *)cfg, sizeof(TypedefLCFG));
-}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
