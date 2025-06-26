@@ -28,8 +28,7 @@
 #define CONFIG_DEBUG_CYCLE_TIMER_MS 5
 #endif
 /* ===================================================================================== */
-typedef struct
-{
+typedef struct {
     /* TX GPIO*/
     DevPinHandleStruct tx_gpio_cfg;
     DevPinHandleStruct rx_gpio_cfg;
@@ -50,47 +49,50 @@ void DebugStreamRcvTask(void *arg);
 const TypdefDebugBSPCfg DebugBspCfg[DebugChannelMax] = {
     {
 
-        .tx_gpio_cfg = {
-            .device_name = "DEBUG_TX",
-            .base        = DEBUG_TX_GPIO_PORT,
-            .af          = DEBUG_TX_GPIO_AF,
-            .pin         = DEBUG_TX_GPIO_PIN,
-        },
-        .rx_gpio_cfg = {
-            .device_name = "DEBUG_RX",
-            .base        = DEBUG_RX_GPIO_PORT,
-            .af          = DEBUG_RX_GPIO_AF,
-            .pin         = DEBUG_RX_GPIO_PIN,
-        },
-        .uart_cfg = {
-            .id           = 0,  // ID
-            .device_name  = "DEBUG_UART",
-            .base         = DEBUG_UART_BASE,
-            .baudrate     = DEBUG_UART_BAUDRATE,
-            .idle_timeout = DEBUG_UART_IDLE_TIMEOUT,
-            .rx_isr_cb    = __DebugRXISRHandle,  // RX ISR callback function
-            .tx_isr_cb    = NULL,                // TX ISR callback function
-            .error_isr_cb = NULL,                // Error ISR callback function
-            /* DMA */
-            .tx_dma_rcu       = DEBUG_TX_DMA_BASE_ADDR,
-            .tx_dma_base_addr = DEBUG_TX_DMA_BASE_ADDR,
-            .tx_dma_channel   = DEBUG_TX_DMA_CHANNEL,
-            .tx_dma_request   = DEBUG_TX_DMA_REQUEST,
-            .tx_dma_isr_cb    = __DebugTXDMAISRHandle,  // TX DMA ISR callback function
-            .rx_dma_rcu       = DEBUG_RX_DMA_BASE_ADDR,
-            .rx_dma_base_addr = DEBUG_RX_DMA_BASE_ADDR,
-            .rx_dma_channel   = DEBUG_RX_DMA_CHANNEL,
-            .rx_dma_request   = DEBUG_RX_DMA_REQUEST,
-            .rx_dma_isr_cb    = __DebugRXISRHandle,  // RX DMA ISR callback function
-        },
+        .tx_gpio_cfg =
+            {
+                .device_name = "DEBUG_TX",
+                .base        = DEBUG_TX_GPIO_PORT,
+                .af          = DEBUG_TX_GPIO_AF,
+                .pin         = DEBUG_TX_GPIO_PIN,
+            },
+        .rx_gpio_cfg =
+            {
+                .device_name = "DEBUG_RX",
+                .base        = DEBUG_RX_GPIO_PORT,
+                .af          = DEBUG_RX_GPIO_AF,
+                .pin         = DEBUG_RX_GPIO_PIN,
+            },
+        .uart_cfg =
+            {
+                .id           = 0,  // ID
+                .device_name  = "DEBUG_UART",
+                .base         = DEBUG_UART_BASE,
+                .baudrate     = DEBUG_UART_BAUDRATE,
+                .idle_timeout = DEBUG_UART_IDLE_TIMEOUT,
+                .rx_isr_cb    = __DebugRXISRHandle,  // RX ISR callback function
+                .tx_isr_cb    = NULL,                // TX ISR callback function
+                .error_isr_cb = NULL,                // Error ISR callback function
+                /* DMA */
+                .tx_dma_rcu       = DEBUG_TX_DMA_BASE_ADDR,
+                .tx_dma_base_addr = DEBUG_TX_DMA_BASE_ADDR,
+                .tx_dma_channel   = DEBUG_TX_DMA_CHANNEL,
+                .tx_dma_request   = DEBUG_TX_DMA_REQUEST,
+                .tx_dma_isr_cb    = __DebugTXDMAISRHandle,  // TX DMA ISR callback function
+                .rx_dma_rcu       = DEBUG_RX_DMA_BASE_ADDR,
+                .rx_dma_base_addr = DEBUG_RX_DMA_BASE_ADDR,
+                .rx_dma_channel   = DEBUG_RX_DMA_CHANNEL,
+                .rx_dma_request   = DEBUG_RX_DMA_REQUEST,
+                .rx_dma_isr_cb    = __DebugRXISRHandle,  // RX DMA ISR callback function
+            },
         .buffer_size = DEBUG_UART_BUFFER_SIZE,
     },
 };
 
-typedef struct
-{
+typedef struct {
     uint32_t uart_base;
     char device_name[DEVICE_NAME_MAX];
+    uint8_t ready;
     uint32_t id;  // ID
     /* Lock */
     SemaphoreHandle_t lock;
@@ -114,28 +116,24 @@ TypdefDebugStatus DebugStatus[DebugChannelMax] = {0};
 /* ===================================================================================== */
 
 static const vfb_event_t DebugEventList[] = {
-    DebugStart,
-    DebugStop,
-    DebugSet,
-    DebugGet,
-    DebugPrint,
-    DebugRcv,
+    DebugStart, DebugStop, DebugSet, DebugGet, DebugPrint, DebugRcv,
 
 };
 
 static const VFBTaskStruct Debug_task_cfg = {
     .name         = "VFBTaskDebug",  // Task name
     .pvParameters = NULL,
-    // .uxPriority = 10,											  // Task parameters
-    .queue_num               = 32,                                            // Number of queues to subscribe
-    .event_list              = DebugEventList,                                // Event list to subscribe
-    .event_num               = sizeof(DebugEventList) / sizeof(vfb_event_t),  // Number of events to subscribe
-    .startup_wait_event_list = NULL,                                          // Events to wait for at startup
-    .startup_wait_event_num  = 0,                                             // Number of startup events to wait for
-    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_DEBUG_CYCLE_TIMER_MS),    // Wait indefinitely
-    .init_msg_cb             = DebugInitHandle,                               // Callback for initialization messages
-    .rcv_msg_cb              = DebugRcvHandle,                                // Callback for received messages
-    .rcv_timeout_cb          = DebugCycHandle,                                // Callback for timeout
+    // .uxPriority = 10,
+    // // Task parameters
+    .queue_num  = 32,                                            // Number of queues to subscribe
+    .event_list = DebugEventList,                                // Event list to subscribe
+    .event_num  = sizeof(DebugEventList) / sizeof(vfb_event_t),  // Number of events to subscribe
+    .startup_wait_event_list = NULL,                             // Events to wait for at startup
+    .startup_wait_event_num  = 0,  // Number of startup events to wait for
+    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_DEBUG_CYCLE_TIMER_MS),  // Wait indefinitely
+    .init_msg_cb             = DebugInitHandle,  // Callback for initialization messages
+    .rcv_msg_cb              = DebugRcvHandle,   // Callback for received messages
+    .rcv_timeout_cb          = DebugCycHandle,   // Callback for timeout
 };
 
 /* ===================================================================================== */
@@ -174,7 +172,8 @@ void DebugDeviceInit(void) {
             while (1);
             return;
         }
-        DevUartDMARecive(&(DebugBspCfg[i].uart_cfg), uart_handle->rx_buffer, DebugBspCfg[i].buffer_size);
+        DevUartDMARecive(&(DebugBspCfg[i].uart_cfg), uart_handle->rx_buffer,
+                         DebugBspCfg[i].buffer_size);
 
         memset(uart_handle->device_name, 0, sizeof(uart_handle->device_name));
         snprintf(uart_handle->device_name, sizeof(uart_handle->device_name), "Debug%d", i);
@@ -193,11 +192,14 @@ void DebugDeviceInit(void) {
 
 static void DebugCreateTaskHandle(void) {
     DebugDeviceInit();
-
-    xTaskCreate(VFBTaskFrame, "VFBTaskDebug", configMINIMAL_STACK_SIZE*2, (void *)&Debug_task_cfg, DebugPriority, NULL);
-    xTaskCreate(DebugStreamRcvTask, "DebugRx", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg, DebugPriority - 1, NULL);
+    DebugStatus[0].ready = 0;
+    xTaskCreate(VFBTaskFrame, "VFBTaskDebug", configMINIMAL_STACK_SIZE * 2, (void *)&Debug_task_cfg,
+                DebugPriority, NULL);
+    xTaskCreate(DebugStreamRcvTask, "DebugRx", configMINIMAL_STACK_SIZE, (void *)&Debug_task_cfg,
+                DebugPriority - 1, NULL);
 }
-SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugCreateTaskHandle, DebugCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugCreateTaskHandle,
+                     DebugCreateTaskHandle init);
 
 static void DebugInitHandle(void *msg) {
     printf("DebugInitHandle\r\n");
@@ -214,6 +216,7 @@ static void DebugRcvHandle(void *msg) {
     switch (tmp_msg->frame->head.event) {
         case DebugStart: {
             elog_i(TAG, "DebugStart %d", tmp_msg->frame->head.data);
+            DebugStatus[0].ready = 1;
         } break;
         case DebugStop: {
         } break;
@@ -226,7 +229,8 @@ static void DebugRcvHandle(void *msg) {
                 printf("[ERROR]DebugPrint: payload is NULL or length is 0\r\n");
                 return;
             }
-            DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
+            DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)MSG_GET_PAYLOAD(tmp_msg),
+                           MSG_GET_LENGTH(tmp_msg));
             // wait for TX DMA complete lock_tx
             if (uart_handle->lock_tx != NULL) {
                 if (xSemaphoreTake(uart_handle->lock_tx, pdMS_TO_TICKS(300)) == pdFALSE) {
@@ -251,7 +255,8 @@ uint8_t dma_buffer[DEBUG_UART_BUFFER_SIZE] = "Hello, Debug!";
 static void DebugCycHandle(void) {
     // TypdefDebugStatus *uart_handle = &DebugStatus[0];
     // memset(dma_buffer, 0, sizeof(dma_buffer));
-    // if (xStreamBufferReceive(uart_handle->rx_stream_buffer, dma_buffer, uart_handle->buffer_size, 0) != 0) {
+    // if (xStreamBufferReceive(uart_handle->rx_stream_buffer, dma_buffer, uart_handle->buffer_size,
+    // 0) != 0) {
     //     vfb_send(DebugRcv, 0, dma_buffer, strlen((char *)dma_buffer));
     // }
 }
@@ -261,9 +266,12 @@ void DebugStreamRcvTask(void *arg) {
     int rcv_count                  = 0;
     memset(dma_buffer, 0, sizeof(dma_buffer));
     while (1) {
-        rcv_count = xStreamBufferReceive(uart_handle->rx_stream_buffer, dma_buffer, uart_handle->buffer_size, portMAX_DELAY);
+        rcv_count = xStreamBufferReceive(uart_handle->rx_stream_buffer, dma_buffer,
+                                         uart_handle->buffer_size, portMAX_DELAY);
         if (rcv_count > 0) {
-            vfb_send(DebugRcv, 0, dma_buffer, rcv_count);
+            if (DebugStatus[0].ready) {
+                vfb_send(DebugRcv, 0, dma_buffer, rcv_count);
+            }
             memset(dma_buffer, 0, rcv_count);
         }
     }
@@ -280,7 +288,8 @@ static void __DebugRXISRHandle(void *arg) {
         printf("DMA transfer number is zero, no data received.\r\n");
     }
     int rx_count = uart_handle->buffer_size - dma_transfer_number;
-    // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count, uart_handle->buffer_size, dma_transfer_number);
+    // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count,
+    // uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
         printf("RX count is zero or negative, no data received.\r\n");
     } else {
@@ -288,10 +297,12 @@ static void __DebugRXISRHandle(void *arg) {
 const void *pvItemToQueue,
 BaseType_t *pxHigherPriorityTaskWoken ); */
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        if (xStreamBufferSendFromISR(uart_handle->rx_stream_buffer, uart_handle->rx_buffer, rx_count, &xHigherPriorityTaskWoken) == 0) {
+        if (xStreamBufferSendFromISR(uart_handle->rx_stream_buffer, uart_handle->rx_buffer,
+                                     rx_count, &xHigherPriorityTaskWoken) == 0) {
             printf("Failed to send data to stream buffer from ISR\r\n");
         }
-        DevUartDMARecive(&(uart_handle->DebugBspCfg->uart_cfg), uart_handle->rx_buffer, uart_handle->buffer_size);
+        DevUartDMARecive(&(uart_handle->DebugBspCfg->uart_cfg), uart_handle->rx_buffer,
+                         uart_handle->buffer_size);
     }
 }
 static void __DebugTXDMAISRHandle(void *arg) {
