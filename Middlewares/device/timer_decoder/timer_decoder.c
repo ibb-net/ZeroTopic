@@ -40,7 +40,7 @@ const float step_phy[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
     STEP_PHY_VALUE_CH0,
     STEP_PHY_VALUE_CH1,
 };
-
+#define ENCODER_MAX_DIFF (100)
 const TypdefDecoderBSPCfg decoder_bsp_cfg[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
 
     {
@@ -363,19 +363,27 @@ static void __decoder_handle(void) {
         TypdefEncoderStruct *encoder = &encoder_struct[i];
         // 读取当前计时器值
         uint64_t current_encoder_counter = timer_counter_read(encoder_struct[i].timer_handle);
-        diff                   = current_encoder_counter - encoder_struct[i].last_encoder_counter;
+        diff = current_encoder_counter - encoder_struct[i].last_encoder_counter;
+        // if (diff == 0) {
+        //     return;
+        // }
+
         diff                   = 0 - diff;
         diff_abs               = (diff < 0) ? -diff : diff;  // 计算绝对差值
         direction              = (diff > 0) ? 0 : 1;         // 计算旋转方向，正向为0，反向为1
         uint32_t tmp_pluse_cnt = 0;                          // 当前周期有效变化
-
-        if (diff_abs) {
+        if (diff_abs > ENCODER_MAX_DIFF) {
+            // do nothing
+            /* 该状态下可能是定时器越界 */
+            __encoder_timer_clear(&encoder_struct[i]);  // 清除计时器
+        } else if (diff_abs) {
+            elog_i(TAG, "diff %ld", diff);
             // elog_i(TAG, "Encoder channel %d diff: %ld", i, diff);
             // elog_i(TAG, "current_encoder_counter: %lu", current_encoder_counter);
             // elog_i(TAG, " last_encoder_counter: %lu", encoder_struct[i].last_encoder_counter);
             encoder_struct[i].last_encoder_counter = current_encoder_counter;  // 更新上次计数值
             // elog_i(TAG, "CH0 diff: %ld", diff);
-            // elog_i(TAG, "CH0 Direction: %s", (diff > 0) ? "Forward" : "Backward");
+            elog_i(TAG, "CH0 Direction: %s", (diff > 0) ? "Forward" : "Backward");
             /* 更新基础状态 */
             encoder->is_turning = 1;  // 正在旋转
             encoder->active_duration += CONFIG_ENCODER_CYCLE_TIMER_MS;
@@ -393,13 +401,13 @@ static void __decoder_handle(void) {
                 encoder->active_duration = 0;  // 重置激活持续时间
             } else {
                 /* 计算转速增益 */
-                if (tmp_pluse_cnt < 5) {
+                if (tmp_pluse_cnt < 3) {
                     encoder->pluse_gain      = 1;
                     encoder->active_duration = 0;  // 如果转速过低，重置激活持续时间
                 } else if (tmp_pluse_cnt < 10) {
-                    encoder->pluse_gain = 2;
-                } else {
                     encoder->pluse_gain = 10;
+                } else {
+                    encoder->pluse_gain = 20;
                 }
                 /* 计算时间增益 */
                 if (encoder->active_duration < CONFIG_ENCODER_CYCLE_TIMER_MS * 30) {
@@ -428,22 +436,35 @@ static void __decoder_handle(void) {
                     encoder->phy_value = decoder_step_map[i][encoder->step_index];
                     // printf("Encoder channel %d step index: %d, value: %ld\r\n", i,
                     // encoder->step_index, encoder->phy_value);
-                    log_i(TAG, "Encoder channel %d step index: %d, value: %ld", i,
-                          encoder->step_index, encoder->phy_value);
+                    elog_i(TAG, "Encoder channel %d step index: %d, value: %ld", i,
+                           encoder->step_index, encoder->phy_value);
                 } else {
                     // do nothing
                 }
             } else {
                 tmp_gain = encoder->pluse_gain * encoder->duration_gain;
+                elog_i(TAG, "phy_value %f tmp_gain %.4f pluse_gain %u duration_gain %u",
+                       encoder->phy_value, tmp_gain, encoder->pluse_gain, encoder->duration_gain);
                 if (diff > 0) {
                     encoder->phy_value +=
                         tmp_pluse_cnt * tmp_gain * encoder->phy_value_step;  // 更新物理值，正向旋转
+
+                    elog_i(
+                        TAG,
+                        "++++ cnt %d phy_value:%.3f tmp_gain : %.4f pluse_gain %u duration_gain %u",
+                        tmp_pluse_cnt, encoder->phy_value, tmp_gain, encoder->pluse_gain,
+                        encoder->duration_gain);
                 } else {
-                    if (encoder->phy_value < tmp_pluse_cnt * tmp_gain) {
+                    if (encoder->phy_value <= tmp_pluse_cnt * tmp_gain * encoder->phy_value_step) {
                         encoder->phy_value = encoder->phy_value_min;
                     } else
                         encoder->phy_value -= tmp_pluse_cnt * tmp_gain *
                                               encoder->phy_value_step;  // 更新物理值，反向旋转
+                    elog_i(
+                        TAG,
+                        "--- cnt %d phy_value:%.3f tmp_gain : %.4f pluse_gain %u duration_gain %u",
+                        tmp_pluse_cnt, encoder->phy_value, tmp_gain, encoder->pluse_gain,
+                        encoder->duration_gain);
                 }
             }
 
@@ -460,7 +481,7 @@ static void __decoder_handle(void) {
                 };
                 vfb_send(ENCODER_TIMER_GET_PHY, i, (void *)&msg_decoder,
                          sizeof(VFBMsgDecoderStruct));  // 发送物理值消息
-                elog_i(TAG, "Encoder[%d] phy:%.3f dur:%dms gain:%d", i, encoder->phy_value,
+                elog_d(TAG, "Encoder[%d] phy:%.3f dur:%dms gain:%d", i, encoder->phy_value,
                        encoder->active_duration, tmp_gain);
             }
 
