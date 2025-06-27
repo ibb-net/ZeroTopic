@@ -252,7 +252,7 @@ static void __DACSgm3533RcvHandle(void *msg) {
             if (DACSgm3533Status[ch].dac_data != *hex) {
                 DACSgm3533Status[ch].dac_data = *hex;  // Update the DAC data
                 DACSgm3533DSPISend(ch, *hex);
-                elog_i(TAG, "DACSgm3533Set: Channel %d, Data 0x%04X", ch, *hex);
+                elog_d(TAG, "DACSgm3533Set: Channel %d, Data 0x%04X", ch, *hex);
             }
 
         } break;
