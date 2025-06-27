@@ -451,7 +451,7 @@ static void __decoder_handle(void) {
                 }
             } else {
                 tmp_gain = encoder->pluse_gain * encoder->duration_gain ;
-                elog_i(TAG, "phy_value %f tmp_gain %.4f pluse_gain %u duration_gain %u",
+                elog_d(TAG, "phy_value %f tmp_gain %.4f pluse_gain %u duration_gain %u",
                        encoder->phy_value, tmp_gain, encoder->pluse_gain, encoder->duration_gain);
                 if (diff > 0) {
                     encoder->phy_value +=
