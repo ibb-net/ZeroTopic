@@ -288,9 +288,10 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
                     VFB_W("No queue found for event %u, use count is 0\r\n", event);
                     vPortFree(tmp_msg.frame);
                 }
-                while (1) {
-                    /* code */
-                }
+                /* Notice:当需要检查发送队列有问题的时候就开启这个,方便定位问题 */
+                // while (1) {
+                //     /* code */
+                // }
 
                 continue;  // Skip this queue
             }
