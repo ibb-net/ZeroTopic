@@ -208,8 +208,8 @@ void ENCODER_TIMER_CREATE_HANDLE(void) {
         __encoder_timer_clear(&encoder_struct[i]);                   // 初始化每个通道的计时器
     }
 
-    xTaskCreate(VFBTaskFrame, "Encoder", configMINIMAL_STACK_SIZE*2, (void *)&ENCODER_TIMER_task_cfg,
-                TimerEcoderPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "Encoder", configMINIMAL_STACK_SIZE * 2,
+                (void *)&ENCODER_TIMER_task_cfg, TimerEcoderPriority, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerInitStage, TimerEcoderPriority, ENCODER_TIMER_CREATE_HANDLE,
                      timer_encoder init);
@@ -359,10 +359,12 @@ static void __decoder_handle(void) {
         int64_t diff                 = 0;
         uint8_t direction            = 0;  // 旋转方向
         TickType_t currentTick       = xTaskGetTickCount();
+        float tmp_gain               = 0;
         TypdefEncoderStruct *encoder = &encoder_struct[i];
         // 读取当前计时器值
         uint64_t current_encoder_counter = timer_counter_read(encoder_struct[i].timer_handle);
         diff                   = current_encoder_counter - encoder_struct[i].last_encoder_counter;
+        diff                   = 0 - diff;
         diff_abs               = (diff < 0) ? -diff : diff;  // 计算绝对差值
         direction              = (diff > 0) ? 0 : 1;         // 计算旋转方向，正向为0，反向为1
         uint32_t tmp_pluse_cnt = 0;                          // 当前周期有效变化
@@ -414,40 +416,25 @@ static void __decoder_handle(void) {
                         } else {
                             encoder->step_index++;
                         }
-                        // if (encoder->step_index > 15) {
-                        //     encoder->step_index = 0;  // 重置步进索引
-                        // }
-                        // while (decoder_step_map[i][encoder->step_index] == -1) {
-                        //     // 如果步进索引对应的值为-1，表示没有更多步进，继续查找下一个有效步进
-                        //     encoder->step_index++;
-                        //     if (encoder->step_index > 15) {
-                        //         encoder->step_index = 0;  // 重置步进索引
-                        //     }
-                        // }
                     } else {
-                        if (encoder->step_index < 0) {
+                        if (encoder->step_index <= 0) {
+                            encoder->step_index = 0;  // 如果步进索引小于0，保持不变
                             // donothing
                         } else {
                             encoder->step_index--;
                         }
-                        // while (decoder_step_map[i][encoder->step_index] == -1) {
-                        //     // 如果步进索引对应的值为-1，表示没有更多步进，继续查找下一个有效步进
-                        //     encoder->step_index--;
-                        //     if (encoder->step_index == 0) {
-                        //         encoder->step_index = 15;  // 重置步进索引
-                        //     }
-                        // }
                     }
 
                     encoder->phy_value = decoder_step_map[i][encoder->step_index];
                     // printf("Encoder channel %d step index: %d, value: %ld\r\n", i,
-                    // encoder->step_index, encoder->phy_value); log_i(TAG, "Encoder channel %d step
-                    // index: %d, value: %ld", i, encoder->step_index, encoder->phy_value);
+                    // encoder->step_index, encoder->phy_value);
+                    log_i(TAG, "Encoder channel %d step index: %d, value: %ld", i,
+                          encoder->step_index, encoder->phy_value);
                 } else {
                     // do nothing
                 }
             } else {
-                uint64_t tmp_gain = encoder->pluse_gain * encoder->duration_gain;
+                tmp_gain = encoder->pluse_gain * encoder->duration_gain;
                 if (diff > 0) {
                     encoder->phy_value +=
                         tmp_pluse_cnt * tmp_gain * encoder->phy_value_step;  // 更新物理值，正向旋转
@@ -473,12 +460,10 @@ static void __decoder_handle(void) {
                 };
                 vfb_send(ENCODER_TIMER_GET_PHY, i, (void *)&msg_decoder,
                          sizeof(VFBMsgDecoderStruct));  // 发送物理值消息
+                elog_i(TAG, "Encoder[%d] phy:%.3f dur:%dms gain:%d", i, encoder->phy_value,
+                       encoder->active_duration, tmp_gain);
             }
 
-            // printf("\r %ld\r\n", encoder->phy_value);
-            // // 输出物理值 printf("\r Physical Value: %ld,Pluses %d Gain: %ld, Duration: %lu ms,
-            // Pulse Count: %d\r\n", 	   encoder->phy_value, tmp_pluse_cnt, tmp_gain,
-            // encoder->active_duration, encoder->pluse_cnt);
         } else {
             if (encoder->is_turning) {
                 if (encoder->active_timeout < currentTick) {

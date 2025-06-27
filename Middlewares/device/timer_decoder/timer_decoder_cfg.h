@@ -64,7 +64,7 @@
 // 0~40mv
 #define MAX_PHY_VALUE_CH0  (0.04f)  // V
 #define DEF_PHY_VALUE_CH0  (0.02f)  // 默认物理值
-#define MIN_PHY_VALUE_CH0  (-0.004f)
+#define MIN_PHY_VALUE_CH0  (0.0f)
 #define STEP_PHY_VALUE_CH0 (10.0 / 1000.0 / 1000.0f)  // 每步物理值10uv
 
 #define MAX_PHY_VALUE_CH1  (9.0f)  // V
@@ -79,7 +79,7 @@ pluse_gain
 #define CONFIG_ENCODER_DURATION_GAIN_DEFAULT 1
 #ifndef CONFIG_ENCODER_ONE_PULSE_CNT
 /* 触发一次转转产生的计时器变化的数值 */
-#define CONFIG_ENCODER_ONE_PULSE_CNT 4
+#define CONFIG_ENCODER_ONE_PULSE_CNT 2
 /* 消抖时间 */
 #define CONFIG_ENCODER_DEBOUNCE_TIME_MS 100
 /* 有效超时时间 */
