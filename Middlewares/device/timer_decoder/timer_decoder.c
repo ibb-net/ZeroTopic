@@ -40,7 +40,14 @@ const float step_phy[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
     STEP_PHY_VALUE_CH0,
     STEP_PHY_VALUE_CH1,
 };
+#define CONFIG_ENCODER_CH0_GAIN (2.2)
+#define CONFIG_ENCODER_CH1_GAIN (1.0)
+const float channel_gain[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+    CONFIG_ENCODER_CH0_GAIN,
+    CONFIG_ENCODER_CH1_GAIN,
+};
 #define ENCODER_MAX_DIFF (100)
+
 const TypdefDecoderBSPCfg decoder_bsp_cfg[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
 
     {
@@ -377,13 +384,13 @@ static void __decoder_handle(void) {
             /* 该状态下可能是定时器越界 */
             __encoder_timer_clear(&encoder_struct[i]);  // 清除计时器
         } else if (diff_abs) {
-            elog_i(TAG, "diff %ld", diff);
+            elog_d(TAG, "diff %ld", diff);
             // elog_i(TAG, "Encoder channel %d diff: %ld", i, diff);
             // elog_i(TAG, "current_encoder_counter: %lu", current_encoder_counter);
             // elog_i(TAG, " last_encoder_counter: %lu", encoder_struct[i].last_encoder_counter);
             encoder_struct[i].last_encoder_counter = current_encoder_counter;  // 更新上次计数值
             // elog_i(TAG, "CH0 diff: %ld", diff);
-            elog_i(TAG, "CH0 Direction: %s", (diff > 0) ? "Forward" : "Backward");
+            elog_d(TAG, "CH0 Direction: %s", (diff > 0) ? "Forward" : "Backward");
             /* 更新基础状态 */
             encoder->is_turning = 1;  // 正在旋转
             encoder->active_duration += CONFIG_ENCODER_CYCLE_TIMER_MS;
@@ -405,9 +412,9 @@ static void __decoder_handle(void) {
                     encoder->pluse_gain      = 1;
                     encoder->active_duration = 0;  // 如果转速过低，重置激活持续时间
                 } else if (tmp_pluse_cnt < 10) {
-                    encoder->pluse_gain = 10;
-                } else {
                     encoder->pluse_gain = 20;
+                } else {
+                    encoder->pluse_gain = 40;
                 }
                 /* 计算时间增益 */
                 if (encoder->active_duration < CONFIG_ENCODER_CYCLE_TIMER_MS * 30) {
@@ -442,7 +449,7 @@ static void __decoder_handle(void) {
                     // do nothing
                 }
             } else {
-                tmp_gain = encoder->pluse_gain * encoder->duration_gain;
+                tmp_gain = encoder->pluse_gain * encoder->duration_gain * channel_gain[i];
                 elog_i(TAG, "phy_value %f tmp_gain %.4f pluse_gain %u duration_gain %u",
                        encoder->phy_value, tmp_gain, encoder->pluse_gain, encoder->duration_gain);
                 if (diff > 0) {
