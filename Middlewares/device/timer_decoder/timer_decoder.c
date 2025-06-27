@@ -457,7 +457,7 @@ static void __decoder_handle(void) {
                     encoder->phy_value +=
                         tmp_pluse_cnt * tmp_gain * encoder->phy_value_step;  // 更新物理值，正向旋转
 
-                    elog_i(
+                    elog_d(
                         TAG,
                         "++++ cnt %d phy_value:%.3f tmp_gain : %.4f pluse_gain %u duration_gain %u",
                         tmp_pluse_cnt, encoder->phy_value, tmp_gain, encoder->pluse_gain,
@@ -468,7 +468,7 @@ static void __decoder_handle(void) {
                     } else
                         encoder->phy_value -= tmp_pluse_cnt * tmp_gain *
                                               encoder->phy_value_step;  // 更新物理值，反向旋转
-                    elog_i(
+                    elog_d(
                         TAG,
                         "--- cnt %d phy_value:%.3f tmp_gain : %.4f pluse_gain %u duration_gain %u",
                         tmp_pluse_cnt, encoder->phy_value, tmp_gain, encoder->pluse_gain,
