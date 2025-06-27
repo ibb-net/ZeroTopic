@@ -412,16 +412,17 @@ static void __decoder_handle(void) {
                     encoder->pluse_gain      = 1;
                     encoder->active_duration = 0;  // 如果转速过低，重置激活持续时间
                 } else if (tmp_pluse_cnt < 10) {
-                    encoder->pluse_gain = 20;
+                    encoder->pluse_gain = 20* channel_gain[i];;
                 } else {
                     encoder->pluse_gain = 40;
                 }
                 /* 计算时间增益 */
-                if (encoder->active_duration < CONFIG_ENCODER_CYCLE_TIMER_MS * 30) {
-                    encoder->duration_gain = 1;
-                } else {
-                    encoder->duration_gain = 10;
-                }
+                // if (encoder->active_duration < CONFIG_ENCODER_CYCLE_TIMER_MS * 30) {
+                //     encoder->duration_gain = 1;
+                // } else {
+                //     encoder->duration_gain = 10;
+                // }
+                encoder->duration_gain = 1;
             }
             if (encoder->mode == DECODER_MODE_STEP) {
                 if (tmp_pluse_cnt) {
@@ -449,7 +450,7 @@ static void __decoder_handle(void) {
                     // do nothing
                 }
             } else {
-                tmp_gain = encoder->pluse_gain * encoder->duration_gain * channel_gain[i];
+                tmp_gain = encoder->pluse_gain * encoder->duration_gain ;
                 elog_i(TAG, "phy_value %f tmp_gain %.4f pluse_gain %u duration_gain %u",
                        encoder->phy_value, tmp_gain, encoder->pluse_gain, encoder->duration_gain);
                 if (diff > 0) {
