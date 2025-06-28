@@ -49,18 +49,6 @@ const float channel_gain[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
 #define ENCODER_MAX_DIFF (100)
 
 const TypdefDecoderBSPCfg decoder_bsp_cfg[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
-
-    {
-        .timer_rcu  = ENCODER_CH1_TIMER_RCU,
-        .timer_base = ENCODER_CH1_TIMER,
-        .gpio_rcu   = ENCODER_CH1_GPIO_RCU,
-        .gpio_port  = ENCODER_CH1_GPIO_PORT,
-        .gpio_af    = ENCODER_CH1_GPIO_AF,
-        .gpio_pin_a = ENCODER_CH1_GPIO_PIN_A,
-        .gpio_pin_b = ENCODER_CH1_GPIO_PIN_B,
-    },
-#if (CONFIG_TIMER_DECODER_CHANNEL_MAX > 1)
-
     {
         .timer_rcu  = ENCODER_CH0_TIMER_RCU,
         .timer_base = ENCODER_CH0_TIMER,
@@ -70,6 +58,17 @@ const TypdefDecoderBSPCfg decoder_bsp_cfg[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
         .gpio_pin_a = ENCODER_CH0_GPIO_PIN_A,
         .gpio_pin_b = ENCODER_CH0_GPIO_PIN_B,
     },
+#if (CONFIG_TIMER_DECODER_CHANNEL_MAX > 1)
+    {
+        .timer_rcu  = ENCODER_CH1_TIMER_RCU,
+        .timer_base = ENCODER_CH1_TIMER,
+        .gpio_rcu   = ENCODER_CH1_GPIO_RCU,
+        .gpio_port  = ENCODER_CH1_GPIO_PORT,
+        .gpio_af    = ENCODER_CH1_GPIO_AF,
+        .gpio_pin_a = ENCODER_CH1_GPIO_PIN_A,
+        .gpio_pin_b = ENCODER_CH1_GPIO_PIN_B,
+    },
+
 #endif
 };
 #if CONFIG_TIMER_DECODER_CHANNEL_MAX == 1
