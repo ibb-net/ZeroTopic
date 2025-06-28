@@ -51,16 +51,6 @@ const float channel_gain[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
 const TypdefDecoderBSPCfg decoder_bsp_cfg[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
 
     {
-        .timer_rcu  = ENCODER_CH0_TIMER_RCU,
-        .timer_base = ENCODER_CH0_TIMER,
-        .gpio_rcu   = ENCODER_CH0_GPIO_RCU,
-        .gpio_port  = ENCODER_CH0_GPIO_PORT,
-        .gpio_af    = ENCODER_CH0_GPIO_AF,
-        .gpio_pin_a = ENCODER_CH0_GPIO_PIN_A,
-        .gpio_pin_b = ENCODER_CH0_GPIO_PIN_B,
-    },
-#if (CONFIG_TIMER_DECODER_CHANNEL_MAX > 1)
-    {
         .timer_rcu  = ENCODER_CH1_TIMER_RCU,
         .timer_base = ENCODER_CH1_TIMER,
         .gpio_rcu   = ENCODER_CH1_GPIO_RCU,
@@ -68,6 +58,17 @@ const TypdefDecoderBSPCfg decoder_bsp_cfg[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
         .gpio_af    = ENCODER_CH1_GPIO_AF,
         .gpio_pin_a = ENCODER_CH1_GPIO_PIN_A,
         .gpio_pin_b = ENCODER_CH1_GPIO_PIN_B,
+    },
+#if (CONFIG_TIMER_DECODER_CHANNEL_MAX > 1)
+
+    {
+        .timer_rcu  = ENCODER_CH0_TIMER_RCU,
+        .timer_base = ENCODER_CH0_TIMER,
+        .gpio_rcu   = ENCODER_CH0_GPIO_RCU,
+        .gpio_port  = ENCODER_CH0_GPIO_PORT,
+        .gpio_af    = ENCODER_CH0_GPIO_AF,
+        .gpio_pin_a = ENCODER_CH0_GPIO_PIN_A,
+        .gpio_pin_b = ENCODER_CH0_GPIO_PIN_B,
     },
 #endif
 };
@@ -342,7 +343,7 @@ static void ENCODER_TIMER_RCV_HANDLE(void *msg) {
             }
             elog_d(TAG, "ENCODER_TIMER_SET_PHY Channel %d, phy_value: %f", channel,
                    tmp_decoder->phy_value);
-            encoder_struct[channel].phy_value = tmp_decoder->phy_value; 
+            encoder_struct[channel].phy_value = tmp_decoder->phy_value;
         } break;
         default:
             printf("TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
