@@ -340,13 +340,9 @@ static void ENCODER_TIMER_RCV_HANDLE(void *msg) {
                        tmp_decoder->phy_value, channel);
                 return;  // 无效物理值
             }
-            elog_i(TAG, "ENCODER_TIMER_SET_PHY Channel %d, phy_value: %f", channel,
+            elog_d(TAG, "ENCODER_TIMER_SET_PHY Channel %d, phy_value: %f", channel,
                    tmp_decoder->phy_value);
-            encoder_struct[channel].phy_value = tmp_decoder->phy_value;  // 设置物理值
-
-            vfb_send(ENCODER_TIMER_GET_PHY, 0, (void *)tmp_decoder,
-                     sizeof(VFBMsgDecoderStruct));  // 发送物理值消息
-
+            encoder_struct[channel].phy_value = tmp_decoder->phy_value; 
         } break;
         default:
             printf("TASK %s RCV: unknown event: %d\r\n", taskName, tmp_msg->frame->head.event);
