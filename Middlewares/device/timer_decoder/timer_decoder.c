@@ -412,7 +412,8 @@ static void __decoder_handle(void) {
                     encoder->pluse_gain      = 1;
                     encoder->active_duration = 0;  // 如果转速过低，重置激活持续时间
                 } else if (tmp_pluse_cnt < 10) {
-                    encoder->pluse_gain = 20* channel_gain[i];;
+                    encoder->pluse_gain = 20 * channel_gain[i];
+                    ;
                 } else {
                     encoder->pluse_gain = 40;
                 }
@@ -440,17 +441,14 @@ static void __decoder_handle(void) {
                             encoder->step_index--;
                         }
                     }
-
                     encoder->phy_value = decoder_step_map[i][encoder->step_index];
-                    // printf("Encoder channel %d step index: %d, value: %ld\r\n", i,
-                    // encoder->step_index, encoder->phy_value);
-                    elog_i(TAG, "Encoder channel %d step index: %d, value: %ld", i,
+                    elog_d(TAG, "Encoder channel %d step index: %d, value: %ld", i,
                            encoder->step_index, encoder->phy_value);
                 } else {
                     // do nothing
                 }
             } else {
-                tmp_gain = encoder->pluse_gain * encoder->duration_gain ;
+                tmp_gain = encoder->pluse_gain * encoder->duration_gain;
                 elog_d(TAG, "phy_value %f tmp_gain %.4f pluse_gain %u duration_gain %u",
                        encoder->phy_value, tmp_gain, encoder->pluse_gain, encoder->duration_gain);
                 if (diff > 0) {
