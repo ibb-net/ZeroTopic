@@ -289,7 +289,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *la
     uint8_t tmp_channel = tmp_mux_reg.bits.PSEL & 0x0F;
     float tmp_gain      = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
 
-    // elog_i(TAG, "Last MUX Register: Channel %d", tmp_channel);
+    elog_d(TAG, "Last MUX Register: Channel %d", tmp_channel);
 
     // Write data to register
     elog_d(TAG, "DevGetADCData: MUX Register get to 0x%02X", mux_reg.raw);
