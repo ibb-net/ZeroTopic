@@ -169,9 +169,11 @@ static uint32_t __adc_channel_sample(uint8_t channel) {
     /* ADC software trigger enable */
     adc_software_trigger_enable(ADC0, ADC_REGULAR_CHANNEL);
     /* wait the end of conversion flag */
+    //TODO 
     while (!adc_flag_get(ADC0, ADC_FLAG_EOC));
     /* clear the end of conversion flag */
     adc_flag_clear(ADC0, ADC_FLAG_EOC);
+    //todo
     /* return regular channel sample value */
     return (adc_regular_data_read(ADC0));
 }
