@@ -331,12 +331,12 @@ static void ENCODER_TIMER_RCV_HANDLE(void *msg) {
             }
             DecoderChannelEnum channel = (DecoderChannelEnum)tmp_decoder->channel;
             if (channel >= CONFIG_TIMER_DECODER_CHANNEL_MAX) {
-                elog_e(TAG, "ENCODER_TIMER_SET_PHY: Invalid channel %d", channel);
+                elog_d(TAG, "ENCODER_TIMER_SET_PHY: Invalid channel %d", channel);
                 return;  // 无效通道
             }
             if (tmp_decoder->phy_value < encoder_struct[channel].phy_value_min ||
                 tmp_decoder->phy_value > encoder_struct[channel].phy_value_max) {
-                elog_e(TAG, "ENCODER_TIMER_SET_PHY: Invalid phy_value %f for channel %d",
+                elog_d(TAG, "ENCODER_TIMER_SET_PHY: Invalid phy_value %f for channel %d",
                        tmp_decoder->phy_value, channel);
                 return;  // 无效物理值
             }
