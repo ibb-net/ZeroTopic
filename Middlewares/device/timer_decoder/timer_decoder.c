@@ -24,25 +24,25 @@ typedef struct {
     uint32_t gpio_pin_a;
     uint32_t gpio_pin_b;
 } TypdefDecoderBSPCfg;
-const float max_pyh[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+const double max_pyh[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
     MAX_PHY_VALUE_CH0,
     MAX_PHY_VALUE_CH1,
 };
-const float min_pyh[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+const double min_pyh[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
     MIN_PHY_VALUE_CH0,
     MIN_PHY_VALUE_CH1,
 };
-const float def_phy[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+const double def_phy[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
     DEF_PHY_VALUE_CH0,
     DEF_PHY_VALUE_CH1,
 };
-const float step_phy[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+const double step_phy[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
     STEP_PHY_VALUE_CH0,
     STEP_PHY_VALUE_CH1,
 };
 #define CONFIG_ENCODER_CH0_GAIN (2.2)
 #define CONFIG_ENCODER_CH1_GAIN (1.0)
-const float channel_gain[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
+const double channel_gain[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
     CONFIG_ENCODER_CH0_GAIN,
     CONFIG_ENCODER_CH1_GAIN,
 };
@@ -72,7 +72,7 @@ const TypdefDecoderBSPCfg decoder_bsp_cfg[CONFIG_TIMER_DECODER_CHANNEL_MAX] = {
 #endif
 };
 #if CONFIG_TIMER_DECODER_CHANNEL_MAX == 1
-const float decoder_step_map[1][16] = {
+const double decoder_step_map[1][16] = {
     {CONFIG_TIMER_DECODER_CH0_STEP0, CONFIG_TIMER_DECODER_CH0_STEP1, CONFIG_TIMER_DECODER_CH0_STEP2,
      CONFIG_TIMER_DECODER_CH0_STEP3, CONFIG_TIMER_DECODER_CH0_STEP4, CONFIG_TIMER_DECODER_CH0_STEP5,
      CONFIG_TIMER_DECODER_CH0_STEP6, CONFIG_TIMER_DECODER_CH0_STEP7, CONFIG_TIMER_DECODER_CH0_STEP8,
@@ -81,7 +81,7 @@ const float decoder_step_map[1][16] = {
      CONFIG_TIMER_DECODER_CH0_STEP13, CONFIG_TIMER_DECODER_CH0_STEP14,
      CONFIG_TIMER_DECODER_CH0_STEP15}};
 #elif CONFIG_TIMER_DECODER_CHANNEL_MAX == 2
-const float decoder_step_map[2][16] = {
+const double decoder_step_map[2][16] = {
     {CONFIG_TIMER_DECODER_CH0_STEP0, CONFIG_TIMER_DECODER_CH0_STEP1, CONFIG_TIMER_DECODER_CH0_STEP2,
      CONFIG_TIMER_DECODER_CH0_STEP3, CONFIG_TIMER_DECODER_CH0_STEP4, CONFIG_TIMER_DECODER_CH0_STEP5,
      CONFIG_TIMER_DECODER_CH0_STEP6, CONFIG_TIMER_DECODER_CH0_STEP7, CONFIG_TIMER_DECODER_CH0_STEP8,
@@ -105,11 +105,11 @@ typedef struct {
     uint32_t timer_handle;
     uint8_t channel_ctr;  // 0 stop 1:start
     uint8_t mode;         // 0:连续模式 1:步进模式
-    float phy_value;
-    float phy_value_last;  // 上次物理值
-    float phy_value_max;   // 最大物理值
-    float phy_value_min;   // 最小物理值
-    float phy_value_step;
+    double phy_value;
+    double phy_value_last;  // 上次物理值
+    double phy_value_max;   // 最大物理值
+    double phy_value_min;   // 最小物理值
+    double phy_value_step;
     uint64_t diff;  // 上次计数值和当前计数值的差值
 
     uint8_t is_turning;             // 是否正在旋转
@@ -362,7 +362,7 @@ static void __decoder_handle(void) {
         int64_t diff                 = 0;
         uint8_t direction            = 0;  // 旋转方向
         TickType_t currentTick       = xTaskGetTickCount();
-        float tmp_gain               = 0;
+        double tmp_gain               = 0;
         TypdefEncoderStruct *encoder = &encoder_struct[i];
         // 读取当前计时器值
         uint64_t current_encoder_counter = timer_counter_read(encoder_struct[i].timer_handle);

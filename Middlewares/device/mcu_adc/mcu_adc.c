@@ -44,7 +44,7 @@ const TypdefMcuadcBSPCfg McuadcBspCfg[McuadcChannelMax] = {
 
 typedef struct {
     char device_name[DEVICE_NAME_MAX];
-    float value;  // ADC value
+    double value;  // ADC value
     uint32_t id;  // ID
 
 } TypdefMcuadcStatus;
@@ -181,7 +181,7 @@ static uint32_t __adc_channel_sample(uint8_t channel) {
 static void __McuadcCycHandle(void) {
     TypdefMcuadcStatus *McuadcStatusHandle = &McuadcStatus[0];
     static uint32_t counter                = 0;
-    static float voltage_sum               = 0.0f;
+    static double voltage_sum               = 0.0f;
     if (McuadcStatusHandle == NULL) {
         elog_e(TAG, "[ERROR]McuadcStatusHandle NULL");
         return;
@@ -189,14 +189,14 @@ static void __McuadcCycHandle(void) {
     if (counter < 10) {
         uint32_t sample_value = 1;
         sample_value          = __adc_channel_sample(ADC_CHANNEL_15);
-        float Voltage         = (float)sample_value / 4095 * 3.3f;
+        double Voltage         = (double)sample_value / 4095 * 3.3f;
         voltage_sum += Voltage;
         counter++;
         return;  // 等待10次
     }
     if (counter == 10) {
         // 第10次采样，打印平均值
-        float average_voltage = voltage_sum / 10.0f * 22;
+        double average_voltage = voltage_sum / 10.0f * 22;
         elog_d(TAG, "ADC Channel 15 Average Voltage: %.2f V", average_voltage);
         voltage_sum = 0.0f;  // 重置电压和计数器
         counter     = 0;

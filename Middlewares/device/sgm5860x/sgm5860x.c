@@ -32,7 +32,7 @@
 #endif
 #define AVG_MAX_CNT (10)
 
-const float f_gain_map[] = {
+const double f_gain_map[] = {
     [SGM58601_GAIN_1] = 1.0f,   [SGM58601_GAIN_2] = 2.0f,     [SGM58601_GAIN_4] = 4.0f,
     [SGM58601_GAIN_8] = 8.0f,   [SGM58601_GAIN_16] = 16.0f,   [SGM58601_GAIN_32] = 32.0f,
     [SGM58601_GAIN_64] = 64.0f, [SGM58601_GAIN_128] = 128.0f,
@@ -147,11 +147,11 @@ typedef struct {
     DevSgm5860xHandleStruct *cfg;
     uint8_t status;                          // Status of the device
     uint8_t scan_index;                      // Channel to scan
-    float last_voltage[sgm5860xChannelMax];  // Last voltage read from each channel
-    float sum[sgm5860xChannelMax];
-    float average[sgm5860xChannelMax];                   // Average voltage for each channel
+    double last_voltage[sgm5860xChannelMax];  // Last voltage read from each channel
+    double sum[sgm5860xChannelMax];
+    double average[sgm5860xChannelMax];                   // Average voltage for each channel
     uint8_t vol_index[sgm5860xChannelMax];               // Voltage index for each channel
-    float tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
+    double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
 
 } Typdefsgm5860xStatus;
 Typdefsgm5860xStatus sgm5860xStatus = {0};
@@ -241,10 +241,10 @@ static void __sgm5860xCycHandle(void) {
     }
     if (sgm5860xStatus.status == 1) {
         // sgm5860xStatus.scan_index
-        float last_voltage   = 0;
+        double last_voltage   = 0;
         uint8_t last_channel = 0;
         uint8_t last_index   = 0;
-        float last_gain      = 0;
+        double last_gain      = 0;
         uint8_t channel =
             sgm5860_channelcfg[sgm5860xStatus.scan_index].channel;  // Get the current channel
         uint8_t gain = sgm5860_channelcfg[sgm5860xStatus.scan_index]
@@ -262,15 +262,15 @@ static void __sgm5860xCycHandle(void) {
 
                 sgm5860xStatus.vol_index[i]++;
                 if (sgm5860xStatus.vol_index[i] >= AVG_MAX_CNT) {
-                    float max1   = sgm5860xStatus.tmp_voltage[i][0],
+                    double max1   = sgm5860xStatus.tmp_voltage[i][0],
                           max2   = sgm5860xStatus.tmp_voltage[i][0];
-                    float min1   = sgm5860xStatus.tmp_voltage[i][0],
+                    double min1   = sgm5860xStatus.tmp_voltage[i][0],
                           min2   = sgm5860xStatus.tmp_voltage[i][0];
                     int max1_idx = 0, max2_idx = 0, min1_idx = 0, min2_idx = 0;
 
                     // 找到最大和次大，最小和次小的索引
                     for (int j = 1; j < AVG_MAX_CNT; j++) {
-                        float v = sgm5860xStatus.tmp_voltage[i][j];
+                        double v = sgm5860xStatus.tmp_voltage[i][j];
                         if (v > max1) {
                             max2     = max1;
                             max2_idx = max1_idx;
@@ -292,7 +292,7 @@ static void __sgm5860xCycHandle(void) {
                     }
 
                     // 计算剩余6个的平均值
-                    float sum = 0.0f;
+                    double sum = 0.0f;
                     int cnt   = 0;
                     for (int j = 0; j < AVG_MAX_CNT; j++) {
                         if (j != max1_idx && j != max2_idx && j != min1_idx && j != min2_idx) {

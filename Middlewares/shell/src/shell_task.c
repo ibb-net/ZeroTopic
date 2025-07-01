@@ -17,7 +17,7 @@
 #define ShellLogLvl ELOG_LVL_INFO
 #define ShellPriority PrioritySystemPriGroup0
 
-#define ShellBufferSize (512)
+#define ShellBufferSize (2048)
 #ifndef ShellChannelMax
 #define ShellChannelMax 1
 #endif

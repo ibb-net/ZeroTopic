@@ -27,7 +27,7 @@ typedef enum
 typedef struct
 {
     uint8_t channel; // 通道号 0:CH0 1:CH1
-    float phy_value; // 物理值
+    double phy_value; // 物理值
     uint8_t mode; // 0:连续模式 1:步进模式
 } VFBMsgDecoderStruct;
 

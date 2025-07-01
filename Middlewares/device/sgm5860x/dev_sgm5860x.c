@@ -34,7 +34,7 @@
 #define ADC_24BIT_MAX        (8388608.0f)  // Maximum value for 24-bit ADC
 #define SGM5860_WAIT_TIME_US 1000
 
-const float gaim_map[SGM58601_GAIN_MAX] = {1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0};
+const double gaim_map[SGM58601_GAIN_MAX] = {1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0};
 
 /*SGM58601初始化*/
 static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
@@ -247,7 +247,7 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     elog_i(TAG, "Read DRATE Register: 0x%02X", drate_reg.raw);
 }
 
-int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *last_voltage,
+int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *last_voltage,
                   uint8_t *last_channel, uint8_t channel, uint8_t gain) {
     if (ptrDevSgm5860xHandle == NULL || last_voltage == NULL) {
         elog_e(TAG, "DevGetADCData: ptrDevSgm5860xHandle or last_voltage is NULL");
@@ -287,7 +287,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *la
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&tmp_adcon_reg,
                        sizeof(tmp_adcon_reg));  // Read ADCON register
     uint8_t tmp_channel = tmp_mux_reg.bits.PSEL & 0x0F;
-    float tmp_gain      = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
+    double tmp_gain      = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
 
     elog_d(TAG, "Last MUX Register: Channel %d", tmp_channel);
 
@@ -304,7 +304,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *la
     int hex_data =
         (rcv_data[1] << 16) | (rcv_data[2] << 8) | rcv_data[3];  // Combine the received data
     elog_d(TAG, "DevGetADCData: Received data: 0x%06X", hex_data);
-    float voltage = 0.0f;
+    double voltage = 0.0f;
     if (hex_data & 0x800000) {                             // Check if the sign bit is set
         hex_data = ADC_24BIT_MAX - (hex_data - 0x800000);  // Convert to positive value
         voltage  = (-1) * hex_data * VREF_VOLTAGE / (ADC_24BIT_MAX) / tmp_gain;
@@ -315,7 +315,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *la
                         sizeof(mux_reg));  // Write MUX register
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
                         sizeof(adcon_reg));  // Write ADCON register    //
-    elog_d(TAG, "DevGetADCData: Calculated voltage: %.6f V %.3f mv  Gain: %.2f", voltage,
+    elog_d(TAG, "DevGetADCData: Calculated voltage: %.10f V %.3f mv  Gain: %.2f", voltage,
            voltage * 1000, gain);
     elog_d(TAG,
            "rcv_data 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X "
@@ -325,7 +325,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, float *la
            rcv_data[12], rcv_data[13], rcv_data[14], rcv_data[15]);
     *last_channel = tmp_mux_reg.bits.PSEL & 0x0F;  // Update last channel
     *last_voltage = voltage;                       // Update last voltage
-    elog_d(TAG, "DevGetADCData[%u]:Get channel %d, last voltage %.6f V", cyc, *last_channel,
+    elog_d(TAG, "DevGetADCData[%u]:Get channel %d, last voltage %.10f V", cyc, *last_channel,
            *last_voltage);
     cyc++;
     return 1;  // Success

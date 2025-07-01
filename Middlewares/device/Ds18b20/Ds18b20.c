@@ -43,7 +43,7 @@ static void __Ds18b20RcvHandle(void *msg);
 static void __Ds18b20CycHandle(void);
 static void __Ds18b20InitHandle(void *msg);
 static void CmdDs18b20Reset(void);
-static float CmdDs18b20Read(uint8_t state);
+static double CmdDs18b20Read(uint8_t state);
 static void CmdDs18b20Covert(uint8_t state);
 const TypdefDs18b20BSPCfg Ds18b20BspCfg[Ds18b20ChannelMax] = {
     {
@@ -67,7 +67,7 @@ typedef struct
     uint32_t id;        // ID
     uint8_t status;     // Status of the sensor
     uint8_t step;       // Step in the conversion process
-    float temperature;  // Temperature in Celsius
+    double temperature;  // Temperature in Celsius
 
 } TypdefDs18b20Status;
 TypdefDs18b20Status Ds18b20Status[Ds18b20ChannelMax] = {0};
@@ -258,7 +258,7 @@ static void CmdDs18b20Covert(uint8_t state) {
     // delay 100ms
     // vTaskDelay(pdMS_TO_TICKS(1000));
 }
-static float CmdDs18b20Read(uint8_t state) {
+static double CmdDs18b20Read(uint8_t state) {
     DevOneWireHandleStruct *handle = (DevOneWireHandleStruct *)&(Ds18b20BspCfg[0].one_wire);
     elog_d(TAG, "Reading DS18B20 temperature...");
     uint8_t scratchpad[9] = {0};
@@ -275,7 +275,7 @@ static float CmdDs18b20Read(uint8_t state) {
     //        scratchpad[4], scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
 
     uint16_t temp = 0;
-    float f_tem   = 0.0f;
+    double f_tem   = 0.0f;
     temp          = scratchpad[1] << 8;
     temp |= scratchpad[0];  // Combine the two bytes
     if (temp < 0)           /* 负温度 */
@@ -307,7 +307,7 @@ static int CmdDs18b20Handle(int argc, char *argv[]) {
         CmdDs18b20ReadRom();
         return 0;
     } else if (strcmp(argv[1], "read") == 0) {
-        float temp = CmdDs18b20Read(1);
+        double temp = CmdDs18b20Read(1);
         elog_i(TAG, "Read temperature: %.2f C", temp);
         return 0;
     } else if (strcmp(argv[1], "convert") == 0) {
