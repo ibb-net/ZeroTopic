@@ -105,7 +105,8 @@ int __io_putchar(int ch) {
     return ch;
 }
 uint8_t isReady(void) {
-    return (dev_uart_status[0].is_initialized && dev_uart_status[0].is_opened && dev_uart_status[0].is_started);
+    return (dev_uart_status[0].is_initialized && dev_uart_status[0].is_opened &&
+            dev_uart_status[0].is_started);
 }
 int debug_putbuffer(const char *buffer, size_t len) {
     for (size_t i = 0; i < len; i++) {
@@ -134,14 +135,8 @@ void DevUartPreInit(const DevUartHandleStruct *ptrDevUartHandle) {
         uint32_t device;
         rcu_periph_enum rcu_clock;
     } dev_clock_map[] = {
-        {USART0, RCU_USART0},
-        {USART1, RCU_USART1},
-        {USART2, RCU_USART2},
-        {UART3, RCU_UART3},
-        {UART4, RCU_UART4},
-        {USART5, RCU_USART5},
-        {UART6, RCU_UART6},
-        {UART7, RCU_UART7},
+        {USART0, RCU_USART0}, {USART1, RCU_USART1}, {USART2, RCU_USART2}, {UART3, RCU_UART3},
+        {UART4, RCU_UART4},   {USART5, RCU_USART5}, {UART6, RCU_UART6},   {UART7, RCU_UART7},
 
     };
     uint8_t is_found = 0;
@@ -174,14 +169,8 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
         uint32_t device;
         rcu_periph_enum rcu_clock;
     } dev_clock_map[] = {
-        {USART0, RCU_USART0},
-        {USART1, RCU_USART1},
-        {USART2, RCU_USART2},
-        {UART3, RCU_UART3},
-        {UART4, RCU_UART4},
-        {USART5, RCU_USART5},
-        {UART6, RCU_UART6},
-        {UART7, RCU_UART7},
+        {USART0, RCU_USART0}, {USART1, RCU_USART1}, {USART2, RCU_USART2}, {UART3, RCU_UART3},
+        {UART4, RCU_UART4},   {USART5, RCU_USART5}, {UART6, RCU_UART6},   {UART7, RCU_UART7},
 
     };
     static const struct {
@@ -190,14 +179,10 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
         IRQn_Type irqn;
 
     } dev_irqn_map[] = {
-        {USART0, RCU_USART0, USART0_IRQn},
-        {USART1, RCU_USART1, USART1_IRQn},
-        {USART2, RCU_USART2, USART2_IRQn},
-        {UART3, RCU_UART3, UART3_IRQn},
-        {UART4, RCU_UART4, UART4_IRQn},
-        {USART5, RCU_USART5, USART5_IRQn},
-        {UART6, RCU_UART6, UART6_IRQn},
-        {UART7, RCU_UART7, UART7_IRQn},
+        {USART0, RCU_USART0, USART0_IRQn}, {USART1, RCU_USART1, USART1_IRQn},
+        {USART2, RCU_USART2, USART2_IRQn}, {UART3, RCU_UART3, UART3_IRQn},
+        {UART4, RCU_UART4, UART4_IRQn},    {USART5, RCU_USART5, USART5_IRQn},
+        {UART6, RCU_UART6, UART6_IRQn},    {UART7, RCU_UART7, UART7_IRQn},
     };
 
     uint8_t is_found = 0;
@@ -220,18 +205,18 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
     usart_stop_bit_set(ptrDevUartHandle->base, USART_STB_1BIT);
     usart_parity_config(ptrDevUartHandle->base, USART_PM_NONE);
     usart_baudrate_set(ptrDevUartHandle->base, ptrDevUartHandle->baudrate);
-    usart_receive_config(ptrDevUartHandle->base, USART_RECEIVE_ENABLE);
+    // usart_receive_config(ptrDevUartHandle->base, USART_RECEIVE_ENABLE);
     usart_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_ENABLE);
 
     usart_receiver_timeout_enable(ptrDevUartHandle->base);
     usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_RT);
-    if (ptrDevUartHandle->base == USART0 || ptrDevUartHandle->base == USART1 || 
+    if (ptrDevUartHandle->base == USART0 || ptrDevUartHandle->base == USART1 ||
         ptrDevUartHandle->base == USART2 || ptrDevUartHandle->base == USART5) {
-            usart_receiver_timeout_threshold_config(ptrDevUartHandle->base, ptrDevUartHandle->idle_timeout);
-        }
-    else
-    {
-        usart_interrupt_enable(ptrDevUartHandle->base, USART_INT_IDLE);  // Enable error interrupt for other UARTs
+        usart_receiver_timeout_threshold_config(ptrDevUartHandle->base,
+                                                ptrDevUartHandle->idle_timeout);
+    } else {
+        usart_interrupt_enable(ptrDevUartHandle->base,
+                               USART_INT_IDLE);  // Enable error interrupt for other UARTs
     }
 
     usart_enable(ptrDevUartHandle->base);
@@ -241,8 +226,9 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
         status->dev_cfg        = ptrDevUartHandle;  // Store the handle
         if (status->handle == NULL) {
             printf(
-                "[FAULT]DevUartInit: handle %s (%x) is NULL.Should call DevUartRegister() before using UART.\r\n", ptrDevUartHandle->device_name,
-                ptrDevUartHandle->base);
+                "[FAULT]DevUartInit: handle %s (%x) is NULL.Should call DevUartRegister() before "
+                "using UART.\r\n",
+                ptrDevUartHandle->device_name, ptrDevUartHandle->base);
             while (1);
         }
     } else {
@@ -257,29 +243,34 @@ void DevUartDeinit(const DevUartHandleStruct *ptrDevUartHandle) {
     usart_deinit(ptrDevUartHandle->base);
 }
 
-void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle) {
+void DevUartStart(const DevUartHandleStruct *ptrDevUartHandle) {
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
     if (status == NULL) {
         printf("Failed to find UART status for base %x\r\n", ptrDevUartHandle->base);
         return;
     }
     if (!status->is_initialized) {
-        printf("UART %s (%x) is not initialized. Call DevUartInit() first.\r\n", ptrDevUartHandle->device_name,
-               ptrDevUartHandle->base);
+        printf("UART %s (%x) is not initialized. Call DevUartInit() first.\r\n",
+               ptrDevUartHandle->device_name, ptrDevUartHandle->base);
         return;
     }
     if (status->handle == NULL) {
         printf(
-            "[FAULT]DevUarStart: handle %s (%x) is NULL. Should call DevUartRegister() before using UART.\r\n",
+            "[FAULT]DevUartStart: handle %s (%x) is NULL. Should call DevUartRegister() before "
+            "using UART.\r\n",
             ptrDevUartHandle->device_name, ptrDevUartHandle->base);
         while (1);
     }
+
     if (status) {
         status->is_opened  = 1;  // Mark as opened
         status->is_started = 1;  // Mark as started
+        usart_receive_config(ptrDevUartHandle->base, USART_RECEIVE_ENABLE);
+        usart_transmit_config(ptrDevUartHandle->base, USART_TRANSMIT_ENABLE);
     }
 }
-void DevUartDMARecive(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *data, size_t len) {
+void DevUartDMARecive(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *data,
+                      size_t len) {
     if (ptrDevUartHandle == NULL || data == NULL || len == 0) {
         printf(
             "Invalid parameters for "

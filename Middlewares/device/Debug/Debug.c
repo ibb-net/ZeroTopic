@@ -183,7 +183,7 @@ void DebugDeviceInit(void) {
             printf("create %s mutex failed!\r\n", uart_handle->device_name);
             return;
         }
-        DevUarStart(&(DebugBspCfg[i].uart_cfg));
+        // DevUartStart(&(DebugBspCfg[i].uart_cfg));
     }
 
     elog_start();
@@ -215,8 +215,9 @@ static void DebugRcvHandle(void *msg) {
     vfb_message_t tmp_msg          = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
         case DebugStart: {
-            elog_i(TAG, "DebugStart %d", tmp_msg->frame->head.data);
             DebugStatus[0].ready = 1;
+            DevUartStart(&(DebugBspCfg[0].uart_cfg));
+            elog_i(TAG, "DebugStart %d", tmp_msg->frame->head.data);
         } break;
         case DebugStop: {
         } break;

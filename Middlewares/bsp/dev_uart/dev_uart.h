@@ -36,7 +36,7 @@ void DevUartRegister(uint32_t base, void *handle);
 void DevUartPreInit(const DevUartHandleStruct *ptrDevUartHandle);
 void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle);
 void DevUartDeinit(const DevUartHandleStruct *ptrDevUartHandle);
-void DevUarStart(const DevUartHandleStruct *ptrDevUartHandle);
+void DevUartStart(const DevUartHandleStruct *ptrDevUartHandle);
 void DevUartDMASend(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *data, size_t len);
 void DevUartDMARecive(const DevUartHandleStruct *ptrDevUartHandle, const uint8_t *data, size_t len) ;
 

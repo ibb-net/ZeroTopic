@@ -194,7 +194,7 @@ void UartDeviceInit(void) {
             elog_e(TAG, "create %s mutex failed!\r\n", uart_handle->device_name);
             return;
         }
-        DevUarStart(&(UartBspCfg[i].uart_cfg));
+        DevUartStart(&(UartBspCfg[i].uart_cfg));
     }
 }
 // SYSTEM_REGISTER_INIT(MCUInitStage, UartPriority, UartDeviceInit, UartDeviceInit);
