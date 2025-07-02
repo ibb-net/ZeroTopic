@@ -181,7 +181,7 @@ static uint32_t __adc_channel_sample(uint8_t channel) {
 static void __McuadcCycHandle(void) {
     TypdefMcuadcStatus *McuadcStatusHandle = &McuadcStatus[0];
     static uint32_t counter                = 0;
-    static double voltage_sum               = 0.0f;
+    static double voltage_sum               = 0.0;
     if (McuadcStatusHandle == NULL) {
         elog_e(TAG, "[ERROR]McuadcStatusHandle NULL");
         return;
@@ -189,16 +189,16 @@ static void __McuadcCycHandle(void) {
     if (counter < 10) {
         uint32_t sample_value = 1;
         sample_value          = __adc_channel_sample(ADC_CHANNEL_15);
-        double Voltage         = (double)sample_value / 4095 * 3.3f;
+        double Voltage         = (double)sample_value / 4095.0 * 3.3;
         voltage_sum += Voltage;
         counter++;
         return;  // 等待10次
     }
     if (counter == 10) {
         // 第10次采样，打印平均值
-        double average_voltage = voltage_sum / 10.0f * 22;
+        double average_voltage = voltage_sum / 10.0 * 22.0;
         elog_d(TAG, "ADC Channel 15 Average Voltage: %.2f V", average_voltage);
-        voltage_sum = 0.0f;  // 重置电压和计数器
+        voltage_sum = 0.0;  // 重置电压和计数器
         counter     = 0;
         // ADCUpdate
         McuadcStatusHandle->value = average_voltage;  // 更新ADC状态值

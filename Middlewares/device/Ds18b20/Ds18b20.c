@@ -127,7 +127,7 @@ static void __Ds18b20InitHandle(void *msg) {
     elog_set_filter_tag_lvl(TAG, Ds18b20LogLvl);
     Ds18b20Status[0].status      = 0;        // Initialize status
     Ds18b20Status[0].step        = 0;        // Initialize step
-    Ds18b20Status[0].temperature = -100.0f;  // Initialize temperature
+    Ds18b20Status[0].temperature = -100.0;  // Initialize temperature
 
     vTaskDelay(pdMS_TO_TICKS(500));  // Delay to ensure all devices are initialized before starting the task
     vfb_send(Ds18b20Start, 0, NULL, 0);
@@ -275,7 +275,7 @@ static double CmdDs18b20Read(uint8_t state) {
     //        scratchpad[4], scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
 
     uint16_t temp = 0;
-    double f_tem   = 0.0f;
+    double f_tem   = 0.0;
     temp          = scratchpad[1] << 8;
     temp |= scratchpad[0];  // Combine the two bytes
     if (temp < 0)           /* 负温度 */

@@ -217,6 +217,7 @@ void DACSgm3533DeviceInit(void) {
         DACSgm3533DSPISend(i, 0x0000);  // Send initial data to clear the buffer
         elog_i(TAG, "DACSgm3533[%d] device_name: %s, spi_base: 0x%08X", i,
                DACSgm3533StatusHandle->device_name, DACSgm3533StatusHandle->cfg.spi_cfg.base);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 SYSTEM_REGISTER_INIT(MCUInitStage, DACSgm3533Priority, DACSgm3533DeviceInit, DACSgm3533DeviceInit);

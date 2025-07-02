@@ -33,9 +33,9 @@
 #define AVG_MAX_CNT (10)
 
 const double f_gain_map[] = {
-    [SGM58601_GAIN_1] = 1.0f,   [SGM58601_GAIN_2] = 2.0f,     [SGM58601_GAIN_4] = 4.0f,
-    [SGM58601_GAIN_8] = 8.0f,   [SGM58601_GAIN_16] = 16.0f,   [SGM58601_GAIN_32] = 32.0f,
-    [SGM58601_GAIN_64] = 64.0f, [SGM58601_GAIN_128] = 128.0f,
+    [SGM58601_GAIN_1] = 1.0,   [SGM58601_GAIN_2] = 2.0,     [SGM58601_GAIN_4] = 4.0,
+    [SGM58601_GAIN_8] = 8.0,   [SGM58601_GAIN_16] = 16.0,   [SGM58601_GAIN_32] = 32.0,
+    [SGM58601_GAIN_64] = 64.0, [SGM58601_GAIN_128] = 128.0,
 };
 typedef struct {
     uint8_t channel;  // Channel number
@@ -292,7 +292,7 @@ static void __sgm5860xCycHandle(void) {
                     }
 
                     // 计算剩余6个的平均值
-                    double sum = 0.0f;
+                    double sum = 0.0;
                     int cnt   = 0;
                     for (int j = 0; j < AVG_MAX_CNT; j++) {
                         if (j != max1_idx && j != max2_idx && j != min1_idx && j != min2_idx) {
@@ -301,9 +301,9 @@ static void __sgm5860xCycHandle(void) {
                         }
                     }
                     if (cnt > 0) {
-                        sgm5860xStatus.average[i] = sum / cnt;
+                        sgm5860xStatus.average[i] = sum / (double)cnt;
                     } else {
-                        sgm5860xStatus.average[i] = 0.0f;
+                        sgm5860xStatus.average[i] = 0.0;
                     }
                     elog_d(TAG,
                            "Channel %d cnt %d ,tmp_voltage: %.7f, %.7f, %.7f, %.7f, %.7f, %.7f, "
@@ -312,10 +312,8 @@ static void __sgm5860xCycHandle(void) {
                            sgm5860xStatus.tmp_voltage[i][2], sgm5860xStatus.tmp_voltage[i][3],
                            sgm5860xStatus.tmp_voltage[i][4], sgm5860xStatus.tmp_voltage[i][5],
                            sgm5860xStatus.tmp_voltage[i][6], sgm5860xStatus.tmp_voltage[i][7]);
-                    // sgm5860xStatus.average[i] = sgm5860xStatus.sum[i] /
-                    // sgm5860xStatus.vol_index[i];
                     sgm5860xStatus.vol_index[i] = 0;  // Reset the index after averaging
-                    sgm5860xStatus.sum[i]       = 0;  // Reset the sum after averaging
+                    sgm5860xStatus.sum[i]       = 0.0;  // Reset the sum after averaging
                     vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.average[i]),
                              sizeof(last_voltage));
                     elog_d(TAG, " Index %d Channel %d, Gain %.0f, Voltage: %.7f V", last_index,
@@ -366,7 +364,7 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
         for (int i = 0; i < sgm5860xChannelMax; i++) {
             elog_i(TAG, "Index %d Channel %d: Voltage = %.7f V %.4f mV, %.1f uV", i,
                    sgm5860_channelcfg[i].channel, sgm5860xStatus.average[i],
-                   sgm5860xStatus.average[i] * 1000.0f, sgm5860xStatus.average[i] * 1000000.0f);
+                   sgm5860xStatus.average[i] * 1000.0, sgm5860xStatus.average[i] * 1000000.0);
         }
         return 0;
     }

@@ -29,9 +29,10 @@
 
 /* =====================================================================================
  */
-#define VREF_VOLTAGE         (5.0f)        // Reference voltage for ADC 2*2.5V
-#define PGA_GAIN             1.0f          // Gain for PGA (Programmable Gain Amplifier)
-#define ADC_24BIT_MAX        (8388608.0f)  // Maximum value for 24-bit ADC
+#define VREF_VOLTAGE         (5.0)      // Reference voltage for ADC 2*2.5V
+#define PGA_GAIN             1.0        // Gain for PGA (Programmable Gain Amplifier)
+#define ADC_24BIT_MAX_INT    8388608    // 2^23 整数版本
+#define ADC_24BIT_MAX_DOUBLE 8388608.0  // 浮点版本，仅用于最终计算
 #define SGM5860_WAIT_TIME_US 1000
 
 const double gaim_map[SGM58601_GAIN_MAX] = {1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0};
@@ -222,29 +223,29 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
         .bits.DIR = 0   // Digital Input/Output Direction
     };
     elog_i(TAG, "DevSgm5860xConfig: Configuring SGM58601 registers");
-    elog_i(TAG, "Config Status Register: 0x%02X", status_reg.raw);
+    elog_d(TAG, "Config Status Register: 0x%02X", status_reg.raw);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&status_reg,
                         sizeof(status_reg));
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&status_reg,
                        sizeof(status_reg));
-    elog_i(TAG, "Read Status Register: 0x%02X", status_reg.raw);
+    elog_d(TAG, "Read Status Register: 0x%02X", status_reg.raw);
 
-    elog_i(TAG, "Config MUX Register: 0x%02X", mux_reg.raw);
+    elog_d(TAG, "Config MUX Register: 0x%02X", mux_reg.raw);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg, sizeof(mux_reg));
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg, sizeof(mux_reg));
-    elog_i(TAG, "Read MUX Register: 0x%02X", mux_reg.raw);
-    elog_i(TAG, "Config ADCON Register: 0x%02X", adcon_reg.raw);
+    elog_d(TAG, "Read MUX Register: 0x%02X", mux_reg.raw);
+    elog_d(TAG, "Config ADCON Register: 0x%02X", adcon_reg.raw);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
                         sizeof(adcon_reg));
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
                        sizeof(adcon_reg));
-    elog_i(TAG, "Read ADCON Register: 0x%02X", adcon_reg.raw);
-    elog_i(TAG, "Config DRATE Register: 0x%02X", drate_reg.raw);
+    elog_d(TAG, "Read ADCON Register: 0x%02X", adcon_reg.raw);
+    elog_d(TAG, "Config DRATE Register: 0x%02X", drate_reg.raw);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&drate_reg,
                         sizeof(drate_reg));
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&drate_reg,
                        sizeof(drate_reg));
-    elog_i(TAG, "Read DRATE Register: 0x%02X", drate_reg.raw);
+    elog_d(TAG, "Read DRATE Register: 0x%02X", drate_reg.raw);
 }
 
 int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *last_voltage,
@@ -276,9 +277,13 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
     }
     mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;
     mux_reg.bits.PSEL  = channel;
-    adcon_reg.bits.PGA = gaim_map[gain];
-    elog_d(TAG, "DevGetADCData[%u]:Set channel %d PGA gain %d ,mux raw 0x%02x ", cyc, channel,
-           adcon_reg.bits.PGA, mux_reg.raw);
+    adcon_reg.bits.PGA = gain;
+    if (adcon_reg.bits.PGA > 1) {
+        elog_d(TAG, "DevGetADCData[%u]:Set channel %d PGA gain %d ,mux raw 0x%02x ", cyc,
+        channel,
+               adcon_reg.bits.PGA, mux_reg.raw);
+    }
+
     SGM5860xMuxReg_t tmp_mux_reg;
     SGM5860xAdconReg_t tmp_adcon_reg;
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&tmp_mux_reg,
@@ -287,9 +292,11 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&tmp_adcon_reg,
                        sizeof(tmp_adcon_reg));  // Read ADCON register
     uint8_t tmp_channel = tmp_mux_reg.bits.PSEL & 0x0F;
-    double tmp_gain      = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
-
-    elog_d(TAG, "Last MUX Register: Channel %d", tmp_channel);
+    double tmp_gain     = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
+    if (tmp_gain > 1) {
+        elog_d(TAG, "Last MUX Register: Channel %d Read Gain %.2f", tmp_channel,
+               tmp_gain);
+    }
 
     // Write data to register
     elog_d(TAG, "DevGetADCData: MUX Register get to 0x%02X", mux_reg.raw);
@@ -304,19 +311,22 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
     int hex_data =
         (rcv_data[1] << 16) | (rcv_data[2] << 8) | rcv_data[3];  // Combine the received data
     elog_d(TAG, "DevGetADCData: Received data: 0x%06X", hex_data);
-    double voltage = 0.0f;
-    if (hex_data & 0x800000) {                             // Check if the sign bit is set
-        hex_data = ADC_24BIT_MAX - (hex_data - 0x800000);  // Convert to positive value
-        voltage  = (-1) * hex_data * VREF_VOLTAGE / (ADC_24BIT_MAX) / tmp_gain;
+    double voltage = 0.0;
+    if (hex_data & 0x800000) {                                 // Check if the sign bit is set
+        hex_data = ADC_24BIT_MAX_INT - (hex_data - 0x800000);  // Convert to positive value
+        double hex_data_double = (double)hex_data;             // Convert to double for calculation
+        voltage = (-1) * hex_data_double * VREF_VOLTAGE / (ADC_24BIT_MAX_DOUBLE) / tmp_gain;
     } else {
-        voltage = hex_data * VREF_VOLTAGE / (ADC_24BIT_MAX) / tmp_gain;  // Calculate voltage
+        double hex_data_double = (double)hex_data;  // Convert to double for calculation
+        voltage                = hex_data_double * VREF_VOLTAGE / (ADC_24BIT_MAX_DOUBLE) /
+                  tmp_gain;  // Calculate voltage
     }
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
                         sizeof(mux_reg));  // Write MUX register
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
                         sizeof(adcon_reg));  // Write ADCON register    //
     elog_d(TAG, "DevGetADCData: Calculated voltage: %.10f V %.3f mv  Gain: %.2f", voltage,
-           voltage * 1000, gain);
+           voltage * 1000.0, gain);
     elog_d(TAG,
            "rcv_data 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X "
            "0x%02X 0x%02X 0x%02X 0x%02X 0x%02X",

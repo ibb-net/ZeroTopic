@@ -19,7 +19,18 @@ static vfb_info_struct __vfb_info;
 static List_t *__vfb_list_get_head(vfb_event_t event);
 static int __vfb_list_add_queue(List_t *queue_list, QueueHandle_t queue_handle);
 ListItem_t *__vfb_list_find_queue(List_t *queue_list, QueueHandle_t queue_handle);
-
+uint8_t error_report(uint8_t state) {
+// #include "gpio.h"
+//     if(state == 0) {
+//         gpio_bit_write(GPIOC, GPIO_PIN_14, GPIO_PIN_RESET);
+//         return state;
+//     }
+//     else
+//     {
+//         gpio_bit_write(GPIOC, GPIO_PIN_14, GPIO_PIN_SET);
+//     }
+    return state;
+}
 /**
  * @brief Get the head of the event list
  *
@@ -231,11 +242,13 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
         List_t *event_list = __vfb_list_get_head(event);
         if (event_list == NULL) {
             VFB_E("Failed to get event list for event %u", event);
+            error_report(1);
             __vfb_givelock(mode);
             return FD_FAIL;
         }
         if (listCURRENT_LIST_LENGTH(event_list) == 0) {
             VFB_W("No queues subscribed for event %u\r\n", event);
+            error_report(1);
             __vfb_givelock(mode);
             return FD_FAIL;
         }
