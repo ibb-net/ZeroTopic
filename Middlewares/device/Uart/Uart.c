@@ -191,8 +191,8 @@ void UartDeviceInit(void) {
             elog_e(TAG, "create %s mutex failed!\r\n", uart_handle->device_name);
             return;
         }
-        DevUartDMARecive(&(UartBspCfg[i].uart_cfg), uart_handle->rx_buffer,
-                         UartBspCfg[i].buffer_size);
+        // DevUartDMARecive(&(UartBspCfg[i].uart_cfg), uart_handle->rx_buffer,
+        //                  UartBspCfg[i].buffer_size);
     }
 }
 // SYSTEM_REGISTER_INIT(MCUInitStage, UartPriority, UartDeviceInit, UartDeviceInit);
@@ -224,7 +224,11 @@ static void UartRcvHandle(void *msg) {
     switch (tmp_msg->frame->head.event) {
         case UartStart: {
             elog_i(TAG, "UartStart %d", tmp_msg->frame->head.data);
+            DevUartDMARecive(&(UartBspCfg[0].uart_cfg), uart_handle->rx_buffer,
+                             UartBspCfg[0].buffer_size);
+            elog_i(TAG, "Uart Rcv Init Done");
             DevUartStart(&(UartBspCfg[0].uart_cfg));
+            elog_i(TAG, "Uart DevUartStart Init Done");
 
         } break;
         case UartStop: {
@@ -288,26 +292,28 @@ static void __UartRXISRHandle(void *arg) {
     channelx                     = uart_handle->UartBspCfg->uart_cfg.rx_dma_channel;
     uint32_t dma_transfer_number = dma_transfer_number_get(dma_periph, channelx);
     if (dma_transfer_number == 0) {
-        printf("\r\n[ERROR]DMA transfer number is zero, no data received.\r\n");
+        printf("\r\n[ERROR]Common UartDMA transfer number is zero, no data received.\r\n");
     }
     int rx_count = uart_handle->buffer_size - dma_transfer_number;
     // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count,
     // uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
         printf(
-            "\r\n[ERROR]Uart RX count is zero or negative, buffer_size = %d, dma_transfer_number = "
+            "\r\n[ERROR]Common Uart RX count is zero or negative, buffer_size = %d, "
+            "dma_transfer_number = "
             "%d\r\n",
             uart_handle->buffer_size, dma_transfer_number);
     } else if (rx_count > uart_handle->buffer_size) {
         printf(
-            "\r\n[ERROR]Uart RX count is greater than buffer_size, buffer_size = %d, rx_count = "
+            "\r\n[ERROR]Common Uart RX count is greater than buffer_size, buffer_size = %d, "
+            "rx_count = "
             "%d\r\n",
             uart_handle->buffer_size, rx_count);
     } else {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         if (xStreamBufferSendFromISR(uart_handle->rx_stream_buffer, uart_handle->rx_buffer,
                                      rx_count, &xHigherPriorityTaskWoken) == 0) {
-            printf("\r\n[ERROR]Failed to send data to stream buffer from ISR\r\n");
+            printf("\r\n[ERROR]Common uart Failed to send data to stream buffer from ISR\r\n");
         }
         DevUartDMARecive(&(uart_handle->UartBspCfg->uart_cfg), uart_handle->rx_buffer,
                          uart_handle->buffer_size);

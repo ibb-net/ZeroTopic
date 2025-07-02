@@ -74,11 +74,9 @@ uint8_t DevPinRead(const DevPinHandleStruct *ptrDevPinHandle) {
 }
 
 void DevErrorLED(uint8_t is_on) {
-    // 假设错误LED连接在GPIOC的第13引脚
-    if (is_on) {
-        gpio_bit_write(GPIOC, GPIO_PIN_14, SET);  // 打开错误LED
-    } else {
-        gpio_bit_write(GPIOC, GPIO_PIN_14, RESET);  // 关闭错误LED
-    }
+    rcu_periph_clock_enable(RCU_GPIOC);
+    gpio_bit_write(GPIOC, GPIO_PIN_14, is_on ? SET : RESET);
+    gpio_mode_set(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO_PIN_14);
+    gpio_output_options_set(GPIOC, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, GPIO_PIN_14);
 }
 #endif

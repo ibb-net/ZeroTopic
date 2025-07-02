@@ -82,12 +82,22 @@ void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
         return;
     }
     elog_i(TAG, "DevSgm5860xReset: Device reset Started");
-
+    uint32_t timeout = SGM5860_WAIT_TIME_US;
     DevPinWrite(&ptrDevSgm5860xHandle->nest, 0);  // Set NEST pin low
     DevDelayUs(100);                              // Wait for 100 microseconds
     DevPinWrite(&ptrDevSgm5860xHandle->nest, 1);  // Set NEST pin high
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0);
-    elog_i(TAG, "DevSgm5860xReset: Device reset completed");
+    while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0) {
+        DevDelayUs(1);
+        timeout--;
+        if (timeout == 0) {
+            break;
+        }
+    }
+    if (timeout == 0) {
+        elog_e(TAG, "DevSgm5860xReset: Timeout waiting for DRDY after reset");
+    } else {
+        elog_i(TAG, "DevSgm5860xReset: Device reset completed");
+    }
 }
 int DevSgm5860xCMDReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t regaddr) {
     uint8_t snd_data[16] = {0};
@@ -279,8 +289,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
     mux_reg.bits.PSEL  = channel;
     adcon_reg.bits.PGA = gain;
     if (adcon_reg.bits.PGA > 1) {
-        elog_d(TAG, "DevGetADCData[%u]:Set channel %d PGA gain %d ,mux raw 0x%02x ", cyc,
-        channel,
+        elog_d(TAG, "DevGetADCData[%u]:Set channel %d PGA gain %d ,mux raw 0x%02x ", cyc, channel,
                adcon_reg.bits.PGA, mux_reg.raw);
     }
 
@@ -294,8 +303,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
     uint8_t tmp_channel = tmp_mux_reg.bits.PSEL & 0x0F;
     double tmp_gain     = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
     if (tmp_gain > 1) {
-        elog_d(TAG, "Last MUX Register: Channel %d Read Gain %.2f", tmp_channel,
-               tmp_gain);
+        elog_d(TAG, "Last MUX Register: Channel %d Read Gain %.2f", tmp_channel, tmp_gain);
     }
 
     // Write data to register

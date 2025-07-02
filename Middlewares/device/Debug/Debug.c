@@ -172,8 +172,6 @@ void DebugDeviceInit(void) {
             while (1);
             return;
         }
-        DevUartDMARecive(&(DebugBspCfg[i].uart_cfg), uart_handle->rx_buffer,
-                         DebugBspCfg[i].buffer_size);
 
         memset(uart_handle->device_name, 0, sizeof(uart_handle->device_name));
         snprintf(uart_handle->device_name, sizeof(uart_handle->device_name), "Debug%d", i);
@@ -183,6 +181,8 @@ void DebugDeviceInit(void) {
             printf("create %s mutex failed!\r\n", uart_handle->device_name);
             return;
         }
+        DevUartDMARecive(&(DebugBspCfg[i].uart_cfg), uart_handle->rx_buffer,
+                         DebugBspCfg[i].buffer_size);
         // DevUartStart(&(DebugBspCfg[i].uart_cfg));
     }
 
@@ -216,6 +216,8 @@ static void DebugRcvHandle(void *msg) {
     switch (tmp_msg->frame->head.event) {
         case DebugStart: {
             DebugStatus[0].ready = 1;
+            // DevUartDMARecive(&(DebugBspCfg[0].uart_cfg), uart_handle->rx_buffer,
+            //                  DebugBspCfg[0].buffer_size);
             DevUartStart(&(DebugBspCfg[0].uart_cfg));
             elog_i(TAG, "DebugStart %d", tmp_msg->frame->head.data);
         } break;
@@ -292,8 +294,7 @@ static void __DebugRXISRHandle(void *arg) {
     // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count,
     // uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
-        DevErrorLED(1);  // Turn on error LED if no data received
-        printf("Debug RX count is zero or negative, no data received.\r\n");
+        // DevErrorLED(1);  // Turn on error LED if no data received
     } else {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         if (xStreamBufferSendFromISR(uart_handle->rx_stream_buffer, uart_handle->rx_buffer,
@@ -302,6 +303,7 @@ static void __DebugRXISRHandle(void *arg) {
         }
         DevUartDMARecive(&(uart_handle->DebugBspCfg->uart_cfg), uart_handle->rx_buffer,
                          uart_handle->buffer_size);
+        DevErrorLED(0);
     }
 }
 static void __DebugTXDMAISRHandle(void *arg) {
