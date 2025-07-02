@@ -6,21 +6,13 @@
 #include "dev_basic.h"
 
 void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle) {
-    static const struct
-    {
+    static const struct {
         uint32_t gpio_base;
         rcu_periph_enum rcu_clock;
     } dev_clock_map[] = {
-        {GPIOA, RCU_GPIOA},
-        {GPIOB, RCU_GPIOB},
-        {GPIOC, RCU_GPIOC},
-        {GPIOD, RCU_GPIOD},
-        {GPIOE, RCU_GPIOE},
-        {GPIOF, RCU_GPIOF},
-        {GPIOG, RCU_GPIOG},
-        {GPIOH, RCU_GPIOH},
-        {GPIOJ, RCU_GPIOJ},
-        {GPIOK, RCU_GPIOK},
+        {GPIOA, RCU_GPIOA}, {GPIOB, RCU_GPIOB}, {GPIOC, RCU_GPIOC}, {GPIOD, RCU_GPIOD},
+        {GPIOE, RCU_GPIOE}, {GPIOF, RCU_GPIOF}, {GPIOG, RCU_GPIOG}, {GPIOH, RCU_GPIOH},
+        {GPIOJ, RCU_GPIOJ}, {GPIOK, RCU_GPIOK},
     };
 
     uint8_t is_found = 0;
@@ -46,17 +38,22 @@ void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle) {
         /* 配置为复用功能 */
         gpio_af_set(ptrDevPinHandle->base, ptrDevPinHandle->af, ptrDevPinHandle->pin);
         gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_AF, GPIO_PUPD_NONE, ptrDevPinHandle->pin);
-        gpio_output_options_set(ptrDevPinHandle->base, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, ptrDevPinHandle->pin);
+        gpio_output_options_set(ptrDevPinHandle->base, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ,
+                                ptrDevPinHandle->pin);
     } else {
         if (ptrDevPinHandle->pin_mode == DevPinModeInput) {
             /* 配置为输入 */
-            gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, ptrDevPinHandle->pin);
+            gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP,
+                          ptrDevPinHandle->pin);
 
         } else if (ptrDevPinHandle->pin_mode == DevPinModeOutput) {
             /* 配置为普通输出 */
-            gpio_bit_write(ptrDevPinHandle->base, ptrDevPinHandle->pin, ptrDevPinHandle->bit_value ? SET : RESET);
-            gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, ptrDevPinHandle->pin);
-            gpio_output_options_set(ptrDevPinHandle->base, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, ptrDevPinHandle->pin);
+            gpio_bit_write(ptrDevPinHandle->base, ptrDevPinHandle->pin,
+                           ptrDevPinHandle->bit_value ? SET : RESET);
+            gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP,
+                          ptrDevPinHandle->pin);
+            gpio_output_options_set(ptrDevPinHandle->base, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ,
+                                    ptrDevPinHandle->pin);
         } else {
             // do nothing
         }
@@ -76,4 +73,12 @@ uint8_t DevPinRead(const DevPinHandleStruct *ptrDevPinHandle) {
     return (gpio_input_bit_get(ptrDevPinHandle->base, ptrDevPinHandle->pin) == SET) ? 1 : 0;
 }
 
+void DevErrorLED(uint8_t is_on) {
+    // 假设错误LED连接在GPIOC的第13引脚
+    if (is_on) {
+        gpio_bit_write(GPIOC, GPIO_PIN_14, SET);  // 打开错误LED
+    } else {
+        gpio_bit_write(GPIOC, GPIO_PIN_14, RESET);  // 关闭错误LED
+    }
+}
 #endif

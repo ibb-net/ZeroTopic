@@ -220,6 +220,7 @@ void DevUartInit(const DevUartHandleStruct *ptrDevUartHandle) {
     }
 
     usart_enable(ptrDevUartHandle->base);
+    printf("UART %s (%x) initialized successfully.\r\n", ptrDevUartHandle->device_name, ptrDevUartHandle->base);
     DevUartStatusStruct *status = __DevUartGetStatus(ptrDevUartHandle->base);
     if (status) {
         status->is_initialized = 1;                 // Mark as initialized

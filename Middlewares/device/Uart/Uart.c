@@ -182,8 +182,6 @@ void UartDeviceInit(void) {
             while (1);
             return;
         }
-        DevUartDMARecive(&(UartBspCfg[i].uart_cfg), uart_handle->rx_buffer,
-                         UartBspCfg[i].buffer_size);
 
         memset(uart_handle->device_name, 0, sizeof(uart_handle->device_name));
         snprintf(uart_handle->device_name, sizeof(uart_handle->device_name), "Uart%d", i);
@@ -193,6 +191,8 @@ void UartDeviceInit(void) {
             elog_e(TAG, "create %s mutex failed!\r\n", uart_handle->device_name);
             return;
         }
+        DevUartDMARecive(&(UartBspCfg[i].uart_cfg), uart_handle->rx_buffer,
+                         UartBspCfg[i].buffer_size);
     }
 }
 // SYSTEM_REGISTER_INIT(MCUInitStage, UartPriority, UartDeviceInit, UartDeviceInit);
@@ -263,9 +263,7 @@ static void UartRcvHandle(void *msg) {
 }
 
 // 超时处理的回调函数
-static void UartCycHandle(void) {
-
-}
+static void UartCycHandle(void) {}
 // UartStreamRcvTask
 void UartStreamRcvTask(void *arg) {
     TypdefUartStatus *uart_handle = &UartStatus[0];
@@ -279,7 +277,6 @@ void UartStreamRcvTask(void *arg) {
             vfb_send(UartRcv, 0, uart_handle->rx_buffer_for_vfb, rcv_count);
             memset(uart_handle->rx_buffer_for_vfb, 0, rcv_count);
         }
-        
     }
 }
 static void __UartRXISRHandle(void *arg) {
@@ -297,11 +294,16 @@ static void __UartRXISRHandle(void *arg) {
     // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count,
     // uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
-        printf("\r\n[ERROR]Uart RX count is zero or negative, no data received.\r\n");
+        printf(
+            "\r\n[ERROR]Uart RX count is zero or negative, buffer_size = %d, dma_transfer_number = "
+            "%d\r\n",
+            uart_handle->buffer_size, dma_transfer_number);
+    } else if (rx_count > uart_handle->buffer_size) {
+        printf(
+            "\r\n[ERROR]Uart RX count is greater than buffer_size, buffer_size = %d, rx_count = "
+            "%d\r\n",
+            uart_handle->buffer_size, rx_count);
     } else {
-        /* BaseType_t xQueueSendFromISR( QueueHandle_t xQueue,
-const void *pvItemToQueue,
-BaseType_t *pxHigherPriorityTaskWoken ); */
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         if (xStreamBufferSendFromISR(uart_handle->rx_stream_buffer, uart_handle->rx_buffer,
                                      rx_count, &xHigherPriorityTaskWoken) == 0) {

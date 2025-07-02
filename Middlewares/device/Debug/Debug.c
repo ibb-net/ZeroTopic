@@ -292,11 +292,9 @@ static void __DebugRXISRHandle(void *arg) {
     // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count,
     // uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
+        DevErrorLED(1);  // Turn on error LED if no data received
         printf("Debug RX count is zero or negative, no data received.\r\n");
     } else {
-        /* BaseType_t xQueueSendFromISR( QueueHandle_t xQueue,
-const void *pvItemToQueue,
-BaseType_t *pxHigherPriorityTaskWoken ); */
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         if (xStreamBufferSendFromISR(uart_handle->rx_stream_buffer, uart_handle->rx_buffer,
                                      rx_count, &xHigherPriorityTaskWoken) == 0) {
