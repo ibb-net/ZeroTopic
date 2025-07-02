@@ -86,11 +86,11 @@ typedef union {
 } SGM5860xFsc0Reg_t;      // 0x08 FSC0: Full-Scale Calibration Byte 0
 typedef union {
     struct {
-        uint8_t FSC : 8;  // Bits 0-7: Full-Scale Calibration Byte 2 (Most Significant Byte)
-    } bits;               // Bit-field structure
-    uint8_t raw;          // Raw register value
-} SGM5860xFsc2Reg_t;      // 0x0A FSC2: Full-Scale Calibration Byte 2
-
+        uint8_t FSC : 8;          // Bits 0-7: Full-Scale Calibration Byte 2 (Most Significant Byte)
+    } bits;                       // Bit-field structure
+    uint8_t raw;                  // Raw register value
+} SGM5860xFsc2Reg_t;              // 0x0A FSC2: Full-Scale Calibration Byte 2
+#define SGM_GAIN_128_MAX (0.030)  // 30mv
 // define commands
 #define SGM58601_CMD_WAKEUP   0x00
 #define SGM58601_CMD_RDATA    0x01

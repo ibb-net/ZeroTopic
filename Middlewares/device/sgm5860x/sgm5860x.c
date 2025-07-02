@@ -20,10 +20,10 @@
 #include "os_server.h"
 // #include "app_event.h"
 
-#define TAG            "sgm5860x"
-#define sgm5860xLogLvl ELOG_LVL_INFO
-
-#define sgm5860xPriority PriorityNormalEventGroup0
+#define TAG                           "sgm5860x"
+#define sgm5860xLogLvl                ELOG_LVL_INFO
+#define SGM58601_GAIN_128_MEASURE_MAX (0.030)  // 30mv
+#define sgm5860xPriority              PriorityNormalEventGroup0
 #ifndef sgm5860xChannelMax
 #define sgm5860xChannelMax 4
 #endif
@@ -145,12 +145,12 @@ typedef struct {
     char device_name[DEVICE_NAME_MAX];
     uint32_t id;  // ID
     DevSgm5860xHandleStruct *cfg;
-    uint8_t status;                          // Status of the device
-    uint8_t scan_index;                      // Channel to scan
+    uint8_t status;                           // Status of the device
+    uint8_t scan_index;                       // Channel to scan
     double last_voltage[sgm5860xChannelMax];  // Last voltage read from each channel
     double sum[sgm5860xChannelMax];
     double average[sgm5860xChannelMax];                   // Average voltage for each channel
-    uint8_t vol_index[sgm5860xChannelMax];               // Voltage index for each channel
+    uint8_t vol_index[sgm5860xChannelMax];                // Voltage index for each channel
     double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
 
 } Typdefsgm5860xStatus;
@@ -241,16 +241,32 @@ static void __sgm5860xCycHandle(void) {
     }
     if (sgm5860xStatus.status == 1) {
         // sgm5860xStatus.scan_index
-        double last_voltage   = 0;
-        uint8_t last_channel = 0;
-        uint8_t last_index   = 0;
-        double last_gain      = 0;
+        double last_voltage           = 0;
+        uint8_t last_channel          = 0;
+        uint8_t last_index            = 0;
+        double last_gain              = 0;
+        static uint8_t channel_6_gain = 0;
         uint8_t channel =
             sgm5860_channelcfg[sgm5860xStatus.scan_index].channel;  // Get the current channel
-        uint8_t gain = sgm5860_channelcfg[sgm5860xStatus.scan_index]
-                           .gain;  // Get the gain for the current channel
+        uint8_t gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
         DevGetADCData(&sgm5860_cfg, &last_voltage, &last_channel, channel, gain);
-
+        if (last_channel == 6) {
+            if (last_voltage >= SGM58601_GAIN_128_MEASURE_MAX) {
+                sgm5860_channelcfg[sgm5860xStatus.scan_index].gain = SGM58601_GAIN_64;
+                if (channel_6_gain != SGM58601_GAIN_64) {
+                    elog_i(TAG, "Channel 6 Gain changed to SGM58601_GAIN_64, Voltage: %.7f V",
+                           last_voltage);
+                           channel_6_gain=SGM58601_GAIN_64;
+                }
+            } else {
+                sgm5860_channelcfg[sgm5860xStatus.scan_index].gain = SGM58601_GAIN_128;
+                if (channel_6_gain != SGM58601_GAIN_128) {
+                    elog_i(TAG, "Channel 6 Gain changed to SGM58601_GAIN_128, Voltage: %.7f V",
+                           last_voltage);
+                           channel_6_gain=SGM58601_GAIN_128;
+                }
+            }
+        }
         for (int i = 0; i < sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]); i++) {
             if (sgm5860_channelcfg[i].channel == last_channel) {
                 last_index = i;
@@ -262,10 +278,10 @@ static void __sgm5860xCycHandle(void) {
 
                 sgm5860xStatus.vol_index[i]++;
                 if (sgm5860xStatus.vol_index[i] >= AVG_MAX_CNT) {
-                    double max1   = sgm5860xStatus.tmp_voltage[i][0],
-                          max2   = sgm5860xStatus.tmp_voltage[i][0];
-                    double min1   = sgm5860xStatus.tmp_voltage[i][0],
-                          min2   = sgm5860xStatus.tmp_voltage[i][0];
+                    double max1  = sgm5860xStatus.tmp_voltage[i][0],
+                           max2  = sgm5860xStatus.tmp_voltage[i][0];
+                    double min1  = sgm5860xStatus.tmp_voltage[i][0],
+                           min2  = sgm5860xStatus.tmp_voltage[i][0];
                     int max1_idx = 0, max2_idx = 0, min1_idx = 0, min2_idx = 0;
 
                     // 找到最大和次大，最小和次小的索引
@@ -293,7 +309,7 @@ static void __sgm5860xCycHandle(void) {
 
                     // 计算剩余6个的平均值
                     double sum = 0.0;
-                    int cnt   = 0;
+                    int cnt    = 0;
                     for (int j = 0; j < AVG_MAX_CNT; j++) {
                         if (j != max1_idx && j != max2_idx && j != min1_idx && j != min2_idx) {
                             sum += sgm5860xStatus.tmp_voltage[i][j];
@@ -308,11 +324,12 @@ static void __sgm5860xCycHandle(void) {
                     elog_d(TAG,
                            "Channel %d cnt %d ,tmp_voltage: %.7f, %.7f, %.7f, %.7f, %.7f, %.7f, "
                            "%.7f, %.7f",
-                           i, cnt, sgm5860xStatus.tmp_voltage[i][0], sgm5860xStatus.tmp_voltage[i][1],
-                           sgm5860xStatus.tmp_voltage[i][2], sgm5860xStatus.tmp_voltage[i][3],
-                           sgm5860xStatus.tmp_voltage[i][4], sgm5860xStatus.tmp_voltage[i][5],
-                           sgm5860xStatus.tmp_voltage[i][6], sgm5860xStatus.tmp_voltage[i][7]);
-                    sgm5860xStatus.vol_index[i] = 0;  // Reset the index after averaging
+                           i, cnt, sgm5860xStatus.tmp_voltage[i][0],
+                           sgm5860xStatus.tmp_voltage[i][1], sgm5860xStatus.tmp_voltage[i][2],
+                           sgm5860xStatus.tmp_voltage[i][3], sgm5860xStatus.tmp_voltage[i][4],
+                           sgm5860xStatus.tmp_voltage[i][5], sgm5860xStatus.tmp_voltage[i][6],
+                           sgm5860xStatus.tmp_voltage[i][7]);
+                    sgm5860xStatus.vol_index[i] = 0;    // Reset the index after averaging
                     sgm5860xStatus.sum[i]       = 0.0;  // Reset the sum after averaging
                     vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.average[i]),
                              sizeof(last_voltage));

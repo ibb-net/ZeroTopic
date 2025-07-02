@@ -22,9 +22,9 @@
 #define sgm5860xLogLvl ELOG_LVL_INFO
 
 #define sgm5860xPriority PriorityNormalEventGroup0
-#ifndef sgm5860xChannelMax
-#define sgm5860xChannelMax 8
-#endif
+// #ifndef sgm5860xChannelMax
+// #define sgm5860xChannelMax 8
+// #endif
 #endif
 
 /* =====================================================================================
@@ -255,7 +255,7 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
                         sizeof(drate_reg));
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&drate_reg,
                        sizeof(drate_reg));
-    elog_d(TAG, "Read DRATE Register: 0x%02X", drate_reg.raw);
+    elog_i(TAG, "Read DRATE Register: 0x%02X", drate_reg.raw);
 }
 
 int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *last_voltage,
@@ -329,6 +329,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
         voltage                = hex_data_double * VREF_VOLTAGE / (ADC_24BIT_MAX_DOUBLE) /
                   tmp_gain;  // Calculate voltage
     }
+
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
                         sizeof(mux_reg));  // Write MUX register
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
