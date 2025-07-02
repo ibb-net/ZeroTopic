@@ -214,9 +214,7 @@ static void UartInitHandle(void *msg) {
     vfb_send(UartStart, 0, NULL, 0);
 }
 // 5A A5 05 82 00A0 007D
-uint8_t buzzer_1s[] = {0x5A, 0xA5, 0x05, 0x82, 0x00, 0xA0, 0x00, 0x7D};
 
-uint8_t bl_100[] = {0x5A, 0xA5, 0x04, 0x82, 0x00, 0x82, 0x20};
 // 接收消息的回调函数
 static void UartRcvHandle(void *msg) {
     TaskHandle_t curTaskHandle    = xTaskGetCurrentTaskHandle();
@@ -266,24 +264,7 @@ static void UartRcvHandle(void *msg) {
 
 // 超时处理的回调函数
 static void UartCycHandle(void) {
-#if 0
-    static uint8_t cnt   = 0;
-    static uint8_t cnt_1 = 0;
 
-    if (cnt % 20 == 0) {
-        if (cnt_1) {
-            elog_i(TAG, "Backlight 30%%");
-            vfb_send(UartSend, 0, bl_30, sizeof(bl_30));  // 测试背光
-            cnt_1 = 0;
-        } else {
-            cnt_1 = 1;
-            elog_i(TAG, "Backlight 100%%");
-            vfb_send(UartSend, 0, bl_100, sizeof(bl_100));  // 测试背光
-        }
-    }
-
-    cnt++;
-#endif
 }
 // UartStreamRcvTask
 void UartStreamRcvTask(void *arg) {
@@ -316,7 +297,7 @@ static void __UartRXISRHandle(void *arg) {
     // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count,
     // uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
-        printf("\r\n[ERROR]RX count is zero or negative, no data received.\r\n");
+        printf("\r\n[ERROR]Uart RX count is zero or negative, no data received.\r\n");
     } else {
         /* BaseType_t xQueueSendFromISR( QueueHandle_t xQueue,
 const void *pvItemToQueue,

@@ -292,7 +292,7 @@ static void __DebugRXISRHandle(void *arg) {
     // printf("RX ISR: rx_count = %d, buffer_size = %d ,dma_transfer_number = %d\r\n", rx_count,
     // uart_handle->buffer_size, dma_transfer_number);
     if (rx_count <= 0) {
-        printf("RX count is zero or negative, no data received.\r\n");
+        printf("Debug RX count is zero or negative, no data received.\r\n");
     } else {
         /* BaseType_t xQueueSendFromISR( QueueHandle_t xQueue,
 const void *pvItemToQueue,
