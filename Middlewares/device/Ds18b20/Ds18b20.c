@@ -32,8 +32,7 @@
 #endif
 
 /* ===================================================================================== */
-typedef struct
-{
+typedef struct {
     DevOneWireHandleStruct one_wire;  // OneWire handle
 
 } TypdefDs18b20BSPCfg;
@@ -47,10 +46,11 @@ static double CmdDs18b20Read(uint8_t state);
 static void CmdDs18b20Covert(uint8_t state);
 const TypdefDs18b20BSPCfg Ds18b20BspCfg[Ds18b20ChannelMax] = {
     {
-        .one_wire = {
-            .device_name = "DS18B20",
-            .dev_pin_id  = DEV_PIN_PA1,  // Example pin, change as needed
-        },
+        .one_wire =
+            {
+                .device_name = "DS18B20",
+                .dev_pin_id  = DEV_PIN_PA1,  // Example pin, change as needed
+            },
     },
     // {
     //     .one_wire = {
@@ -60,13 +60,12 @@ const TypdefDs18b20BSPCfg Ds18b20BspCfg[Ds18b20ChannelMax] = {
     // },
 };
 
-typedef struct
-{
+typedef struct {
     char device_name[DEVICE_NAME_MAX];
     uint8_t rom[8];
-    uint32_t id;        // ID
-    uint8_t status;     // Status of the sensor
-    uint8_t step;       // Step in the conversion process
+    uint32_t id;         // ID
+    uint8_t status;      // Status of the sensor
+    uint8_t step;        // Step in the conversion process
     double temperature;  // Temperature in Celsius
 
 } TypdefDs18b20Status;
@@ -84,16 +83,17 @@ static const vfb_event_t Ds18b20EventList[] = {
 static const VFBTaskStruct Ds18b20_task_cfg = {
     .name         = "VFBTaskDs18b20",  // Task name
     .pvParameters = NULL,
-    // .uxPriority = 10,											  // Task parameters
-    .queue_num               = 8,                                               // Number of queues to subscribe
-    .event_list              = Ds18b20EventList,                                // Event list to subscribe
-    .event_num               = sizeof(Ds18b20EventList) / sizeof(vfb_event_t),  // Number of events to subscribe
-    .startup_wait_event_list = NULL,                                            // Events to wait for at startup
-    .startup_wait_event_num  = 0,                                               // Number of startup events to wait for
-    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_DS18B20_CYCLE_TIMER_MS),    // Wait indefinitely
-    .init_msg_cb             = __Ds18b20InitHandle,                             // Callback for initialization messages
-    .rcv_msg_cb              = __Ds18b20RcvHandle,                              // Callback for received messages
-    .rcv_timeout_cb          = __Ds18b20CycHandle,                              // Callback for timeout
+    // .uxPriority = 10,
+    // // Task parameters
+    .queue_num  = 8,                                               // Number of queues to subscribe
+    .event_list = Ds18b20EventList,                                // Event list to subscribe
+    .event_num  = sizeof(Ds18b20EventList) / sizeof(vfb_event_t),  // Number of events to subscribe
+    .startup_wait_event_list = NULL,                               // Events to wait for at startup
+    .startup_wait_event_num  = 0,  // Number of startup events to wait for
+    .xTicksToWait            = pdMS_TO_TICKS(CONFIG_DS18B20_CYCLE_TIMER_MS),  // Wait indefinitely
+    .init_msg_cb             = __Ds18b20InitHandle,  // Callback for initialization messages
+    .rcv_msg_cb              = __Ds18b20RcvHandle,   // Callback for received messages
+    .rcv_timeout_cb          = __Ds18b20CycHandle,   // Callback for timeout
 };
 
 /* ===================================================================================== */
@@ -106,31 +106,39 @@ void Ds18b20DeviceInit(void) {
 
         Ds18b20StatusHandle->id = i;
         memset(Ds18b20StatusHandle->device_name, 0, sizeof(Ds18b20StatusHandle->device_name));
-        snprintf(Ds18b20StatusHandle->device_name, sizeof(Ds18b20StatusHandle->device_name), "Ds18b20%d", i);
+        snprintf(Ds18b20StatusHandle->device_name, sizeof(Ds18b20StatusHandle->device_name),
+                 "Ds18b20%d", i);
         DevOneWireInit((DevOneWireHandleStruct *)&(Ds18b20BspCfg[i].one_wire));
         // extern const TypedefDevPinMap DevPinMap[GD32H7XXZ_PIN_MAP_MAX];
-        elog_i(TAG, "Ds18b20 Channel %d initialized with pin %s %s", i, Ds18b20BspCfg[i].one_wire.device_name, DevPinMap[Ds18b20BspCfg[i].one_wire.dev_pin_id].pin_name);
+        elog_i(TAG, "Ds18b20 Channel %d initialized with pin %s %s", i,
+               Ds18b20BspCfg[i].one_wire.device_name,
+               DevPinMap[Ds18b20BspCfg[i].one_wire.dev_pin_id].pin_name);
     }
 
-    DevOneWireStop(&(Ds18b20BspCfg[0].one_wire));  // Stop the OneWire bus to ensure no interference during initialization
+    DevOneWireStop(
+        &(Ds18b20BspCfg[0]
+              .one_wire));  // Stop the OneWire bus to ensure no interference during initialization
 }
 SYSTEM_REGISTER_INIT(MCUInitStage, Ds18b20Priority, Ds18b20DeviceInit, Ds18b20DeviceInit);
 
 static void __Ds18b20CreateTaskHandle(void) {
     for (size_t i = 0; i < Ds18b20ChannelMax; i++) {
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskDs18b20", configMINIMAL_STACK_SIZE * 2, (void *)&Ds18b20_task_cfg, Ds18b20Priority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskDs18b20", configMINIMAL_STACK_SIZE * 2,
+                (void *)&Ds18b20_task_cfg, Ds18b20Priority, NULL);
 }
-SYSTEM_REGISTER_INIT(BoardInitStage, Ds18b20Priority, __Ds18b20CreateTaskHandle, __Ds18b20CreateTaskHandle init);
+SYSTEM_REGISTER_INIT(BoardInitStage, Ds18b20Priority, __Ds18b20CreateTaskHandle,
+                     __Ds18b20CreateTaskHandle init);
 
 static void __Ds18b20InitHandle(void *msg) {
     elog_i(TAG, "__Ds18b20InitHandle");
     elog_set_filter_tag_lvl(TAG, Ds18b20LogLvl);
-    Ds18b20Status[0].status      = 0;        // Initialize status
-    Ds18b20Status[0].step        = 0;        // Initialize step
+    Ds18b20Status[0].status      = 0;       // Initialize status
+    Ds18b20Status[0].step        = 0;       // Initialize step
     Ds18b20Status[0].temperature = -100.0;  // Initialize temperature
 
-    vTaskDelay(pdMS_TO_TICKS(500));  // Delay to ensure all devices are initialized before starting the task
+    vTaskDelay(pdMS_TO_TICKS(
+        500));  // Delay to ensure all devices are initialized before starting the task
     vfb_send(Ds18b20Start, 0, NULL, 0);
 }
 // 接收消息的回调函数
@@ -166,19 +174,13 @@ static void __Ds18b20CycHandle(void) {
                 CmdDs18b20Covert(0);
                 Ds18b20StatusTmp->step = 1;
             } else {
-                double temp_reading = CmdDs18b20Read(0);  // Read temperature
-                
-                // 检查温度读取是否有效
-                if (temp_reading != -999.0) {
-                    Ds18b20StatusTmp->temperature = temp_reading;
-                    elog_d(TAG, "Ds18b20 temperature: %.2f", Ds18b20StatusTmp->temperature);
-                    // Send temperature to HMI
-                    vfb_send(Ds18b20GetTemperature, 0, &Ds18b20StatusTmp->temperature, sizeof(Ds18b20StatusTmp->temperature));
-                    elog_d(TAG, "Send Ds18b20GetTemperature done %u ", conter);
-                } else {
-                    elog_e(TAG, "Failed to read valid temperature from DS18B20");
-                }
-                
+                double temp_reading           = CmdDs18b20Read(0);  // Read temperature
+                Ds18b20StatusTmp->temperature = temp_reading;
+                elog_d(TAG, "Ds18b20 temperature: %.2f", Ds18b20StatusTmp->temperature);
+                // Send temperature to HMI
+                vfb_send(Ds18b20GetTemperature, 0, &Ds18b20StatusTmp->temperature,
+                         sizeof(Ds18b20StatusTmp->temperature));
+                elog_d(TAG, "Send Ds18b20GetTemperature done %u ", conter);
                 Ds18b20StatusTmp->step = 0;
             }
 
@@ -221,7 +223,8 @@ static void CmdDs18b20Reset(void) {
 // DevOneWirePinWrite
 static void CmdDs18b20DelayTest(int delay_us) {
     elog_i(TAG, "Testing DS18B20 delay with %d us...", delay_us);
-    vTaskDelay(pdMS_TO_TICKS(100));  // Delay to ensure all devices are initialized before starting the task
+    vTaskDelay(pdMS_TO_TICKS(
+        100));  // Delay to ensure all devices are initialized before starting the task
 
     vTaskSuspendAll();
     NVIC_DisableIRQ(SysTick_IRQn);
@@ -248,10 +251,10 @@ static void CmdDs18b20ReadRom(void) {
     if (status != 0) {
         elog_e(TAG, "Failed to read ROM code from DS18B20 Status %d", status);
     } else {
-        elog_i(TAG, "DS18B20 ROM code: %02X%02X%02X%02X%02X%02X%02X%02X",
-               Ds18b20Status[0].rom[0], Ds18b20Status[0].rom[1], Ds18b20Status[0].rom[2],
-               Ds18b20Status[0].rom[3], Ds18b20Status[0].rom[4], Ds18b20Status[0].rom[5],
-               Ds18b20Status[0].rom[6], Ds18b20Status[0].rom[7]);
+        elog_i(TAG, "DS18B20 ROM code: %02X%02X%02X%02X%02X%02X%02X%02X", Ds18b20Status[0].rom[0],
+               Ds18b20Status[0].rom[1], Ds18b20Status[0].rom[2], Ds18b20Status[0].rom[3],
+               Ds18b20Status[0].rom[4], Ds18b20Status[0].rom[5], Ds18b20Status[0].rom[6],
+               Ds18b20Status[0].rom[7]);
     }
 }
 static void CmdDs18b20Covert(uint8_t state) {
@@ -282,14 +285,14 @@ static double CmdDs18b20Read(uint8_t state) {
     //        scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3],
     //        scratchpad[4], scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
 
-    uint16_t temp_raw = 0;
+    uint16_t temp_raw   = 0;
     int16_t temp_signed = 0;
-    double f_tem = 0.0;
-    
+    double f_tem        = 0.0;
+
     // 组合两个字节
-    temp_raw = ((uint16_t)scratchpad[1] << 8) | scratchpad[0];
+    temp_raw    = ((uint16_t)scratchpad[1] << 8) | scratchpad[0];
     temp_signed = (int16_t)temp_raw;  // 转换为有符号整数
-    
+
     // DS18B20使用二进制补码表示负温度
     if (temp_signed < 0) {
         /* 负温度处理：DS18B20负温度已经是二进制补码形式 */
@@ -298,16 +301,16 @@ static double CmdDs18b20Read(uint8_t state) {
         /* 正温度处理 */
         f_tem = (double)temp_signed * 0.0625;
     }
-    
+
     // DS18B20的温度范围检查：-55°C 到 +125°C
     if (f_tem < -55.0 || f_tem > 125.0) {
         elog_w(TAG, "DS18B20 temperature out of range: %.2f C (raw: 0x%04X)", f_tem, temp_raw);
         // 返回一个错误值来表示读取失败
-        return -999.0;
+        return F_INVAILD;
     }
-    
-    elog_d(TAG, "DS18B20 Raw: 0x%04X, Signed: %d, Temperature: %.2f C", 
-           temp_raw, temp_signed, f_tem);
+
+    elog_d(TAG, "DS18B20 Raw: 0x%04X, Signed: %d, Temperature: %.2f C", temp_raw, temp_signed,
+           f_tem);
     return f_tem;
 }
 static int CmdDs18b20Handle(int argc, char *argv[]) {
@@ -365,4 +368,5 @@ static int CmdDs18b20Handle(int argc, char *argv[]) {
     return 0;
 }
 
-SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), ds18b20, CmdDs18b20Handle, demo command);
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), ds18b20,
+                 CmdDs18b20Handle, demo command);
