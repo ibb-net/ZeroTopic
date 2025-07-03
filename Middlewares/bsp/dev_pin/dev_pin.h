@@ -23,5 +23,6 @@ void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle);
 void DevPinWrite(const DevPinHandleStruct *ptrDevPinHandle, uint8_t bit_value);
 uint8_t DevPinRead(const DevPinHandleStruct *ptrDevPinHandle);
 void DevErrorLED(uint8_t is_on) ;
+void DevErrorLEDToggle() ;
 extern const TypedefDevPinMap DevPinMap[GD32H7XXZ_PIN_MAP_MAX];
 #endif  // __DEV_PIN_H

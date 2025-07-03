@@ -79,4 +79,23 @@ void DevErrorLED(uint8_t is_on) {
     gpio_mode_set(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO_PIN_14);
     gpio_output_options_set(GPIOC, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, GPIO_PIN_14);
 }
+
+void DevErrorLEDToggle() {
+    static uint8_t is_init = 0;
+    static uint32_t cyc    = 0;
+    static uint8_t is_on=0;
+    if (!is_init) {
+        is_init = 1;
+        rcu_periph_clock_enable(RCU_GPIOC);
+        gpio_mode_set(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO_PIN_14);
+        gpio_output_options_set(GPIOC, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, GPIO_PIN_14);
+    }
+    if (cyc % 100 == 0)
+    {
+        is_on = !is_on;
+        gpio_bit_write(GPIOC, GPIO_PIN_14, is_on ? SET : RESET);
+    }
+       
+    cyc++;
+}
 #endif
