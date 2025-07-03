@@ -34,7 +34,7 @@ static void __KeyRcvHandle(void *msg);
 static void __KeyCycHandle(void);
 static void __KeyInitHandle(void *msg);
 static void __KeyRegister(TypdefKeyBSPCfg *cfg);
-static void __KeyCtrl(TypdefKeyBSPCfg *cfg,uint8_t en);
+static void __KeyCtrl(TypdefKeyBSPCfg *cfg, uint8_t en);
 static void __KeyScan(void);
 static void __KeyShortPressCallback(TypdefKeyStatus *key_status);
 static void __KeyLongPressCallback(TypdefKeyStatus *key_status);
@@ -58,16 +58,17 @@ static const vfb_event_t KeyEventList[] = {
 static const VFBTaskStruct Key_task_cfg = {
     .name         = "VFBTaskKey",  // Task name
     .pvParameters = NULL,
-    // .uxPriority = 10,											  // Task parameters
-    .queue_num               = 8,                                           // Number of queues to subscribe
-    .event_list              = KeyEventList,                                // Event list to subscribe
-    .event_num               = sizeof(KeyEventList) / sizeof(vfb_event_t),  // Number of events to subscribe
-    .startup_wait_event_list = NULL,                                        // Events to wait for at startup
-    .startup_wait_event_num  = 0,                                           // Number of startup events to wait for
+    // .uxPriority = 10,
+    // // Task parameters
+    .queue_num  = 8,                                           // Number of queues to subscribe
+    .event_list = KeyEventList,                                // Event list to subscribe
+    .event_num  = sizeof(KeyEventList) / sizeof(vfb_event_t),  // Number of events to subscribe
+    .startup_wait_event_list = NULL,                           // Events to wait for at startup
+    .startup_wait_event_num  = 0,  // Number of startup events to wait for
     .xTicksToWait            = pdMS_TO_TICKS(CONFIG_KEY_CYCLE_TIMER_MS),  // Wait indefinitely
-    .init_msg_cb             = __KeyInitHandle,                             // Callback for initialization messages
-    .rcv_msg_cb              = __KeyRcvHandle,                              // Callback for received messages
-    .rcv_timeout_cb          = __KeyCycHandle,                              // Callback for timeout
+    .init_msg_cb             = __KeyInitHandle,  // Callback for initialization messages
+    .rcv_msg_cb              = __KeyRcvHandle,   // Callback for received messages
+    .rcv_timeout_cb          = __KeyCycHandle,   // Callback for timeout
 };
 
 /* ===================================================================================== */
@@ -92,9 +93,11 @@ static void __KeyCreateTaskHandle(void) {
         TypdefKeyStatus *KeyStatusHandle = &KeyStatus[i];
         KeyStatusHandle->last_pin_value  = 0xFF;  // Initialize last pin value to 0xFF
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskKey", configMINIMAL_STACK_SIZE * 2, (void *)&Key_task_cfg, KeyPriority, NULL);
+    xTaskCreate(VFBTaskFrame, "VFBTaskKey", configMINIMAL_STACK_SIZE * 2, (void *)&Key_task_cfg,
+                KeyPriority, NULL);
 }
-SYSTEM_REGISTER_INIT(ServerInitStage, KeyPriority, __KeyCreateTaskHandle, __KeyCreateTaskHandle init);
+SYSTEM_REGISTER_INIT(ServerInitStage, KeyPriority, __KeyCreateTaskHandle,
+                     __KeyCreateTaskHandle init);
 
 static void __KeyInitHandle(void *msg) {
     elog_i(TAG, "__KeyInitHandle");
@@ -139,7 +142,8 @@ static void __KeyCycHandle(void) {
 }
 static void __KeyShortPressCallback(TypdefKeyStatus *key_status) {
     if (key_status->cfg->short_press_event == 0) {
-        // elog_e(TAG, "Short press event is not configured for key %s", key_status->cfg->device_name);
+        // elog_e(TAG, "Short press event is not configured for key %s",
+        // key_status->cfg->device_name);
         return;
     }
     elog_i(TAG, "Key %s short pressed", key_status->cfg->device_name);
@@ -147,7 +151,8 @@ static void __KeyShortPressCallback(TypdefKeyStatus *key_status) {
 }
 static void __KeyLongPressCallback(TypdefKeyStatus *key_status) {
     if (key_status->cfg->long_press_event == 0) {
-        // elog_e(TAG, "Long press event is not configured for key %s", key_status->cfg->device_name);
+        // elog_e(TAG, "Long press event is not configured for key %s",
+        // key_status->cfg->device_name);
         return;
     }
     elog_i(TAG, "Key %s long pressed", key_status->cfg->device_name);
@@ -200,15 +205,25 @@ static void __KeyRegister(TypdefKeyBSPCfg *cfg) {
     }
     elog_e(TAG, "No available key slots to register");
 }
-static void __KeyCtrl(TypdefKeyBSPCfg *cfg,uint8_t en) {
-    //device_name
+static void __KeyCtrl(TypdefKeyBSPCfg *cfg, uint8_t en) {
+    // device_name
     if (cfg == NULL || cfg->device_name == NULL) {
         elog_e(TAG, "KeyCtrl: cfg or device_name is NULL");
         return;
     }
     for (size_t i = 0; i < KeyChannelMax; i++) {
-        if (KeyStatus[i].cfg != NULL && strcmp(KeyStatus[i].cfg->device_name, cfg->device_name) == 0) {
-            KeyStatus[i].enable = en;
+        if (KeyStatus[i].cfg != NULL &&
+            strcmp(KeyStatus[i].cfg->device_name, cfg->device_name) == 0) {
+            if (KeyStatus[i].enable == en) {
+                elog_i(TAG, "Key %s already in desired state (slot %d)", cfg->device_name, i);
+                return;  // Already in the desired state
+            }
+            KeyStatus[i].enable               = en;
+            KeyStatus[i].state                = 0;
+            KeyStatus[i].press_time           = 0;
+            KeyStatus[i].long_press_triggered = 0;
+            KeyStatus[i].last_pin_value       = 0xFF;  // Initialize last pin value to 0xFF
+
             elog_i(TAG, "Key %s started (slot %d)", cfg->device_name, i);
             return;
         }
@@ -232,7 +247,8 @@ static void __KeyScan(void) {
         switch (triger_mode) {
             case KEY_TRIGGER_MODE_PRESS:  // 按键模式
             {
-                key_value = (pin_value == active_level) ? KEY_ACTIVE : KEY_INACTIVE;  // Active level is pressed
+                key_value = (pin_value == active_level) ? KEY_ACTIVE
+                                                        : KEY_INACTIVE;  // Active level is pressed
                 if (key_value == KEY_ACTIVE && key_states->state == 0) {
                     // Key pressed
                     key_states->state                = 1;
@@ -241,28 +257,33 @@ static void __KeyScan(void) {
                 } else if (key_value == KEY_ACTIVE && key_states->state == 1) {
                     // Key is still pressed
                     uint32_t press_duration = current_time - key_states->press_time;
-                    if (press_duration >= LONG_PRESS_THRESHOLD && !key_states->long_press_triggered) {
+                    if (press_duration >= LONG_PRESS_THRESHOLD &&
+                        !key_states->long_press_triggered) {
                         __KeyLongPressCallback(key_states);
                         key_states->long_press_triggered = 1;
                     }
                 } else if (key_value == KEY_INACTIVE && key_states->state == 1) {
                     // Key released
                     uint32_t press_duration = current_time - key_states->press_time;
-                    if (press_duration < LONG_PRESS_THRESHOLD && press_duration >= SHORT_PRESS_THRESHOLD) {
+                    if (press_duration < LONG_PRESS_THRESHOLD &&
+                        press_duration >= SHORT_PRESS_THRESHOLD) {
                         __KeyShortPressCallback(key_states);
                     }
                     key_states->state = 0;
                 }
             } break;
-            case KEY_TRIGGER_MODE_TOGGLE: {                                           // 自锁模式
-                key_value = (pin_value == active_level) ? KEY_ACTIVE : KEY_INACTIVE;  // Active level is pressed
+            case KEY_TRIGGER_MODE_TOGGLE: {  // 自锁模式
+                key_value = (pin_value == active_level) ? KEY_ACTIVE
+                                                        : KEY_INACTIVE;  // Active level is pressed
                 if (key_value != key_states->last_pin_value) {
                     // Key state changed
                     key_states->last_pin_value       = key_value;  // Update last pin value
                     key_states->press_time           = current_time;
                     key_states->long_press_triggered = 0;
-                    elog_i(TAG, "Key %s state changed: %d", key_states->cfg->device_name, key_value);
-                } else if (key_value == key_states->last_pin_value && key_states->long_press_triggered == 0) {
+                    elog_i(TAG, "Key %s state changed: %d", key_states->cfg->device_name,
+                           key_value);
+                } else if (key_value == key_states->last_pin_value &&
+                           key_states->long_press_triggered == 0) {
                     uint32_t press_duration = current_time - key_states->press_time;
                     if (press_duration >= SHORT_PRESS_THRESHOLD) {
                         key_states->state = key_value;
@@ -270,11 +291,13 @@ static void __KeyScan(void) {
                         key_states->long_press_triggered = 1;
                     } else {
                         // Key state unchanged, do nothing
-                        // elog_i(TAG, "Key %s state unchanged: %d", key_states->cfg->device_name, key_value);
+                        // elog_i(TAG, "Key %s state unchanged: %d", key_states->cfg->device_name,
+                        // key_value);
                     }
                 } else {
                     // 按键未变化,或者按键处于消抖等待状态,不做处理
-                    // elog_i(TAG, "Key %s state unchanged: %d", key_states->cfg->device_name, key_value);
+                    // elog_i(TAG, "Key %s state unchanged: %d", key_states->cfg->device_name,
+                    // key_value);
                 }
             } break;
             default:
@@ -297,5 +320,6 @@ static int CmdKeyHandle(int argc, char *argv[]) {
     return 0;
 }
 
-SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), Key, CmdKeyHandle, Key command);
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), Key, CmdKeyHandle,
+                 Key command);
 #endif
