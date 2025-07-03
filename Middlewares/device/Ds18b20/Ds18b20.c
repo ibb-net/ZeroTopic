@@ -111,7 +111,8 @@ void Ds18b20DeviceInit(void) {
         // extern const TypedefDevPinMap DevPinMap[GD32H7XXZ_PIN_MAP_MAX];
         elog_i(TAG, "Ds18b20 Channel %d initialized with pin %s %s", i, Ds18b20BspCfg[i].one_wire.device_name, DevPinMap[Ds18b20BspCfg[i].one_wire.dev_pin_id].pin_name);
     }
-    DevOneWireStop(&(Ds18b20BspCfg[1].one_wire));  // Stop the OneWire bus to ensure no interference during initialization
+
+    DevOneWireStop(&(Ds18b20BspCfg[0].one_wire));  // Stop the OneWire bus to ensure no interference during initialization
 }
 SYSTEM_REGISTER_INIT(MCUInitStage, Ds18b20Priority, Ds18b20DeviceInit, Ds18b20DeviceInit);
 
@@ -165,13 +166,20 @@ static void __Ds18b20CycHandle(void) {
                 CmdDs18b20Covert(0);
                 Ds18b20StatusTmp->step = 1;
             } else {
-                Ds18b20StatusTmp->temperature =
-                    CmdDs18b20Read(0);  // Read temperature
+                double temp_reading = CmdDs18b20Read(0);  // Read temperature
+                
+                // 检查温度读取是否有效
+                if (temp_reading != -999.0) {
+                    Ds18b20StatusTmp->temperature = temp_reading;
+                    elog_d(TAG, "Ds18b20 temperature: %.2f", Ds18b20StatusTmp->temperature);
+                    // Send temperature to HMI
+                    vfb_send(Ds18b20GetTemperature, 0, &Ds18b20StatusTmp->temperature, sizeof(Ds18b20StatusTmp->temperature));
+                    elog_d(TAG, "Send Ds18b20GetTemperature done %u ", conter);
+                } else {
+                    elog_e(TAG, "Failed to read valid temperature from DS18B20");
+                }
+                
                 Ds18b20StatusTmp->step = 0;
-                elog_d(TAG, "Ds18b20 temperature: %.2f", Ds18b20StatusTmp->temperature);
-                // Send temperature to HMI
-                vfb_send(Ds18b20GetTemperature, 0, &Ds18b20StatusTmp->temperature, sizeof(Ds18b20StatusTmp->temperature));
-                elog_d(TAG, "Send Ds18b20GetTemperature done %u ", conter);
             }
 
         } else {
@@ -274,15 +282,32 @@ static double CmdDs18b20Read(uint8_t state) {
     //        scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3],
     //        scratchpad[4], scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
 
-    uint16_t temp = 0;
-    double f_tem   = 0.0;
-    temp          = scratchpad[1] << 8;
-    temp |= scratchpad[0];  // Combine the two bytes
-    if (temp < 0)           /* 负温度 */
-        f_tem = (~temp + 1) * 0.0625;
-    else
-        f_tem = temp * 0.0625;
-    elog_d(TAG, "DS18B20 Temperature: %.2f C", f_tem);
+    uint16_t temp_raw = 0;
+    int16_t temp_signed = 0;
+    double f_tem = 0.0;
+    
+    // 组合两个字节
+    temp_raw = ((uint16_t)scratchpad[1] << 8) | scratchpad[0];
+    temp_signed = (int16_t)temp_raw;  // 转换为有符号整数
+    
+    // DS18B20使用二进制补码表示负温度
+    if (temp_signed < 0) {
+        /* 负温度处理：DS18B20负温度已经是二进制补码形式 */
+        f_tem = (double)temp_signed * 0.0625;
+    } else {
+        /* 正温度处理 */
+        f_tem = (double)temp_signed * 0.0625;
+    }
+    
+    // DS18B20的温度范围检查：-55°C 到 +125°C
+    if (f_tem < -55.0 || f_tem > 125.0) {
+        elog_w(TAG, "DS18B20 temperature out of range: %.2f C (raw: 0x%04X)", f_tem, temp_raw);
+        // 返回一个错误值来表示读取失败
+        return -999.0;
+    }
+    
+    elog_d(TAG, "DS18B20 Raw: 0x%04X, Signed: %d, Temperature: %.2f C", 
+           temp_raw, temp_signed, f_tem);
     return f_tem;
 }
 static int CmdDs18b20Handle(int argc, char *argv[]) {
