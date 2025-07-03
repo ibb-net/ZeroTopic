@@ -207,7 +207,7 @@ static void __KeyRegister(TypdefKeyBSPCfg *cfg) {
 }
 static void __KeyCtrl(TypdefKeyBSPCfg *cfg, uint8_t en) {
     // device_name
-    if (cfg == NULL || cfg->device_name == NULL) {
+    if (cfg == NULL) {
         elog_e(TAG, "KeyCtrl: cfg or device_name is NULL");
         return;
     }
