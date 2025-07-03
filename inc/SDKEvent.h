@@ -49,9 +49,11 @@ typedef enum {
     sgm5860xCH3,                         // 1037
     sgm5860xCH4,                         // 1038
     ADCUpdate,                           // 1039
-                  
+
     /************************************************* */
     SDK_EVENT_NUM,
     SDK_EVENT_LIST_MAX = SDK_EVENT_LIST_APP_START - 1
 } SDK_EVENT_LIST;
+#define F_INVAILD (-999999.0)  // Invalid double value for Covert measurement
+
 #endif  // __SDK_EVENT_H__
