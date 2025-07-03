@@ -245,8 +245,8 @@ static void ENCODER_TIMER_INIT_HANDLE(void *msg) {
     elog_i(TAG, "ENCODER_TIMER_INIT_HANDLE\r\n");
     // 发布事件，表示计时器已准备就绪
     // vfb_publish(ENCODER_TIMER_READY);
-    vfb_send(ENCODER_TIMER_START, DECODER_CHANNEL1, NULL, 0);  // 启动计时器
-    vfb_send(ENCODER_TIMER_START, DECODER_CHANNEL0, NULL, 0);  // 启动计时器
+    // vfb_send(ENCODER_TIMER_START, DECODER_CHANNEL1, NULL, 0);  // 启动计时器
+    // vfb_send(ENCODER_TIMER_START, DECODER_CHANNEL0, NULL, 0);  // 启动计时器
     VFBMsgDecoderStruct msg_decoder = {
         .channel   = DECODER_CHANNEL0,
         .phy_value = 0,
