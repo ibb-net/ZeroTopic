@@ -228,10 +228,10 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
         .bits.DR = SGM58601_DRATE_100SPS  // Data Rate
     };
 
-    SGM5860xIoReg_t io_reg = {
-        .bits.DIO = 0,  // Digital Input/Output State
-        .bits.DIR = 0   // Digital Input/Output Direction
-    };
+    /*     SGM5860xIoReg_t io_reg = {
+            .bits.DIO = 0,  // Digital Input/Output State
+            .bits.DIR = 0   // Digital Input/Output Direction
+        }; */
     elog_i(TAG, "DevSgm5860xConfig: Configuring SGM58601 registers");
     elog_d(TAG, "Config Status Register: 0x%02X", status_reg.raw);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&status_reg,

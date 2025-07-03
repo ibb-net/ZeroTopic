@@ -33,7 +33,7 @@
 
 #define VFB_E printf
 #define VFB_W printf
-#define VFB_D 
+#define VFB_D(...) do { if(0) printf(__VA_ARGS__); } while(0)
 #define VFB_SUBSCRIBE(num, list) vfb_subscribe(num, list, sizeof(list) / sizeof(vfb_event_t))
 
 // TODO 改为指针偏移
