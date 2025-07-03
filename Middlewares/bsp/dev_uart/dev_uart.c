@@ -391,17 +391,17 @@ void DMA0_Channel0_IRQHandler(void) {
 
     } else if (RESET != dma_interrupt_flag_get(DMA0, DMA_CH0, DMA_INT_FLAG_TAE)) {
         dma_interrupt_flag_clear(DMA0, DMA_CH0, DMA_INT_FLAG_TAE);
-        DevErrorLED(1);
+        // DevErrorLED(1);
     } else if (RESET != dma_interrupt_flag_get(DMA0, DMA_CH0, DMA_INT_FLAG_SDE)) {
         dma_interrupt_flag_clear(DMA0, DMA_CH0, DMA_INT_FLAG_SDE);
-        DevErrorLED(1);
+        // DevErrorLED(1);
     } else if (RESET != dma_interrupt_flag_get(DMA0, DMA_CH0, DMA_INT_FLAG_FEE)) {
         dma_interrupt_flag_clear(DMA0, DMA_CH0, DMA_INT_FLAG_FEE);
-        DevErrorLED(1);
+        // DevErrorLED(1);
     }
 
     else {
-        DevErrorLED(1);
+        // DevErrorLED(1);
     }
 }
 
