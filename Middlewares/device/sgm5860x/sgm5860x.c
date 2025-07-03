@@ -250,23 +250,6 @@ static void __sgm5860xCycHandle(void) {
             sgm5860_channelcfg[sgm5860xStatus.scan_index].channel;  // Get the current channel
         uint8_t gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
         DevGetADCData(&sgm5860_cfg, &last_voltage, &last_channel, channel, gain);
-        if (last_channel == 6) {
-            if (last_voltage >= SGM58601_GAIN_128_MEASURE_MAX) {
-                sgm5860_channelcfg[sgm5860xStatus.scan_index].gain = SGM58601_GAIN_64;
-                if (channel_6_gain != SGM58601_GAIN_64) {
-                    elog_i(TAG, "Channel 6 Gain changed to SGM58601_GAIN_64, Voltage: %.7f V",
-                           last_voltage);
-                           channel_6_gain=SGM58601_GAIN_64;
-                }
-            } else {
-                sgm5860_channelcfg[sgm5860xStatus.scan_index].gain = SGM58601_GAIN_128;
-                if (channel_6_gain != SGM58601_GAIN_128) {
-                    elog_i(TAG, "Channel 6 Gain changed to SGM58601_GAIN_128, Voltage: %.7f V",
-                           last_voltage);
-                           channel_6_gain=SGM58601_GAIN_128;
-                }
-            }
-        }
         for (int i = 0; i < sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]); i++) {
             if (sgm5860_channelcfg[i].channel == last_channel) {
                 last_index = i;
@@ -339,6 +322,57 @@ static void __sgm5860xCycHandle(void) {
                 break;
             }
         }
+        for (int i = 3; i < sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]); i++) {
+            if ((sgm5860_channelcfg[i].channel == 6) && (last_channel == 6)) {
+                // printf("this2");
+                uint8_t tmp_last_channel = sgm5860_channelcfg[i].channel;
+                elog_d(TAG, "Index %d Last Channel %d Voltage %.7f V\r\n ", i, last_channel,
+                       last_voltage);
+                if (last_voltage >= SGM58601_GAIN_128_MEASURE_MAX) {
+                    sgm5860_channelcfg[i].gain = SGM58601_GAIN_64;
+                    if (channel_6_gain != SGM58601_GAIN_64) {
+                        elog_i(
+                            TAG,
+                            "Index %d Channel %d Gain changed to SGM58601_GAIN_64, Voltage: %.7f V",
+                            i, tmp_last_channel, last_voltage);
+                        channel_6_gain = SGM58601_GAIN_64;
+                    }
+                } else {
+                    sgm5860_channelcfg[i].gain = SGM58601_GAIN_128;
+                    if (channel_6_gain != SGM58601_GAIN_128) {
+                        elog_i(
+                            TAG,
+                            "Index %d Channel 6 Gain changed to SGM58601_GAIN_128, Voltage: %.7f V",
+                            i, last_voltage);
+                        channel_6_gain = SGM58601_GAIN_128;
+                    }
+                }
+                // printf("this3\r\n");
+                break;
+            }
+        }
+        // if (last_channel == 6) {
+        //     // printf("this2");
+        //     printf("index %d Last Channel %d \r\n ", 3, last_channel);
+        //     if (last_voltage >= SGM58601_GAIN_128_MEASURE_MAX) {
+        //         sgm5860_channelcfg[3].gain = SGM58601_GAIN_64;
+        //         if (channel_6_gain != SGM58601_GAIN_64) {
+        //             elog_i(TAG,
+        //                    "Index %d Channel 6 Gain changed to SGM58601_GAIN_64, Voltage: %.7f V
+        //                    ", 3, last_voltage);
+        //             channel_6_gain = SGM58601_GAIN_64;
+        //         }
+        //     } else {
+        //         sgm5860_channelcfg[3].gain = SGM58601_GAIN_128;
+        //         if (channel_6_gain != SGM58601_GAIN_128) {
+        //             elog_i(TAG,
+        //                    "Index %d Channel 6 Gain changed to SGM58601_GAIN_128, Voltage: %.7f
+        //                    V", 3, last_voltage);
+        //             channel_6_gain = SGM58601_GAIN_128;
+        //         }
+        //     }
+        //     printf("this3\r\n");
+        // }
 
         sgm5860xStatus.scan_index++;
         if (sgm5860xStatus.scan_index >
