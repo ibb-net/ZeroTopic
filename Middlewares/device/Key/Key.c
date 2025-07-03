@@ -34,6 +34,7 @@ static void __KeyRcvHandle(void *msg);
 static void __KeyCycHandle(void);
 static void __KeyInitHandle(void *msg);
 static void __KeyRegister(TypdefKeyBSPCfg *cfg);
+static void __KeyCtrl(TypdefKeyBSPCfg *cfg,uint8_t en);
 static void __KeyScan(void);
 static void __KeyShortPressCallback(TypdefKeyStatus *key_status);
 static void __KeyLongPressCallback(TypdefKeyStatus *key_status);
@@ -98,7 +99,6 @@ SYSTEM_REGISTER_INIT(ServerInitStage, KeyPriority, __KeyCreateTaskHandle, __KeyC
 static void __KeyInitHandle(void *msg) {
     elog_i(TAG, "__KeyInitHandle");
     elog_set_filter_tag_lvl(TAG, KeyLogLvl);
-    vfb_send(KeyStart, 0, NULL, 0);
 }
 // 接收消息的回调函数
 static void __KeyRcvHandle(void *msg) {
@@ -108,7 +108,10 @@ static void __KeyRcvHandle(void *msg) {
     vfb_message_t tmp_msg = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
         case KeyStart: {
-            elog_i(TAG, "KeyStartTask %d", tmp_msg->frame->head.data);
+            __KeyCtrl((TypdefKeyBSPCfg *)MSG_GET_PAYLOAD(tmp_msg), 1);
+        } break;
+        case KeyStop: {
+            __KeyCtrl((TypdefKeyBSPCfg *)MSG_GET_PAYLOAD(tmp_msg), 0);
         } break;
 
         case KeyRegister: {
@@ -183,7 +186,7 @@ static void __KeyRegister(TypdefKeyBSPCfg *cfg) {
                 return;
             }
             memcpy(KeyStatus[i].cfg, cfg, sizeof(TypdefKeyBSPCfg));
-            KeyStatus[i].enable               = 1;
+            KeyStatus[i].enable               = 0;
             KeyStatus[i].state                = 0;
             KeyStatus[i].press_time           = 0;
             KeyStatus[i].long_press_triggered = 0;
@@ -197,6 +200,22 @@ static void __KeyRegister(TypdefKeyBSPCfg *cfg) {
     }
     elog_e(TAG, "No available key slots to register");
 }
+static void __KeyCtrl(TypdefKeyBSPCfg *cfg,uint8_t en) {
+    //device_name
+    if (cfg == NULL || cfg->device_name == NULL) {
+        elog_e(TAG, "KeyCtrl: cfg or device_name is NULL");
+        return;
+    }
+    for (size_t i = 0; i < KeyChannelMax; i++) {
+        if (KeyStatus[i].cfg != NULL && strcmp(KeyStatus[i].cfg->device_name, cfg->device_name) == 0) {
+            KeyStatus[i].enable = en;
+            elog_i(TAG, "Key %s started (slot %d)", cfg->device_name, i);
+            return;
+        }
+    }
+    elog_e(TAG, "KeyStart: No matching key found for %s", cfg->device_name);
+}
+
 static void __KeyScan(void) {
     for (int i = 0; i < KeyChannelMax; i++) {
         TypdefKeyStatus *key_states = &KeyStatus[i];
