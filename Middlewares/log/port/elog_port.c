@@ -49,9 +49,7 @@ ElogErrCode elog_port_init(void) {
  * EasyLogger port deinitialize
  *
  */
-void elog_port_deinit(void) {
-    /* add your code here */
-}
+void elog_port_deinit(void) { /* add your code here */ }
 
 /**
  * output log port interface
@@ -60,6 +58,7 @@ void elog_port_deinit(void) {
  * @param size log size
  */
 void elog_port_output(const char *log, size_t size) {
+#if 1
     static uint32_t is_os_run = 0;
     if (is_os_run == 0) {
         debug_putbuffer(log, size);
@@ -67,21 +66,22 @@ void elog_port_output(const char *log, size_t size) {
     } else {
         vfb_send(DebugPrint, 0, (void *)log, size);
     }
+#else
+    debug_putbuffer(log, size);
+    // char tail[]="\r\n";
+    // debug_putbuffer(tail, sizeof(tail));
+#endif
 }
 
 /**
  * output lock
  */
-void elog_port_output_lock(void) {
-    /* add your code here */
-}
+void elog_port_output_lock(void) { /* add your code here */ }
 
 /**
  * output unlock
  */
-void elog_port_output_unlock(void) {
-    /* add your code here */
-}
+void elog_port_output_unlock(void) { /* add your code here */ }
 
 /**
  * get current time interface
@@ -95,8 +95,9 @@ const char *elog_port_get_time(void) {
     uint32_t seconds = ticks / configTICK_RATE_HZ;
     memset((void *)time_buffer, 0, sizeof(time_buffer));  // Clear the time_buffer
     // 时间格式为HH:MM:SS.ms
-    snprintf(time_buffer, sizeof(time_buffer), "%02lu:%02lu:%02lu.%03lu",
-             (seconds / 3600) % 24, (seconds / 60) % 60, seconds % 60, (ticks % configTICK_RATE_HZ) * 1000 / configTICK_RATE_HZ);
+    snprintf(time_buffer, sizeof(time_buffer), "%02lu:%02lu:%02lu.%03lu", (seconds / 3600) % 24,
+             (seconds / 60) % 60, seconds % 60,
+             (ticks % configTICK_RATE_HZ) * 1000 / configTICK_RATE_HZ);
     return (const char *)time_buffer;
 
     // return "00:00:00";
