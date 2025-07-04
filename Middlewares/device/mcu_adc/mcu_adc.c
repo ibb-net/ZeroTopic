@@ -103,7 +103,7 @@ SYSTEM_REGISTER_INIT(MCUInitStage, McuadcPriority, McuadcDeviceInit, McuadcDevic
 static void __McuadcCreateTaskHandle(void) {
     for (size_t i = 0; i < McuadcChannelMax; i++) {
     }
-    xTaskCreate(VFBTaskFrame, "VFBTaskMcuadc", configMINIMAL_STACK_SIZE, (void *)&Mcuadc_task_cfg,
+    xTaskCreate(VFBTaskFrame, "VFBTaskMcuadc", configMINIMAL_STACK_SIZE*2, (void *)&Mcuadc_task_cfg,
                 McuadcPriority, NULL);
 }
 SYSTEM_REGISTER_INIT(ServerInitStage, McuadcPriority, __McuadcCreateTaskHandle,
