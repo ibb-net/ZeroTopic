@@ -154,7 +154,7 @@ typedef struct {
     double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
 
 } Typdefsgm5860xStatus;
-Typdefsgm5860xStatus sgm5860xStatus = {0};
+volatile Typdefsgm5860xStatus sgm5860xStatus = {0};
 
 /* ===================================================================================== */
 
@@ -190,9 +190,10 @@ void sgm5860xDeviceInit(void) {
 
     DevSgm5860xHandleStruct *sgm5860xBspCfg = (DevSgm5860xHandleStruct *)&sgm5860_cfg;
     sgm5860xStatus.cfg                      = sgm5860xBspCfg;  // Assign the BSP configuration
-    strcpy(sgm5860xStatus.device_name, "sgm58601");
+    strcpy((char*)sgm5860xStatus.device_name, "sgm58601");
     DevSgm5860xInit(sgm5860xBspCfg);  // Initialize the SGM5860x device
     elog_i(TAG, "sgm5860xDeviceInit completed");
+    elog_i(TAG, "sgm5860xStatus.device_name: %s", sgm5860xStatus.device_name);
 }
 SYSTEM_REGISTER_INIT(MCUInitStage, sgm5860xPriority, sgm5860xDeviceInit, sgm5860xDeviceInit);
 
@@ -234,7 +235,7 @@ static void __sgm5860xRcvHandle(void *msg) {
 }
 
 static void __sgm5860xCycHandle(void) {
-    Typdefsgm5860xStatus *sgm5860xStatusHandle = &sgm5860xStatus;
+    Typdefsgm5860xStatus *sgm5860xStatusHandle =( Typdefsgm5860xStatus *) &sgm5860xStatus;
     if (sgm5860xStatusHandle == NULL) {
         elog_e(TAG, "[ERROR]sgm5860xStatusHandle NULL");
         return;
@@ -246,6 +247,7 @@ static void __sgm5860xCycHandle(void) {
         uint8_t last_index            = 0;
         double last_gain              = 0;
         static uint8_t channel_6_gain = 0;
+        (void *)&channel_6_gain;
         uint8_t channel =
             sgm5860_channelcfg[sgm5860xStatus.scan_index].channel;  // Get the current channel
         uint8_t gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
@@ -323,6 +325,7 @@ static void __sgm5860xCycHandle(void) {
             }
         }
 #if 0  // 自动放大倍数
+        static uint8_t channel_6_gain = 0;
         for (int i = 3; i < sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]); i++) {
             if ((sgm5860_channelcfg[i].channel == 6) && (last_channel == 6)) {
                 // printf("this2");
