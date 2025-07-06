@@ -174,6 +174,20 @@ void UartDeviceInit(void) {
             while (1);
             return;
         }
+        else
+        {
+            elog_i(TAG, "malloc %s buffer size: %d\r\n", UartBspCfg[i].uart_cfg.device_name,
+                   UartBspCfg[i].buffer_size);
+            uint8_t is_32byte_aligned = (uintptr_t)uart_handle->rx_buffer % 32 == 0;
+            if (!is_32byte_aligned) {
+                elog_w(TAG, "[WARNING] %s buffer is not 32-byte aligned!\r\n",
+                        UartBspCfg[i].uart_cfg.device_name);
+            }
+            else {
+                elog_i(TAG, "[INFO] %s buffer is 32-byte aligned!\r\n",
+                       UartBspCfg[i].uart_cfg.device_name);
+            }
+        }
         uart_handle->rx_buffer_for_vfb = pvPortMalloc(UartBspCfg[i].buffer_size);
         if (uart_handle->rx_buffer_for_vfb == NULL) {
             elog_e(TAG, "[Fault]malloc %s buffer for vfb failed!\r\n",
