@@ -45,7 +45,8 @@ static void DebugInitHandle(void *msg);
 static void __DebugRXISRHandle(void *arg);
 static void __DebugTXDMAISRHandle(void *arg);
 void DebugStreamRcvTask(void *arg);
-
+__attribute__((aligned(32))) uint8_t debug_rx_buffer[DebugChannelMax][DEBUG_UART_BUFFER_SIZE];
+__attribute__((aligned(32))) uint8_t debug_tx_buffer[DebugChannelMax][DEBUG_UART_BUFFER_SIZE];
 const TypdefDebugBSPCfg DebugBspCfg[DebugChannelMax] = {
     {
 
@@ -166,7 +167,8 @@ void DebugDeviceInit(void) {
         uart_handle->uart_base        = DebugBspCfg[i].uart_cfg.base;
         uart_handle->buffer_size      = DebugBspCfg[i].buffer_size;
         uart_handle->rx_stream_buffer = xStreamBufferCreate(DebugBspCfg[i].buffer_size, 1);
-        uart_handle->rx_buffer        = pvPortMalloc(DebugBspCfg[i].buffer_size);
+        // uart_handle->rx_buffer        = pvPortMalloc(DebugBspCfg[i].buffer_size);
+        uart_handle->rx_buffer = debug_rx_buffer[i];  // Use the static aligned buffer
         if (uart_handle->rx_buffer == NULL) {
             printf("[Fault]malloc %s buffer failed!\r\n", DebugBspCfg[i].uart_cfg.device_name);
             while (1);
@@ -232,8 +234,8 @@ static void DebugRcvHandle(void *msg) {
                 printf("[ERROR]DebugPrint: payload is NULL or length is 0\r\n");
                 return;
             }
-            DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)MSG_GET_PAYLOAD(tmp_msg),
-                           MSG_GET_LENGTH(tmp_msg));
+            memcpy(debug_tx_buffer[0], MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
+            DevUartDMASend(&DebugBspCfg[0].uart_cfg, (const uint8_t *)debug_tx_buffer[0], MSG_GET_LENGTH(tmp_msg));
             // wait for TX DMA complete lock_tx
             if (uart_handle->lock_tx != NULL) {
                 if (xSemaphoreTake(uart_handle->lock_tx, pdMS_TO_TICKS(300)) == pdFALSE) {

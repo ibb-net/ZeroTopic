@@ -37,6 +37,8 @@ typedef struct {
     uint32_t buffer_size;
 
 } TypdefUartBSPCfg;
+__attribute__((aligned(32))) uint8_t uart_rx_buffer[UartChannelMax][Uart_UART_BUFFER_SIZE] ;
+__attribute__((aligned(32))) uint8_t uart_tx_buffer[UartChannelMax][Uart_UART_BUFFER_SIZE] ;
 
 static void UartCreateTaskHandle(void);
 static void UartRcvHandle(void *msg);
@@ -168,22 +170,20 @@ void UartDeviceInit(void) {
         uart_handle->uart_base        = UartBspCfg[i].uart_cfg.base;
         uart_handle->buffer_size      = UartBspCfg[i].buffer_size;
         uart_handle->rx_stream_buffer = xStreamBufferCreate(UartBspCfg[i].buffer_size, 1);
-        uart_handle->rx_buffer        = pvPortMalloc(UartBspCfg[i].buffer_size);
+        // uart_handle->rx_buffer        = pvPortMalloc(UartBspCfg[i].buffer_size);
+        uart_handle->rx_buffer = uart_rx_buffer[i];  // Use the static aligned buffer
         if (uart_handle->rx_buffer == NULL) {
             elog_e(TAG, "[Fault]malloc %s buffer failed!\r\n", UartBspCfg[i].uart_cfg.device_name);
             while (1);
             return;
-        }
-        else
-        {
+        } else {
             elog_i(TAG, "malloc %s buffer size: %d\r\n", UartBspCfg[i].uart_cfg.device_name,
                    UartBspCfg[i].buffer_size);
             uint8_t is_32byte_aligned = (uintptr_t)uart_handle->rx_buffer % 32 == 0;
             if (!is_32byte_aligned) {
                 elog_w(TAG, "[WARNING] %s buffer is not 32-byte aligned!\r\n",
-                        UartBspCfg[i].uart_cfg.device_name);
-            }
-            else {
+                       UartBspCfg[i].uart_cfg.device_name);
+            } else {
                 elog_i(TAG, "[INFO] %s buffer is 32-byte aligned!\r\n",
                        UartBspCfg[i].uart_cfg.device_name);
             }
@@ -242,6 +242,7 @@ static void UartRcvHandle(void *msg) {
                              UartBspCfg[0].buffer_size);
             elog_i(TAG, "Uart Rcv Init Done");
             DevUartStart(&(UartBspCfg[0].uart_cfg));
+            // printf("Uart Rcv Init Done\r\n");
             elog_i(TAG, "Uart DevUartStart Init Done");
 
         } break;
@@ -258,8 +259,8 @@ static void UartRcvHandle(void *msg) {
             }
             elog_d(TAG, "UartSend: length: %d", MSG_GET_LENGTH(tmp_msg));
             // elog_hexdump(TAG, 16, MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
-            DevUartDMASend(&UartBspCfg[0].uart_cfg, (const uint8_t *)MSG_GET_PAYLOAD(tmp_msg),
-                           MSG_GET_LENGTH(tmp_msg));
+            memcpy(uart_tx_buffer[0], MSG_GET_PAYLOAD(tmp_msg), MSG_GET_LENGTH(tmp_msg));
+            DevUartDMASend(&UartBspCfg[0].uart_cfg,(const uint8_t *) uart_tx_buffer[0], MSG_GET_LENGTH(tmp_msg));
             // wait for TX DMA complete lock_tx
             if (uart_handle->lock_tx != NULL) {
                 if (xSemaphoreTake(uart_handle->lock_tx, pdMS_TO_TICKS(300)) == pdFALSE) {

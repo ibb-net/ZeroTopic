@@ -14,7 +14,7 @@
 #include "task.h"
 #include "vfb/vfb_config.h"
 
-static vfb_info_struct __vfb_info;
+volatile vfb_info_struct __vfb_info;
 
 static List_t *__vfb_list_get_head(vfb_event_t event);
 static int __vfb_list_add_queue(List_t *queue_list, QueueHandle_t queue_handle);

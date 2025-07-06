@@ -51,5 +51,6 @@
         "span": "c",
         "text_encoding": "c",
         "portmacro.h": "c"
-    }
+    },
+    "cmake.sourceDirectory": "D:/Code/OpenIBBOs/OS/include"
 }
