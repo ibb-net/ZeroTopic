@@ -37,11 +37,22 @@
  *
  * @return result
  */
+// elog_output_mutex
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "task.h"
+volatile SemaphoreHandle_t elogLockSemaphore = NULL;
+volatile uint8_t print_busy_flag = 0;  // Flag to indicate if the print function is busy
 ElogErrCode elog_port_init(void) {
     ElogErrCode result = ELOG_NO_ERR;
 
     /* add your code here */
-
+    elogLockSemaphore = xSemaphoreCreateBinary();
+    if (elogLockSemaphore == NULL) {
+        VFB_E("Failed to create semaphore for FD server");
+        return 1;
+    }
+    xSemaphoreGive(elogLockSemaphore);
     return result;
 }
 
@@ -76,12 +87,24 @@ void elog_port_output(const char *log, size_t size) {
 /**
  * output lock
  */
-void elog_port_output_lock(void) { /* add your code here */ }
-
+void elog_port_output_lock(void) {
+    /* add your code here */
+    if (elogLockSemaphore != NULL) {
+        xSemaphoreTake(elogLockSemaphore, portMAX_DELAY);
+    }
+    while (print_busy_flag) {
+        vTaskDelay(pdMS_TO_TICKS(10));  // Adjust the delay as needed
+    }
+}
 /**
  * output unlock
  */
-void elog_port_output_unlock(void) { /* add your code here */ }
+void elog_port_output_unlock(void) {
+    /* add your code here */
+    if (elogLockSemaphore != NULL) {
+        xSemaphoreGive(elogLockSemaphore);
+    }
+}
 
 /**
  * get current time interface
