@@ -8694,3 +8694,62 @@ void vTaskResetState( void )
     #endif /* #if ( configGENERATE_RUN_TIME_STATS == 1 ) */
 }
 /*-----------------------------------------------------------*/
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+    /* The stack space has been exceeded for a task */
+    volatile uint32_t ulStackHighWaterMark;
+    uint32_t current_sp, current_lr, current_pc;
+    
+    taskDISABLE_INTERRUPTS();
+    printf("                              \r\n");
+    printf("                              \r\n");
+    printf("                              \r\n");
+
+    // 获取当前寄存器状态
+    __asm volatile (
+        "mov %0, sp\n\t"
+        "mov %1, lr\n\t"
+        "mov %2, pc\n\t"
+        : "=r"(current_sp), "=r"(current_lr), "=r"(current_pc)
+    );
+    
+    printf("=== STACK OVERFLOW DETECTED ===\r\n");
+    printf("Task Name: %s\r\n", pcTaskName);
+    printf("Task Handle: 0x%08lX\r\n", (uint32_t)xTask);
+    
+    if (xTask != NULL) {
+        // 获取任务基本信息
+        printf("Task Priority: %lu\r\n", (uint32_t)uxTaskPriorityGet(xTask));
+        printf("Task State: %lu\r\n", (uint32_t)eTaskGetState(xTask));
+        
+        // 获取堆栈水位线信息
+        // ulStackHighWaterMark = uxTaskGetStackHighWaterMark(xTask);
+        // printf("Stack High Water Mark: %lu bytes\r\n", ulStackHighWaterMark);
+        
+        printf("Current SP: 0x%08lX\r\n", current_sp);
+        printf("Current LR: 0x%08lX\r\n", current_lr);
+        printf("Current PC: 0x%08lX\r\n", current_pc);
+        
+        // 打印堆栈内容 (当前SP附近的内容)
+        printf("Stack Content near SP:\r\n");
+        uint32_t *pxStack = (uint32_t *)current_sp;
+        for (int i = -4; i < 12; i++) {
+            printf("  SP[%+02d] 0x%08lX: 0x%08lX\r\n", 
+                   i, (uint32_t)(pxStack + i), pxStack[i]);
+        }
+    }
+    
+    printf("=== DEBUGGING TIPS ===\r\n");
+    printf("1. Use debugger to examine call stack\r\n");
+    printf("2. Check LR (0x%08lX) for last function call\r\n", current_lr);
+    printf("3. Increase stack size for task '%s'\r\n", pcTaskName);
+    printf("4. Look for large local variables or deep recursion\r\n");
+    printf("=== END STACK OVERFLOW INFO ===\r\n");
+    
+    // 保持系统停止，便于调试器连接
+    while(1) {
+        // 在这里设置断点进行调试
+        __asm volatile ("nop");
+    }
+}
+/*-----------------------------------------------------------*/
