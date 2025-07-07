@@ -78,7 +78,19 @@ DevUartStatusStruct dev_uart_status[] = {{
 
 /* retarget the C library printf function to the
  * USART */
-
+extern volatile uint8_t print_busy_flag;
+int basic_putc(int ch, FILE *f) {
+    static DevUartStatusStruct *status;
+    if (status == NULL) {
+        status = __DevUartGetStatus(USART0);
+    }
+    if (!status || !status->is_initialized || !status->is_opened || !status->is_started) {
+        return ch;  // Error handling
+    }
+    usart_data_transmit(USART0, (uint8_t)ch);
+    while (RESET == usart_flag_get(USART0, USART_FLAG_TBE));
+    return ch;
+}
 int fputc(int ch, FILE *f) {
     static DevUartStatusStruct *status;
     if (status == NULL) {
@@ -110,7 +122,7 @@ uint8_t isReady(void) {
 }
 int debug_putbuffer(const char *buffer, size_t len) {
     for (size_t i = 0; i < len; i++) {
-        fputc(buffer[i], NULL);
+        basic_putc(buffer[i], NULL);
     }
     return len;
 }
