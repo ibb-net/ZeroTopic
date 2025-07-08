@@ -1,4 +1,3 @@
-source "../OpenIBBOs/Drivers/Kconfig"
 source "../OpenIBBOs/OS/Kconfig"
 source "../OpenIBBOs/Middlewares/Kconfig"
 menu "SDK"

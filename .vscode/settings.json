@@ -50,7 +50,8 @@
         "initializer_list": "c",
         "span": "c",
         "text_encoding": "c",
-        "portmacro.h": "c"
+        "portmacro.h": "c",
+        "task.h": "c"
     },
     "cmake.sourceDirectory": "D:/Code/OpenIBBOs/OS/include"
 }
