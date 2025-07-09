@@ -160,7 +160,7 @@ QueueHandle_t vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, u
         return NULL;
     }
     VFB_D("Task %s Queue %p created, queue_num: %u\r\n", taskName, queue_handle, queue_num);
-    if (xSemaphoreTake(__vfb_info.xFDSemaphore, pdMS_TO_TICKS(1000)) == pdTRUE) {
+    if (xSemaphoreTake(__vfb_info.xFDSemaphore, pdMS_TO_TICKS(300)) == pdTRUE) {
         for (uint16_t i = 0; i < event_num; i++) {
             List_t *queue_list = __vfb_list_get_head(event_list[i]);
             if (queue_list == NULL) {

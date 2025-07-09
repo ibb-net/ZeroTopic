@@ -25,7 +25,7 @@
 #define DebugChannelMax 1
 #endif
 #ifndef CONFIG_DEBUG_CYCLE_TIMER_MS
-#define CONFIG_DEBUG_CYCLE_TIMER_MS 5
+#define CONFIG_DEBUG_CYCLE_TIMER_MS 100
 #endif
 /* ===================================================================================== */
 typedef struct {

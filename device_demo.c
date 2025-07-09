@@ -26,7 +26,7 @@
 #define DemoChannelMax 1
 #endif
 #ifndef CONFIG_Demo_CYCLE_TIMER_MS
-#define CONFIG_Demo_CYCLE_TIMER_MS 5
+#define CONFIG_Demo_CYCLE_TIMER_MS 300
 #endif
 /* ===================================================================================== */
 typedef struct

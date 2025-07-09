@@ -26,7 +26,7 @@
 #define osMonitorChannelMax 1
 #endif
 #ifndef CONFIG_osMonitor_CYCLE_TIMER_MS
-#define CONFIG_osMonitor_CYCLE_TIMER_MS 5
+#define CONFIG_osMonitor_CYCLE_TIMER_MS 300
 #endif
 /* ===================================================================================== */
 typedef struct
