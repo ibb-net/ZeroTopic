@@ -132,7 +132,7 @@ SYSTEM_REGISTER_INIT(BoardInitStage, Ds18b20Priority, __Ds18b20CreateTaskHandle,
 
 static void __Ds18b20InitHandle(void *msg) {
     elog_i(TAG, "__Ds18b20InitHandle");
-    elog_set_filter_tag_lvl(TAG, Ds18b20LogLvl);
+    //elog_set_filter_tag_lvl(TAG, Ds18b20LogLvl);
     Ds18b20Status[0].status      = 0;       // Initialize status
     Ds18b20Status[0].step        = 0;       // Initialize step
     Ds18b20Status[0].temperature = -100.0;  // Initialize temperature

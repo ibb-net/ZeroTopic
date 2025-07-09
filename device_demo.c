@@ -104,7 +104,7 @@ SYSTEM_REGISTER_INIT(AppInitStage, DemoPriority, __DemoCreateTaskHandle, __DemoC
 
 static void __DemoInitHandle(void *msg) {
     elog_i(TAG, "__DemoInitHandle");
-    elog_set_filter_tag_lvl(TAG, DemoLogLvl);
+    //elog_set_filter_tag_lvl(TAG, DemoLogLvl);
     vfb_send(DemoStart, 0, NULL, 0);
 }
 // 接收消息的回调函数

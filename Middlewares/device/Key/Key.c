@@ -101,7 +101,7 @@ SYSTEM_REGISTER_INIT(ServerInitStage, KeyPriority, __KeyCreateTaskHandle,
 
 static void __KeyInitHandle(void *msg) {
     elog_i(TAG, "__KeyInitHandle");
-    elog_set_filter_tag_lvl(TAG, KeyLogLvl);
+    //elog_set_filter_tag_lvl(TAG, KeyLogLvl);
 }
 // 接收消息的回调函数
 static void __KeyRcvHandle(void *msg) {
@@ -215,7 +215,7 @@ static void __KeyCtrl(TypdefKeyBSPCfg *cfg, uint8_t en) {
         if (KeyStatus[i].cfg != NULL &&
             strcmp(KeyStatus[i].cfg->device_name, cfg->device_name) == 0) {
             if (KeyStatus[i].enable == en) {
-                elog_i(TAG, "Key %s already in desired state (slot %d)", cfg->device_name, i);
+                elog_i(TAG, "Key %s already %s", cfg->device_name, en ? "enabled" : "disabled");
                 return;  // Already in the desired state
             }
             KeyStatus[i].enable               = en;

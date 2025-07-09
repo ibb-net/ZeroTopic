@@ -104,7 +104,7 @@ SYSTEM_REGISTER_INIT(AppInitStage, osMonitorPriority, __osMonitorCreateTaskHandl
 
 static void __osMonitorInitHandle(void *msg) {
     elog_i(TAG, "__osMonitorInitHandle");
-    elog_set_filter_tag_lvl(TAG, osMonitorLogLvl);
+    //elog_set_filter_tag_lvl(TAG, osMonitorLogLvl);
     vfb_send(osMonitorStart, 0, NULL, 0);
 }
 // 接收消息的回调函数

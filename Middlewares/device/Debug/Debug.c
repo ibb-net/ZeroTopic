@@ -205,7 +205,7 @@ SYSTEM_REGISTER_INIT(PreStartupInitStage, DebugPriority, DebugCreateTaskHandle,
 
 static void DebugInitHandle(void *msg) {
     printf("DebugInitHandle\r\n");
-    elog_set_filter_tag_lvl(TAG, DebugLogLvl);
+    //elog_set_filter_tag_lvl(TAG, DebugLogLvl);
     vfb_send(DebugStart, 0, NULL, 0);
     printf("DebugInitHandle Done\r\n");
 }

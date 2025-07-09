@@ -42,7 +42,8 @@
 #include "semphr.h"
 #include "task.h"
 volatile SemaphoreHandle_t elogLockSemaphore = NULL;
-volatile uint8_t print_busy_flag = 0;  // Flag to indicate if the print function is busy
+volatile uint8_t print_busy_flag             = 0;  // Flag to indicate if the print function is busy
+volatile uint8_t log_enabled                  = 1;  // Flag to indicate if logging is enabled
 ElogErrCode elog_port_init(void) {
     ElogErrCode result = ELOG_NO_ERR;
 
@@ -88,13 +89,26 @@ void elog_port_output(const char *log, size_t size) {
  * output lock
  */
 void elog_port_output_lock(void) {
+#if 0
     /* add your code here */
+    uint32_t cnt = 0;
+    BaseType_t ref = 0;
     if (elogLockSemaphore != NULL) {
-        xSemaphoreTake(elogLockSemaphore, portMAX_DELAY);
+        ref = xSemaphoreTake(elogLockSemaphore, pdMS_TO_TICKS(100));
+        if (ref != pdTRUE) {
+            VFB_E("\r\nFailed to take output lock\r\n");
+            return;
+        }
     }
     while (print_busy_flag) {
         vTaskDelay(pdMS_TO_TICKS(10));  // Adjust the delay as needed
+        cnt++;
+        if (cnt > 10) {  // Timeout after 1 second
+            VFB_E("\r\nOutput lock timeout\r\n");
+            break;
+        }
     }
+#endif
 }
 /**
  * output unlock

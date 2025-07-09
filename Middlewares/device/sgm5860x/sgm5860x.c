@@ -207,7 +207,7 @@ SYSTEM_REGISTER_INIT(BoardInitStage, sgm5860xPriority, __sgm5860xCreateTaskHandl
 
 static void __sgm5860xInitHandle(void *msg) {
     elog_i(TAG, "__sgm5860xInitHandle");
-    elog_set_filter_tag_lvl(TAG, sgm5860xLogLvl);
+    //elog_set_filter_tag_lvl(TAG, sgm5860xLogLvl);
     vTaskDelay(pdMS_TO_TICKS(1));  // Delay to ensure the system is ready
     // Initialize the SGM5860x device
     vfb_send(sgm5860xStart, 0, NULL, 0);

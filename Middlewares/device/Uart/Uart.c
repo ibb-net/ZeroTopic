@@ -224,7 +224,7 @@ SYSTEM_REGISTER_INIT(ServerInitStage, UartPriority, UartCreateTaskHandle,
 
 static void UartInitHandle(void *msg) {
     elog_i(TAG, "UartInitHandle\r\n");
-    elog_set_filter_tag_lvl(TAG, UartLogLvl);
+    //elog_set_filter_tag_lvl(TAG, UartLogLvl);
     vfb_send(UartStart, 0, NULL, 0);
 }
 // 5A A5 05 82 00A0 007D

@@ -111,7 +111,7 @@ SYSTEM_REGISTER_INIT(ServerInitStage, McuadcPriority, __McuadcCreateTaskHandle,
 
 static void __McuadcInitHandle(void *msg) {
     elog_i(TAG, "__McuadcInitHandle");
-    elog_set_filter_tag_lvl(TAG, McuadcLogLvl);
+    //elog_set_filter_tag_lvl(TAG, McuadcLogLvl);
     // vfb_send(McuadcStart, 0, NULL, 0);
     /* reset ADC */
 

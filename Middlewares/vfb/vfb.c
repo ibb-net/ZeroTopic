@@ -128,7 +128,7 @@ void vfb_server_init(void) {
         return;
     }
     vListInitialise(&(__vfb_info.event_list));
-    elog_set_filter_tag_lvl(TAG, VFBLogLvl);
+    //elog_set_filter_tag_lvl(TAG, VFBLogLvl);
 
     xSemaphoreGive(__vfb_info.xFDSemaphore);
     VFB_I("FD server initialized successfully\r\n");
@@ -304,7 +304,7 @@ uint8_t __vfb_send_core(vfb_msg_mode_t mode, vfb_event_t event, uint32_t data, v
             }
 
             if (__vfb_send_queue(mode, queue_handle, &tmp_msg) != FD_PASS) {
-                VFB_E("Failed to send message to queue for event %u", event);
+                VFB_E("Failed to send message to queue for event %u\r\n", event);
                 tmp_msg.frame->head.use_cnt--;
                 if (tmp_msg.frame->head.use_cnt == 0) {
                     VFB_W("No queue found for event %u, use count is 0\r\n", event);
