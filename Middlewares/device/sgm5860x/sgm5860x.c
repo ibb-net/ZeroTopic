@@ -1,4 +1,3 @@
-
 #include "sgm5860x.h"
 #define CONFIG_sgm5860x_EN 1
 #if CONFIG_sgm5860x_EN
@@ -30,7 +29,17 @@
 #ifndef CONFIG_sgm5860x_CYCLE_TIMER_MS
 #define CONFIG_sgm5860x_CYCLE_TIMER_MS 10
 #endif
+#define KALMAN_FILTER_MODE (1)  // 0: No filter, 1: Kalman filter
+#define AVG_FILTER_MODE    (0)  // 0: No filter, 1: Average filter
+#define FILTER_MODE        (KALMAN_FILTER_MODE)
+#if FILTER_MODE == KALMAN_FILTER_MODE
+#include "kalman_filter.h"
+#elif FILTER_MODE == AVG_FILTER_MODE
 #define AVG_MAX_CNT (10)
+#else
+#error \
+    "Invalid filter mode selected. Please set FILTER_MODE to either KALMAN_FILTER_MODE or AVG_FILTER_MODE"
+#endif
 
 const double f_gain_map[] = {
     [SGM58601_GAIN_1] = 1.0,   [SGM58601_GAIN_2] = 2.0,     [SGM58601_GAIN_4] = 4.0,
@@ -141,6 +150,13 @@ void sgm5860xReadReg(unsigned char regaddr, unsigned char databyte);
 // void sgm5860xsend(uint8_t ch, uint16_t data);
 int sgm5860xReadSingleData(unsigned char channel);
 
+#if FILTER_MODE == KALMAN_FILTER_MODE
+// 卡尔曼滤波器相关函数声明
+static void sgm5860x_kalman_filter_init(uint8_t channel_index);
+static void sgm5860x_print_kalman_stats(uint8_t channel_index);
+static void sgm5860x_check_kalman_health(uint8_t channel_index);
+#endif
+
 typedef struct {
     char device_name[DEVICE_NAME_MAX];
     uint32_t id;  // ID
@@ -149,9 +165,16 @@ typedef struct {
     uint8_t scan_index;                       // Channel to scan
     double last_voltage[sgm5860xChannelMax];  // Last voltage read from each channel
     double sum[sgm5860xChannelMax];
-    double average[sgm5860xChannelMax];                   // Average voltage for each channel
-    uint8_t vol_index[sgm5860xChannelMax];                // Voltage index for each channel
+    double average[sgm5860xChannelMax];     // Average voltage for each channel
+    uint8_t vol_index[sgm5860xChannelMax];  // Voltage index for each channel
+#if FILTER_MODE == KALMAN_FILTER_MODE
+    AdaptiveKalmanFilter_t kalman_filters[sgm5860xChannelMax];  // Kalman filters for each channel
+    uint8_t kalman_initialized[sgm5860xChannelMax];             // Kalman filter initialization status
+    double filtered_voltage[sgm5860xChannelMax];               // Filtered voltage for each channel
+    uint32_t sample_count[sgm5860xChannelMax];                 // Sample count for each channel
+#elif FILTER_MODE == AVG_FILTER_MODE
     double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
+#endif
 
 } Typdefsgm5860xStatus;
 volatile Typdefsgm5860xStatus sgm5860xStatus = {0};
@@ -190,7 +213,21 @@ void sgm5860xDeviceInit(void) {
 
     DevSgm5860xHandleStruct *sgm5860xBspCfg = (DevSgm5860xHandleStruct *)&sgm5860_cfg;
     sgm5860xStatus.cfg                      = sgm5860xBspCfg;  // Assign the BSP configuration
-    strcpy((char*)sgm5860xStatus.device_name, "sgm58601");
+    strcpy((char *)sgm5860xStatus.device_name, "sgm58601");
+    
+    // 初始化所有通道的滤波器状态
+    for (int i = 0; i < sgm5860xChannelMax; i++) {
+        sgm5860xStatus.last_voltage[i] = 0.0;
+        sgm5860xStatus.sum[i] = 0.0;
+        sgm5860xStatus.average[i] = 0.0;
+        sgm5860xStatus.vol_index[i] = 0;
+#if FILTER_MODE == KALMAN_FILTER_MODE
+        sgm5860xStatus.kalman_initialized[i] = 0;
+        sgm5860xStatus.filtered_voltage[i] = 0.0;
+        sgm5860xStatus.sample_count[i] = 0;
+#endif
+    }
+    
     DevSgm5860xInit(sgm5860xBspCfg);  // Initialize the SGM5860x device
     elog_i(TAG, "sgm5860xDeviceInit completed");
     elog_i(TAG, "sgm5860xStatus.device_name: %s", sgm5860xStatus.device_name);
@@ -207,7 +244,7 @@ SYSTEM_REGISTER_INIT(BoardInitStage, sgm5860xPriority, __sgm5860xCreateTaskHandl
 
 static void __sgm5860xInitHandle(void *msg) {
     elog_i(TAG, "__sgm5860xInitHandle");
-    //elog_set_filter_tag_lvl(TAG, sgm5860xLogLvl);
+    // elog_set_filter_tag_lvl(TAG, sgm5860xLogLvl);
     vTaskDelay(pdMS_TO_TICKS(1));  // Delay to ensure the system is ready
     // Initialize the SGM5860x device
     vfb_send(sgm5860xStart, 0, NULL, 0);
@@ -223,7 +260,14 @@ static void __sgm5860xRcvHandle(void *msg) {
             elog_i(TAG, "sgm5860xStartTask %d", tmp_msg->frame->head.data);
             DevSgm5860xConfig(&sgm5860_cfg);  // Configure the SGM5860x device
             sgm5860xStatus.status = 1;        // Set status to indicate the device is started
-
+            
+#if FILTER_MODE == KALMAN_FILTER_MODE
+            // 初始化所有通道的卡尔曼滤波器
+            for (int i = 0; i < sgm5860xChannelMax; i++) {
+                sgm5860x_kalman_filter_init(i);
+            }
+            elog_i(TAG, "All Kalman filters initialized");
+#endif
         } break;
         case sgm5860xSet: {
             elog_i(TAG, "sgm5860xSetTask %d", tmp_msg->frame->head.data);
@@ -235,7 +279,7 @@ static void __sgm5860xRcvHandle(void *msg) {
 }
 
 static void __sgm5860xCycHandle(void) {
-    Typdefsgm5860xStatus *sgm5860xStatusHandle =( Typdefsgm5860xStatus *) &sgm5860xStatus;
+    Typdefsgm5860xStatus *sgm5860xStatusHandle = (Typdefsgm5860xStatus *)&sgm5860xStatus;
     if (sgm5860xStatusHandle == NULL) {
         elog_e(TAG, "[ERROR]sgm5860xStatusHandle NULL");
         return;
@@ -259,6 +303,39 @@ static void __sgm5860xCycHandle(void) {
                     f_gain_map[sgm5860_channelcfg[i].gain];  // Get the gain for the last channel
                 sgm5860xStatus.last_voltage[i] = last_voltage;
                 sgm5860xStatus.sum[i] += last_voltage;  // Accumulate the voltage for averaging
+
+#if FILTER_MODE == KALMAN_FILTER_MODE
+                // 使用自适应卡尔曼滤波器处理数据
+                if (sgm5860xStatus.kalman_initialized[i]) {
+                    // 更新卡尔曼滤波器
+                    sgm5860xStatus.filtered_voltage[i] = adaptive_kalman_update(
+                        &sgm5860xStatus.kalman_filters[i], last_voltage);
+                    
+                    sgm5860xStatus.sample_count[i]++;
+                    
+                    // 每个采样都发送滤波后的数据
+                    vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.filtered_voltage[i]),
+                             sizeof(sgm5860xStatus.filtered_voltage[i]));
+                    
+                    elog_d(TAG, "Index %d Channel %d, Gain %.0f, Raw: %.7f V, Filtered: %.7f V", 
+                           last_index, last_channel, last_gain, last_voltage, 
+                           sgm5860xStatus.filtered_voltage[i]);
+                    
+                    // 每100个样本检查一次滤波器健康状态
+                    if (sgm5860xStatus.sample_count[i] % 100 == 0) {
+                        sgm5860x_check_kalman_health(i);
+                    }
+                    
+                    // 每1000个样本打印一次统计信息
+                    if (sgm5860xStatus.sample_count[i] % 1000 == 0) {
+                        sgm5860x_print_kalman_stats(i);
+                    }
+                } else {
+                    // 如果滤波器未初始化，使用原始值
+                    sgm5860xStatus.filtered_voltage[i] = last_voltage;
+                    elog_w(TAG, "Kalman filter not initialized for channel %d", i);
+                }
+#elif FILTER_MODE == AVG_FILTER_MODE
                 sgm5860xStatus.tmp_voltage[i][sgm5860xStatus.vol_index[i]] = last_voltage;
 
                 sgm5860xStatus.vol_index[i]++;
@@ -321,6 +398,8 @@ static void __sgm5860xCycHandle(void) {
                     elog_d(TAG, " Index %d Channel %d, Gain %.0f, Voltage: %.7f V", last_index,
                            last_channel, last_gain, sgm5860xStatus.average[i]);
                 }
+#endif
+
                 break;
             }
         }
@@ -377,6 +456,15 @@ static void Cmdsgm5860xHelp(void) {
     printf("  reset         Reset the SGM5860x device\r\n");
     printf("  init          Initialize the SGM5860x device\r\n");
     printf("  data          Read data from the SGM5860x device\r\n");
+    printf("  read <addr>   Read register from SGM5860x device\r\n");
+#if FILTER_MODE == KALMAN_FILTER_MODE
+    printf("  kalman        Kalman filter control commands\r\n");
+    printf("    status [ch] - Show filter status\r\n");
+    printf("    stats [ch]  - Show filter statistics\r\n");
+    printf("    reset [ch]  - Reset filter\r\n");
+    printf("    tune <ch> <resp> <stab> - Tune filter parameters\r\n");
+    printf("    check [ch]  - Check filter health\r\n");
+#endif
 }
 
 static int Cmdsgm5860xHandle(int argc, char *argv[]) {
@@ -396,9 +484,18 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
     if (strcmp(argv[1], "data") == 0) {
         elog_i(TAG, "SGM5860x data readout\r\n");
         for (int i = 0; i < sgm5860xChannelMax; i++) {
+#if FILTER_MODE == KALMAN_FILTER_MODE
+            elog_i(TAG, "Index %d Channel %d: Raw=%.7f V, Filtered=%.7f V (%.4f mV, %.1f uV)", 
+                   i, sgm5860_channelcfg[i].channel, 
+                   sgm5860xStatus.last_voltage[i],
+                   sgm5860xStatus.filtered_voltage[i],
+                   sgm5860xStatus.filtered_voltage[i] * 1000.0, 
+                   sgm5860xStatus.filtered_voltage[i] * 1000000.0);
+#elif FILTER_MODE == AVG_FILTER_MODE
             elog_i(TAG, "Index %d Channel %d: Voltage = %.7f V %.4f mV, %.1f uV", i,
                    sgm5860_channelcfg[i].channel, sgm5860xStatus.average[i],
                    sgm5860xStatus.average[i] * 1000.0, sgm5860xStatus.average[i] * 1000000.0);
+#endif
         }
         return 0;
     }
@@ -420,9 +517,279 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
         return 0;
     }
 
-    Cmdsgm5860xHelp();
-    return 0;
+#if FILTER_MODE == KALMAN_FILTER_MODE
+    // kalman
+    if (strcmp(argv[1], "kalman") == 0) {
+        if (argc < 3) {
+            printf("Usage: sgm5860x kalman <command> [args]\r\n");
+            printf("Commands:\r\n");
+            printf("  status [channel] - Show Kalman filter status\r\n");
+            printf("  stats [channel]  - Show Kalman filter statistics\r\n");
+            printf("  reset [channel]  - Reset Kalman filter\r\n");
+            printf("  tune <channel> <responsiveness> <stability> - Tune filter parameters\r\n");
+            printf("  check [channel]  - Check filter health\r\n");
+            return 0;
+        }
+        
+        if (strcmp(argv[2], "status") == 0) {
+            if (argc >= 4) {
+                int channel = atoi(argv[3]);
+                if (channel >= 0 && channel < sgm5860xChannelMax) {
+                    sgm5860x_print_kalman_stats(channel);
+                } else {
+                    printf("Invalid channel number. Range: 0-%d\r\n", sgm5860xChannelMax - 1);
+                }
+            } else {
+                // 显示所有通道的状态
+                for (int i = 0; i < sgm5860xChannelMax; i++) {
+                    sgm5860x_print_kalman_stats(i);
+                }
+            }
+            return 0;
+        }
+        
+        if (strcmp(argv[2], "stats") == 0) {
+            if (argc >= 4) {
+                int channel = atoi(argv[3]);
+                if (channel >= 0 && channel < sgm5860xChannelMax) {
+                    if (sgm5860xStatus.kalman_initialized[channel]) {
+                        AdaptiveKalmanPerformance_t perf;
+                        adaptive_kalman_get_performance_stats(&sgm5860xStatus.kalman_filters[channel], &perf);
+                        
+                        printf("Channel %d Performance Statistics:\r\n", channel);
+                        printf("  Tracking Accuracy: %.4f\r\n", perf.tracking_accuracy);
+                        printf("  Filter Stability: %.4f\r\n", perf.filter_stability);
+                        printf("  Convergence Speed: %.4f\r\n", perf.convergence_speed);
+                        printf("  Q Drift: %.4f%%\r\n", perf.Q_drift * 100);
+                        printf("  R Drift: %.4f%%\r\n", perf.R_drift * 100);
+                        printf("  Total Adaptations: %d\r\n", perf.total_adaptations);
+                        printf("  State Changes: %d\r\n", perf.state_changes);
+                        printf("  Samples: %d\r\n", (int)sgm5860xStatus.sample_count[channel]);
+                    } else {
+                        printf("Kalman filter not initialized for channel %d\r\n", channel);
+                    }
+                } else {
+                    printf("Invalid channel number. Range: 0-%d\r\n", sgm5860xChannelMax - 1);
+                }
+            } else {
+                printf("Usage: sgm5860x kalman stats <channel>\r\n");
+            }
+            return 0;
+        }
+        
+        if (strcmp(argv[2], "reset") == 0) {
+            if (argc >= 4) {
+                int channel = atoi(argv[3]);
+                if (channel >= 0 && channel < sgm5860xChannelMax) {
+                    if (sgm5860xStatus.kalman_initialized[channel]) {
+                        double current_value = sgm5860xStatus.filtered_voltage[channel];
+                        adaptive_kalman_reset(&sgm5860xStatus.kalman_filters[channel], current_value);
+                        sgm5860xStatus.sample_count[channel] = 0;
+                        printf("Kalman filter reset for channel %d to value %.6f\r\n", channel, current_value);
+                    } else {
+                        printf("Kalman filter not initialized for channel %d\r\n", channel);
+                    }
+                } else {
+                    printf("Invalid channel number. Range: 0-%d\r\n", sgm5860xChannelMax - 1);
+                }
+            } else {
+                // 重置所有通道
+                for (int i = 0; i < sgm5860xChannelMax; i++) {
+                    if (sgm5860xStatus.kalman_initialized[i]) {
+                        double current_value = sgm5860xStatus.filtered_voltage[i];
+                        adaptive_kalman_reset(&sgm5860xStatus.kalman_filters[i], current_value);
+                        sgm5860xStatus.sample_count[i] = 0;
+                        printf("Kalman filter reset for channel %d to value %.6f\r\n", i, current_value);
+                    }
+                }
+            }
+            return 0;
+        }
+        
+        if (strcmp(argv[2], "tune") == 0) {
+            if (argc >= 6) {
+                int channel = atoi(argv[3]);
+                double responsiveness = atof(argv[4]);
+                double stability = atof(argv[5]);
+                
+                if (channel >= 0 && channel < sgm5860xChannelMax) {
+                    if (sgm5860xStatus.kalman_initialized[channel]) {
+                        adaptive_kalman_tune_parameters(&sgm5860xStatus.kalman_filters[channel], 
+                                                       responsiveness, stability);
+                        printf("Kalman filter tuned for channel %d: responsiveness=%.2f, stability=%.2f\r\n", 
+                               channel, responsiveness, stability);
+                    } else {
+                        printf("Kalman filter not initialized for channel %d\r\n", channel);
+                    }
+                } else {
+                    printf("Invalid channel number. Range: 0-%d\r\n", sgm5860xChannelMax - 1);
+                }
+            } else {
+                printf("Usage: sgm5860x kalman tune <channel> <responsiveness> <stability>\r\n");
+                printf("  responsiveness: 0.1-1.0 (higher = more responsive)\r\n");
+                printf("  stability: 0.1-1.0 (higher = more stable)\r\n");
+            }
+            return 0;
+        }
+        
+        if (strcmp(argv[2], "check") == 0) {
+            if (argc >= 4) {
+                int channel = atoi(argv[3]);
+                if (channel >= 0 && channel < sgm5860xChannelMax) {
+                    if (sgm5860xStatus.kalman_initialized[channel]) {
+                        int check_result = adaptive_kalman_self_check(&sgm5860xStatus.kalman_filters[channel]);
+                        printf("Channel %d health check: ", channel);
+                        if (check_result == KALMAN_CHECK_OK) {
+                            printf("OK\r\n");
+                        } else {
+                            printf("ERROR 0x%02X", check_result);
+                            if (check_result & KALMAN_CHECK_PARAM_ERROR) printf(" PARAM");
+                            if (check_result & KALMAN_CHECK_BOUNDS_ERROR) printf(" BOUNDS");
+                            if (check_result & KALMAN_CHECK_UNSTABLE) printf(" UNSTABLE");
+                            if (check_result & KALMAN_CHECK_POOR_TRACKING) printf(" TRACKING");
+                            if (check_result & KALMAN_CHECK_POOR_STABILITY) printf(" STABILITY");
+                            printf("\r\n");
+                        }
+                    } else {
+                        printf("Kalman filter not initialized for channel %d\r\n", channel);
+                    }
+                } else {
+                    printf("Invalid channel number. Range: 0-%d\r\n", sgm5860xChannelMax - 1);
+                }
+            } else {
+                // 检查所有通道
+                for (int i = 0; i < sgm5860xChannelMax; i++) {
+                    if (sgm5860xStatus.kalman_initialized[i]) {
+                        int check_result = adaptive_kalman_self_check(&sgm5860xStatus.kalman_filters[i]);
+                        printf("Channel %d: ", i);
+                        if (check_result == KALMAN_CHECK_OK) {
+                            printf("OK\r\n");
+                        } else {
+                            printf("ERROR 0x%02X\r\n", check_result);
+                        }
+                    }
+                }
+            }
+            return 0;
+        }
+        
+        printf("Unknown kalman command: %s\r\n", argv[2]);
+        return 0;
+    }
+#endif
 }
 
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), sgm5860x,
                  Cmdsgm5860xHandle, sgm5860x command);
+
+#if FILTER_MODE == KALMAN_FILTER_MODE
+/**
+ * @brief 初始化ADC通道的自适应卡尔曼滤波器
+ * @param channel_index 通道索引
+ */
+static void sgm5860x_kalman_filter_init(uint8_t channel_index) {
+    if (channel_index >= sgm5860xChannelMax) return;
+    
+    // 根据通道特性设置不同的初始参数
+    double initial_value = 0.0;
+    double process_noise = 0.01;    // 默认过程噪声
+    double measurement_noise = 0.1; // 默认测量噪声
+    
+    // 根据通道配置调整滤波器参数
+    uint8_t gain = sgm5860_channelcfg[channel_index].gain;
+    switch (gain) {
+        case SGM58601_GAIN_1:
+        case SGM58601_GAIN_2:
+        case SGM58601_GAIN_4:
+            // 低增益通道：信号较大，噪声相对较小
+            process_noise = 0.005;
+            measurement_noise = 0.05;
+            break;
+            
+        case SGM58601_GAIN_8:
+        case SGM58601_GAIN_16:
+        case SGM58601_GAIN_32:
+            // 中增益通道：信号中等，噪声中等
+            process_noise = 0.01;
+            measurement_noise = 0.1;
+            break;
+            
+        case SGM58601_GAIN_64:
+        case SGM58601_GAIN_128:
+            // 高增益通道：信号较小，噪声相对较大
+            process_noise = 0.02;
+            measurement_noise = 0.2;
+            break;
+    }
+    
+    // 初始化自适应卡尔曼滤波器
+    adaptive_kalman_init(&sgm5860xStatus.kalman_filters[channel_index], 
+                        initial_value, 
+                        process_noise, 
+                        measurement_noise, 
+                        1.0);
+    
+    // 设置参数边界
+    adaptive_kalman_set_bounds(&sgm5860xStatus.kalman_filters[channel_index],
+                              process_noise * 0.1,    // Q_min
+                              process_noise * 10.0,    // Q_max
+                              measurement_noise * 0.1, // R_min
+                              measurement_noise * 10.0); // R_max
+    
+    // 根据通道特性调整自适应速率
+    if (gain >= SGM58601_GAIN_64) {
+        // 高增益通道需要更快的自适应速率
+        adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.15);
+    } else {
+        // 低增益通道使用较慢的自适应速率
+        adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.08);
+    }
+    
+    sgm5860xStatus.kalman_initialized[channel_index] = 1;
+    sgm5860xStatus.sample_count[channel_index] = 0;
+    sgm5860xStatus.filtered_voltage[channel_index] = 0.0;
+    
+    elog_d(TAG, "Kalman filter initialized for channel %d (gain=%d)", 
+           channel_index, gain);
+}
+
+/**
+ * @brief 获取通道的滤波器性能统计
+ * @param channel_index 通道索引
+ */
+static void sgm5860x_print_kalman_stats(uint8_t channel_index) {
+    if (channel_index >= sgm5860xChannelMax || 
+        !sgm5860xStatus.kalman_initialized[channel_index]) return;
+    
+    AdaptiveKalmanStatus_t status;
+    adaptive_kalman_get_status(&sgm5860xStatus.kalman_filters[channel_index], &status);
+    
+    elog_i(TAG, "Channel %d Kalman Stats:", channel_index);
+    elog_i(TAG, "  Value: %.6f V, Gain: %.4f", status.current_value, status.kalman_gain);
+    elog_i(TAG, "  Q: %.6f, R: %.6f", status.process_noise, status.measurement_noise);
+    elog_i(TAG, "  Stability: %.4f, Error: %.6f", status.stability_metric, status.tracking_error);
+    elog_i(TAG, "  Signal State: %d, Adaptations: %d", status.signal_state, status.adaptation_counter);
+}
+
+/**
+ * @brief 检查并重置异常的滤波器
+ * @param channel_index 通道索引
+ */
+static void sgm5860x_check_kalman_health(uint8_t channel_index) {
+    if (channel_index >= sgm5860xChannelMax || 
+        !sgm5860xStatus.kalman_initialized[channel_index]) return;
+    
+    int check_result = adaptive_kalman_self_check(&sgm5860xStatus.kalman_filters[channel_index]);
+    
+    if (check_result != KALMAN_CHECK_OK) {
+        elog_w(TAG, "Channel %d Kalman filter error: 0x%02X", channel_index, check_result);
+        
+        // 如果检测到严重错误，重置滤波器
+        if (check_result & (KALMAN_CHECK_UNSTABLE | KALMAN_CHECK_POOR_STABILITY)) {
+            double current_value = sgm5860xStatus.filtered_voltage[channel_index];
+            adaptive_kalman_reset(&sgm5860xStatus.kalman_filters[channel_index], current_value);
+            elog_i(TAG, "Channel %d Kalman filter reset to %.6f", channel_index, current_value);
+        }
+    }
+}
+#endif
