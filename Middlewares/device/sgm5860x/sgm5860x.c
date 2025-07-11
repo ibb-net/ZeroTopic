@@ -148,6 +148,9 @@ void sgm5860xWriteReg(unsigned char regaddr, unsigned char databyte);
 void sgm5860xInit(void);
 void sgm5860xReadReg(unsigned char regaddr, unsigned char databyte);
 // void sgm5860xsend(uint8_t ch, uint16_t data);
+static void sgm5860x_check_kalman_health(uint8_t channel_index);
+static void sgm5860x_kalman_filter_init(uint8_t channel_index);
+static void sgm5860x_print_kalman_stats(uint8_t channel_index);
 int sgm5860xReadSingleData(unsigned char channel);
 
 typedef struct {

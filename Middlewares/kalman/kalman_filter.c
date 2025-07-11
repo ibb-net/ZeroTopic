@@ -581,3 +581,130 @@ void adaptive_kalman_get_performance_stats(AdaptiveKalmanFilter_t *akf, Adaptive
     stats->Q_drift = fabs(akf->Q - akf->Q_base) / akf->Q_base;
     stats->R_drift = fabs(akf->R - akf->R_base) / akf->R_base;
 }
+
+// ==================== 缺少的自适应卡尔曼滤波器扩展函数实现 ====================
+
+/**
+ * @brief 设置自适应卡尔曼滤波器的参数边界
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @param Q_min 最小过程噪声
+ * @param Q_max 最大过程噪声
+ * @param R_min 最小测量噪声
+ * @param R_max 最大测量噪声
+ */
+void adaptive_kalman_set_bounds(AdaptiveKalmanFilter_t *akf, double Q_min, double Q_max, double R_min, double R_max) {
+    if (akf == NULL) return;
+    
+    // 确保参数合理性
+    if (Q_min > 0 && Q_max > Q_min) {
+        akf->Q_min = Q_min;
+        akf->Q_max = Q_max;
+    }
+    
+    if (R_min > 0 && R_max > R_min) {
+        akf->R_min = R_min;
+        akf->R_max = R_max;
+    }
+    
+    // 约束当前值在边界内
+    if (akf->Q < akf->Q_min) akf->Q = akf->Q_min;
+    if (akf->Q > akf->Q_max) akf->Q = akf->Q_max;
+    if (akf->R < akf->R_min) akf->R = akf->R_min;
+    if (akf->R > akf->R_max) akf->R = akf->R_max;
+}
+
+/**
+ * @brief 启用或禁用自适应功能
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @param enable 1启用，0禁用
+ */
+void adaptive_kalman_enable_adaptation(AdaptiveKalmanFilter_t *akf, int enable) {
+    if (akf == NULL) return;
+    akf->enable_adaptation = enable;
+}
+
+/**
+ * @brief 设置自适应调整速率
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @param rate 自适应速率 (0.01-1.0)
+ */
+void adaptive_kalman_set_adaptation_rate(AdaptiveKalmanFilter_t *akf, double rate) {
+    if (akf == NULL || rate <= 0 || rate > 1.0) return;
+    akf->adaptation_threshold = rate;
+}
+
+/**
+ * @brief 获取当前自适应增益
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @return 自适应增益值
+ */
+double adaptive_kalman_get_adaptation_gain(AdaptiveKalmanFilter_t *akf) {
+    if (akf == NULL) return 0.0;
+    return akf->adaptation_gain;
+}
+
+/**
+ * @brief 获取稳定性指标
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @return 稳定性指标值
+ */
+double adaptive_kalman_get_stability_metric(AdaptiveKalmanFilter_t *akf) {
+    if (akf == NULL) return 0.0;
+    return akf->stability_metric;
+}
+
+/**
+ * @brief 获取当前信号状态
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @return 信号状态枚举值
+ */
+SignalState_t adaptive_kalman_get_signal_state(AdaptiveKalmanFilter_t *akf) {
+    if (akf == NULL) return SIGNAL_STABLE;
+    return akf->signal_state;
+}
+
+/**
+ * @brief 设置遗忘因子
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @param factor 遗忘因子 (0.9-1.0)
+ */
+void adaptive_kalman_set_forgetting_factor(AdaptiveKalmanFilter_t *akf, double factor) {
+    if (akf == NULL || factor < 0.5 || factor > 1.0) return;
+    akf->forgetting_factor = factor;
+}
+
+/**
+ * @brief 带标定的自适应卡尔曼滤波更新
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @param raw_measurement 原始测量值
+ * @param offset 偏移校正值
+ * @param scale 比例校正值
+ * @return 标定并滤波后的估计值
+ */
+double adaptive_kalman_update_with_calibration(AdaptiveKalmanFilter_t *akf, double raw_measurement, double offset, double scale) {
+    if (akf == NULL || scale == 0.0) return raw_measurement;
+    
+    // 应用标定
+    double calibrated_measurement = (raw_measurement + offset) * scale;
+    
+    // 进行自适应滤波
+    return adaptive_kalman_update(akf, calibrated_measurement);
+}
+
+/**
+ * @brief 带多点插值标定的自适应卡尔曼滤波更新
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @param raw_measurement 原始测量值
+ * @param cal_points 标定点数组
+ * @param num_points 标定点数量
+ * @return 标定并滤波后的估计值
+ */
+double adaptive_kalman_update_with_interpolation(AdaptiveKalmanFilter_t *akf, double raw_measurement, const double cal_points[][2], int num_points) {
+    if (akf == NULL || cal_points == NULL || num_points < 2) return raw_measurement;
+    
+    // 应用线性插值标定
+    double calibrated_measurement = kalman_linear_interpolation_calibration(raw_measurement, cal_points, num_points);
+    
+    // 进行自适应滤波
+    return adaptive_kalman_update(akf, calibrated_measurement);
+}
