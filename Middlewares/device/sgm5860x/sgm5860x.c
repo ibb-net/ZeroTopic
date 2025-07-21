@@ -303,10 +303,18 @@ static void __sgm5860xCycHandle(void) {
 #if FILTER_MODE == KALMAN_FILTER_MODE
                 // 使用自适应卡尔曼滤波器处理数据
                 if (sgm5860xStatus.kalman_initialized[i]) {
+                    double tmp_voltage = last_voltage;
                     // 更新卡尔曼滤波器
+                    if(last_channel ==6)
+                    {
+                        tmp_voltage=last_voltage*250.0;
+                    }
                     sgm5860xStatus.filtered_voltage[i] = adaptive_kalman_update(
-                        &sgm5860xStatus.kalman_filters[i], last_voltage);
-                    
+                        &sgm5860xStatus.kalman_filters[i], tmp_voltage);
+                    if(last_channel ==6)
+                    {
+                              sgm5860xStatus.filtered_voltage[i]=      sgm5860xStatus.filtered_voltage[i]/250.0;
+                    }
                     sgm5860xStatus.sample_count[i]++;
                     
                     // 每个采样都发送滤波后的数据
@@ -713,8 +721,8 @@ static void sgm5860x_kalman_filter_init(uint8_t channel_index) {
         case SGM58601_GAIN_64:
         case SGM58601_GAIN_128:
             // 高增益通道：信号较小，噪声相对较大
-            process_noise = 0.02;
-            measurement_noise = 0.2;
+            process_noise = 0.005;
+            measurement_noise = 0.05;
             break;
     }
     
@@ -735,7 +743,9 @@ static void sgm5860x_kalman_filter_init(uint8_t channel_index) {
     // 根据通道特性调整自适应速率
     if (gain >= SGM58601_GAIN_64) {
         // 高增益通道需要更快的自适应速率
-        adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.15);
+        // adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.15);
+                adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.08);
+
     } else {
         // 低增益通道使用较慢的自适应速率
         adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.08);
