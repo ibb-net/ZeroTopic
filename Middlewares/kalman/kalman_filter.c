@@ -2,7 +2,7 @@
 
 #include <math.h>
 #include <string.h>
-
+#include <stdio.h>
 #include "elog.h"
 #define TAG "kalman"
 
@@ -289,7 +289,7 @@ static void debug_signal_analysis(AdaptiveKalmanFilter_t *akf, double latest_dev
 
         // 如果检测到100mV以上变化，特别标记
         if (latest_deviation > 0.1 || latest_change > 0.1) {
-            elog_w(TAG, "*** LARGE CHANGE DETECTED: %.1fmV deviation, %.1fmV step ***",
+            elog_d(TAG, "*** LARGE CHANGE DETECTED: %.1fmV deviation, %.1fmV step ***",
                    latest_deviation * 1000, latest_change * 1000);
         }
 
@@ -356,10 +356,22 @@ SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
     else if (variance > akf->R_base * NOISY_VARIANCE_RATIO) {
         detected_state = SIGNAL_NOISY;
     }
-    // 4. 检测稳定状态
+    // 4. 检测稳定状态（增强精度检测）
     else if (variance < akf->R_base * STABLE_VARIANCE_RATIO &&
              max_variation < akf->R_base * STABLE_VARIATION_RATIO) {
-        detected_state = SIGNAL_STABLE;
+        
+        // 额外的稳定性检查：连续样本的变化都很小
+        double consecutive_stability = 0.0;
+        for (int i = 1; i < ADAPTIVE_WINDOW_SIZE; i++) {
+            double step_change = fabs(akf->measurement_history[i] - akf->measurement_history[i-1]);
+            consecutive_stability += step_change;
+        }
+        consecutive_stability /= (ADAPTIVE_WINDOW_SIZE - 1);
+        
+        // 只有连续变化也很小时才认为真正稳定
+        if (consecutive_stability < akf->R_base * STABLE_VARIATION_RATIO * 0.5) {
+            detected_state = SIGNAL_STABLE;
+        }
     }
 
     // 调试信息输出（增强版）
@@ -367,7 +379,7 @@ SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
 
     // 特别监控100mV级别的变化
     if (immediate_change > 0.08 || latest_deviation > 0.08) {  // 80mV以上
-        elog_w(TAG, "DETECTION: immediate=%.1fmV, deviation=%.1fmV, state=%d->%d, counter=%d",
+        elog_d(TAG, "DETECTION: immediate=%.1fmV, deviation=%.1fmV, state=%d->%d, counter=%d",
                immediate_change * 1000, latest_deviation * 1000, akf->previous_signal_state,
                detected_state, *state_counter);
     }
@@ -394,20 +406,20 @@ SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
     if (detected_state == SIGNAL_CHANGING) {
         // 100mV以上的突变立即响应（无需确认）
         if (immediate_change > 0.1 || latest_deviation > 0.1) {
-            elog_w(TAG, "*** 100mV+ CHANGE: immediate=%.1fmV, dev=%.1fmV ***",
+            elog_d(TAG, "*** 100mV+ CHANGE: immediate=%.1fmV, dev=%.1fmV ***",
                    immediate_change * 1000, latest_deviation * 1000);
             return detected_state;
         }
         // 50-100mV变化立即响应
         if (immediate_change > 0.05 || latest_deviation > 0.05) {
-            elog_i(TAG, "Major CHANGING: immediate=%.1fmV, dev=%.1fmV", immediate_change * 1000,
+            elog_d(TAG, "Major CHANGING: immediate=%.1fmV, dev=%.1fmV", immediate_change * 1000,
                    latest_deviation * 1000);
             return detected_state;
         }
         // 25-50mV中等变化（包括临界100mV）需要简单确认
         if (immediate_change > 0.025 || latest_deviation > 0.025) {
             if (*state_counter >= 1) {
-                elog_i(TAG, "Medium CHANGING confirmed: immediate=%.1fmV, dev=%.1fmV",
+                elog_d(TAG, "Medium CHANGING confirmed: immediate=%.1fmV, dev=%.1fmV",
                        immediate_change * 1000, latest_deviation * 1000);
                 return detected_state;
             }
@@ -525,7 +537,84 @@ static int check_fast_convergence(AdaptiveKalmanFilter_t *akf) {
 }
 
 /**
- * @brief 基于统计特性的自适应调整（优化版）
+ * @brief 计算稳定性系数（用于精度提升）
+ */
+static double calculate_stability_factor(AdaptiveKalmanFilter_t *akf) {
+    // 使用结构体内部的稳定性计数器
+    if (akf->signal_state == SIGNAL_STABLE) {
+        akf->stability_counter++;
+    } else {
+        akf->stability_counter = 0;
+    }
+    
+    // 稳定性系数：0.1(刚稳定) 到1.0(长期稳定)
+    double base_stability = fmin(1.0, 0.1 + (akf->stability_counter * 0.008));
+    
+    // 额外考虑测量方差：方差越小，稳定性越高
+    double variance_factor = 1.0;
+    if (akf->measurement_variance > 0) {
+        variance_factor = 1.0 / (1.0 + akf->measurement_variance * 500);
+    }
+    
+    // 考虑跟踪误差：误差越小，稳定性越高
+    double error_factor = 1.0;
+    if (akf->tracking_error > 0) {
+        error_factor = 1.0 / (1.0 + akf->tracking_error * 100);
+    }
+    
+    double final_stability = base_stability * variance_factor * error_factor;
+    
+    // 更新精度因子
+    akf->precision_factor = final_stability;
+    
+    return final_stability;
+}
+
+/**
+ * @brief 增强稳定状态的精度调整
+ */
+static void enhanced_stable_adjustment(AdaptiveKalmanFilter_t *akf, double adaptation_rate) {
+    double stability_factor = calculate_stability_factor(akf);
+    
+    // 基础精度参数
+    double base_Q_ratio = 0.3;  // 从0.5降低到0.3，提高稳定性
+    double base_R_ratio = 1.2;  // 从0.8增加到1.2，降低测量噪声权重
+    
+    // 根据稳定性动态调整
+    double precision_Q_ratio = base_Q_ratio * (1.0 - stability_factor * 0.7);  // 最低可降到70%
+    double precision_R_ratio = base_R_ratio * (1.0 + stability_factor * 0.5);  // 最高可增加50%
+    
+    // 特别针对高精度状态的优化
+    if (akf->high_precision_mode && stability_factor > 0.6) {
+        // 长期稳定：最大化精度
+        double ultra_precision_Q = akf->Q_base * 0.02;  // 极小的过程噪声（2%）
+        double ultra_precision_R = akf->R_base * 3.0;   // 增加测量噪声，强化滤波
+        
+        // 直接设置，不使用渐进式
+        akf->Q = fmax(ultra_precision_Q, akf->Q_min);
+        akf->R = fmin(ultra_precision_R, akf->R_max);
+        
+        // 高精度模式日志
+        if (akf->stability_counter % 50 == 0) {
+            elog_d(TAG, "ULTRA-PRECISION: Q=%.8f, R=%.6f, stability=%.3f, counter=%d", 
+                   akf->Q, akf->R, stability_factor, akf->stability_counter);
+        }
+    } else if (stability_factor > 0.4) {
+        // 中等稳定：增强精度
+        double enhanced_Q = akf->Q_base * 0.1;  // 10%过程噪声
+        double enhanced_R = akf->R_base * 2.0;  // 2倍测量噪声
+        
+        adjust_parameters_gradual(akf, enhanced_Q / akf->Q_base, enhanced_R / akf->R_base, adaptation_rate * 2);
+    } else {
+        // 正常稳定：渐进式调整
+        adjust_parameters_gradual(akf, precision_Q_ratio, precision_R_ratio, adaptation_rate);
+    }
+    
+    constrain_parameter_bounds(akf);
+}
+
+/**
+ * @brief 基于统计特性的自适应调整（增强精度版）
  */
 void statistics_based_adaptation(AdaptiveKalmanFilter_t *akf) {
     if (akf == NULL || !akf->enable_adaptation) return;
@@ -543,21 +632,24 @@ void statistics_based_adaptation(AdaptiveKalmanFilter_t *akf) {
     // 状态切换日志（增强版）
     if (akf->signal_state != akf->previous_signal_state) {
         const char *state_names[] = {"STABLE", "CHANGING", "NOISY", "SATURATED"};
-        elog_w(TAG, "State: %s -> %s, mean=%.4f, var=%.6f, err=%.4f",
+        elog_d(TAG, "State: %s -> %s, mean=%.4f, var=%.6f, err=%.4f",
                state_names[akf->previous_signal_state], state_names[akf->signal_state],
                akf->measurement_mean, akf->measurement_variance, akf->tracking_error);
 
         if (akf->previous_signal_state == SIGNAL_CHANGING && akf->signal_state == SIGNAL_STABLE) {
-            elog_w(TAG, "Signal stabilized from CHANGING to STABLE");
+            elog_d(TAG, "Signal stabilized from CHANGING to STABLE - Precision enhancement starting");
+            // 重置精度计数器，开始新的稳定周期
+            akf->stability_counter = 0;
+            akf->precision_factor = 0.1;
         }
         akf->previous_signal_state = akf->signal_state;
         akf->state_change_counter++;
     }
 
-    // 根据信号状态调整参数
+    // 根据信号状态调整参数（增强精度版）
     switch (akf->signal_state) {
         case SIGNAL_STABLE:
-            adjust_parameters_gradual(akf, 0.5, 0.8, adaptation_rate);
+            enhanced_stable_adjustment(akf, adaptation_rate);
             break;
 
         case SIGNAL_CHANGING:
@@ -1079,4 +1171,41 @@ int adaptive_kalman_is_micro_fluctuation(AdaptiveKalmanFilter_t *akf) {
 
     double range = adaptive_kalman_get_voltage_range(akf);
     return KALMAN_IS_MICRO_FLUCTUATION(range);
+}
+
+/**
+ * @brief 启用/禁用高精度模式
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @param enable 1-启用，0-禁用
+ */
+void adaptive_kalman_enable_high_precision(AdaptiveKalmanFilter_t *akf, int enable) {
+    KALMAN_CHECK_NULL_VOID(akf);
+    akf->high_precision_mode = enable;
+    if (!enable) {
+        akf->stability_counter = 0;
+        akf->precision_factor = 1.0;
+        elog_i(TAG, "High precision mode disabled");
+    } else {
+        elog_i(TAG, "High precision mode enabled");
+    }
+}
+
+/**
+ * @brief 检查是否处于高精度模式
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @return 1-高精度模式，0-正常模式
+ */
+int adaptive_kalman_is_high_precision_mode(AdaptiveKalmanFilter_t *akf) {
+    KALMAN_CHECK_NULL(akf, 0);
+    return akf->high_precision_mode && (akf->precision_factor > 0.7);
+}
+
+/**
+ * @brief 获取当前精度因子
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @return 精度因子 (0.1-1.0)
+ */
+double adaptive_kalman_get_precision_factor(AdaptiveKalmanFilter_t *akf) {
+    KALMAN_CHECK_NULL(akf, 1.0);
+    return akf->precision_factor;
 }

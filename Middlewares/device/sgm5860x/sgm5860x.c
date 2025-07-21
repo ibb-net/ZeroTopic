@@ -307,13 +307,13 @@ static void __sgm5860xCycHandle(void) {
                     double tmp_voltage = last_voltage;
                     // 更新卡尔曼滤波器
                     if (last_channel == 6) {
-                        tmp_voltage = last_voltage * 250.0;
+                        tmp_voltage = last_voltage * 62.5;
                     }
                     sgm5860xStatus.filtered_voltage[i] =
                         adaptive_kalman_update(&sgm5860xStatus.kalman_filters[i], tmp_voltage);
                     if (last_channel == 6) {
                         sgm5860xStatus.filtered_voltage[i] =
-                            sgm5860xStatus.filtered_voltage[i] / 250.0;
+                            sgm5860xStatus.filtered_voltage[i] / 62.5;
                     }
                     sgm5860xStatus.sample_count[i]++;
 

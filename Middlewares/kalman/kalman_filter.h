@@ -61,6 +61,11 @@ typedef struct {
     int adaptation_counter;
     int state_change_counter;
     
+    // 精度控制参数
+    int stability_counter;          // 稳定状态计数器
+    int high_precision_mode;        // 高精度模式标志
+    double precision_factor;        // 当前精度因子
+    
     // 性能监控
     double tracking_error;
     double convergence_metric;
@@ -210,6 +215,11 @@ SignalState_t adaptive_kalman_query_signal_state(AdaptiveKalmanFilter_t *akf);
 // 微小波动检测函数
 double adaptive_kalman_get_voltage_range(AdaptiveKalmanFilter_t *akf);
 int adaptive_kalman_is_micro_fluctuation(AdaptiveKalmanFilter_t *akf);
+
+// 精度控制函数
+void adaptive_kalman_enable_high_precision(AdaptiveKalmanFilter_t *akf, int enable);
+int adaptive_kalman_is_high_precision_mode(AdaptiveKalmanFilter_t *akf);
+double adaptive_kalman_get_precision_factor(AdaptiveKalmanFilter_t *akf);
 // 自检错误码定义
 #define KALMAN_CHECK_OK                0x00    // 正常
 #define KALMAN_CHECK_PARAM_ERROR       0x01    // 参数错误
@@ -230,5 +240,11 @@ int adaptive_kalman_is_micro_fluctuation(AdaptiveKalmanFilter_t *akf);
 // 微小波动检测宏
 #define MICRO_FLUCTUATION_THRESHOLD    (0.0001 / 4.7)  // 0.0001/4.7V ≈ 21.3μV
 #define KALMAN_IS_MICRO_FLUCTUATION(range) ((range) > 0 && (range) < MICRO_FLUCTUATION_THRESHOLD)
+
+// 精度控制宏
+#define KALMAN_IS_HIGH_PRECISION(akf)   adaptive_kalman_is_high_precision_mode(akf)
+#define KALMAN_GET_PRECISION(akf)       adaptive_kalman_get_precision_factor(akf)
+#define KALMAN_ENABLE_PRECISION(akf)    adaptive_kalman_enable_high_precision(akf, 1)
+#define KALMAN_DISABLE_PRECISION(akf)   adaptive_kalman_enable_high_precision(akf, 0)
 
 #endif // KALMAN_FILTER_H
