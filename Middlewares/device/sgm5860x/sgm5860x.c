@@ -164,6 +164,7 @@ typedef struct {
     double average[sgm5860xChannelMax];     // Average voltage for each channel
     uint8_t vol_index[sgm5860xChannelMax];  // Voltage index for each channel
 #if FILTER_MODE == KALMAN_FILTER_MODE
+    SignalState_t last_kalman_state[sgm5860xChannelMax];
     AdaptiveKalmanFilter_t kalman_filters[sgm5860xChannelMax];  // Kalman filters for each channel
     uint8_t kalman_initialized[sgm5860xChannelMax];  // Kalman filter initialization status
     double filtered_voltage[sgm5860xChannelMax];     // Filtered voltage for each channel
@@ -319,12 +320,25 @@ static void __sgm5860xCycHandle(void) {
                     // 每个采样都发送滤波后的数据
                     // SignalState_t signal_state =
                     // adaptive_kalman_query_signal_state(&sgm5860xStatus.kalman_filters[i]);
-                    if (KALMAN_IS_STABLE(&sgm5860xStatus.kalman_filters[i])) {
-                        vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.filtered_voltage[i]),
-                                 sizeof(sgm5860xStatus.filtered_voltage[i]));
-                        elog_w(TAG, "Index %d Channel %d, Gain %.0f, Raw: %.7f V, Filtered: %.7f V",
+                    if (sgm5860xStatus.last_kalman_state[i] !=
+                        sgm5860xStatus.kalman_filters[i].signal_state) {
+                        sgm5860xStatus.last_kalman_state[i] =
+                            sgm5860xStatus.kalman_filters[i].signal_state;
+                        elog_i(TAG, "Channel %d state changed to %d", i,
+                               sgm5860xStatus.kalman_filters[i].signal_state);
+                        elog_i(TAG, "Index %d Channel %d, Gain %.0f, Raw: %.7f V, Filtered: %.7f V",
                                last_index, last_channel, last_gain, last_voltage,
                                sgm5860xStatus.filtered_voltage[i]);
+                        vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.filtered_voltage[i]),
+                                 sizeof(sgm5860xStatus.filtered_voltage[i]));
+                    }
+                    else
+                    {
+                        if(sgm5860xStatus.sample_count[i]%10 == 0)
+                        elog_d(TAG, "Channel %d state unchanged %d ", i,
+                               sgm5860xStatus.kalman_filters[i].signal_state);
+                                 vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.filtered_voltage[i]),
+                                 sizeof(sgm5860xStatus.filtered_voltage[i]));
                     }
 
                     // 每100个样本检查一次滤波器健康状态

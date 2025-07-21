@@ -1,20 +1,38 @@
 #include "kalman_filter.h"
+
 #include <math.h>
 #include <string.h>
 
+#include "elog.h"
+#define TAG "kalman"
+// #define sgm5860xLogLvl                ELOG_LVL_INFO
 // ==================== 原始卡尔曼滤波器实现 ====================
 
 /**
- * @brief 初始化卡尔曼滤波器
- */
-void kalman_init(KalmanFilter_t *kf, double initial_value, double process_noise, double measurement_noise, double initial_covariance) {
+ * @brief 初始    // 先保存当前状态作为历史状态
+    SignalState_t previous_state = akf->signal_state;
+
+    // 分析信号状态
+    akf->signal_state = analyze_signal_state(akf);
+
+    // 检测状态变化
+    if (akf->signal_state != previous_state) {
+        akf->state_change_counter++;
+        // elog_i(TAG, "State changed from %d to %d (counter=%d)",
+        //        previous_state, akf->signal_state, akf->state_change_counter);
+    }
+
+    // 更新previous_signal_state用于下次比较
+    akf->previous_signal_state = previous_state;*/
+void kalman_init(KalmanFilter_t *kf, double initial_value, double process_noise,
+                 double measurement_noise, double initial_covariance) {
     if (kf == NULL) return;
-    
-    kf->x = initial_value;          // 初始状态估计
-    kf->P = initial_covariance;     // 初始误差协方差
-    kf->Q = process_noise;          // 过程噪声协方差
-    kf->R = measurement_noise;      // 测量噪声协方差
-    kf->K = 0.0;                    // 卡尔曼增益初始化为0
+
+    kf->x = initial_value;       // 初始状态估计
+    kf->P = initial_covariance;  // 初始误差协方差
+    kf->Q = process_noise;       // 过程噪声协方差
+    kf->R = measurement_noise;   // 测量噪声协方差
+    kf->K = 0.0;                 // 卡尔曼增益初始化为0
 }
 
 /**
@@ -22,16 +40,16 @@ void kalman_init(KalmanFilter_t *kf, double initial_value, double process_noise,
  */
 double kalman_update(KalmanFilter_t *kf, double measurement) {
     if (kf == NULL) return measurement;
-    
+
     // 预测步骤
     double x_pred = kf->x;
     double P_pred = kf->P + kf->Q;
-    
+
     // 更新步骤
     kf->K = P_pred / (P_pred + kf->R);
     kf->x = x_pred + kf->K * (measurement - x_pred);
     kf->P = (1.0 - kf->K) * P_pred;
-    
+
     return kf->x;
 }
 
@@ -48,55 +66,55 @@ void kalman_set_measurement_noise(KalmanFilter_t *kf, double new_R) {
 /**
  * @brief 初始化自适应卡尔曼滤波器
  */
-void adaptive_kalman_init(AdaptiveKalmanFilter_t *akf, double initial_value, 
-                         double process_noise, double measurement_noise, double initial_covariance) {
+void adaptive_kalman_init(AdaptiveKalmanFilter_t *akf, double initial_value, double process_noise,
+                          double measurement_noise, double initial_covariance) {
     if (akf == NULL) return;
-    
+
     // 基本卡尔曼参数
     akf->x = initial_value;
     akf->P = initial_covariance;
     akf->Q = process_noise;
     akf->R = measurement_noise;
     akf->K = 0.0;
-    
+
     // 保存基础参数
     akf->Q_base = process_noise;
     akf->R_base = measurement_noise;
-    
+
     // 设置默认边界
     akf->Q_min = process_noise * MIN_ADAPTATION_RATIO;
     akf->Q_max = process_noise * MAX_ADAPTATION_RATIO;
     akf->R_min = measurement_noise * MIN_ADAPTATION_RATIO;
     akf->R_max = measurement_noise * MAX_ADAPTATION_RATIO;
-    
+
     // 初始化历史记录
     memset(akf->innovation_history, 0, sizeof(akf->innovation_history));
     memset(akf->measurement_history, 0, sizeof(akf->measurement_history));
-    akf->innovation_index = 0;
+    akf->innovation_index  = 0;
     akf->measurement_index = 0;
-    
+
     // 初始化统计参数
-    akf->innovation_variance = 0.0;
-    akf->innovation_mean = 0.0;
+    akf->innovation_variance  = 0.0;
+    akf->innovation_mean      = 0.0;
     akf->measurement_variance = 0.0;
-    akf->measurement_mean = initial_value;
-    
+    akf->measurement_mean     = initial_value;
+
     // 初始化状态
-    akf->signal_state = SIGNAL_STABLE;
+    akf->signal_state          = SIGNAL_STABLE;
     akf->previous_signal_state = SIGNAL_STABLE;
-    akf->adaptation_counter = 0;
-    akf->state_change_counter = 0;
-    
+    akf->adaptation_counter    = 0;
+    akf->state_change_counter  = 0;
+
     // 初始化性能监控
-    akf->tracking_error = 0.0;
+    akf->tracking_error     = 0.0;
     akf->convergence_metric = 0.0;
-    akf->adaptation_gain = 1.0;
-    akf->stability_metric = 1.0;
-    
+    akf->adaptation_gain    = 1.0;
+    akf->stability_metric   = 1.0;
+
     // 初始化自适应控制
-    akf->enable_adaptation = 1;
+    akf->enable_adaptation    = 1;
     akf->adaptation_threshold = CONVERGENCE_THRESHOLD;
-    akf->forgetting_factor = 0.95;
+    akf->forgetting_factor    = 0.95;
 }
 
 /**
@@ -104,7 +122,7 @@ void adaptive_kalman_init(AdaptiveKalmanFilter_t *akf, double initial_value,
  */
 static double calculate_variance(const double *data, int size, double mean) {
     if (size <= 1) return 0.0;
-    
+
     double variance = 0.0;
     for (int i = 0; i < size; i++) {
         double diff = data[i] - mean;
@@ -118,7 +136,7 @@ static double calculate_variance(const double *data, int size, double mean) {
  */
 static double calculate_mean(const double *data, int size) {
     if (size <= 0) return 0.0;
-    
+
     double sum = 0.0;
     for (int i = 0; i < size; i++) {
         sum += data[i];
@@ -131,30 +149,99 @@ static double calculate_mean(const double *data, int size) {
  */
 SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
     if (akf == NULL) return SIGNAL_STABLE;
-    
+
+    // 状态持续性检查：避免频繁切换状态，特别是在CHANGING状态时
+    static int stable_state_counter = 0;
+    static SignalState_t last_state = SIGNAL_STABLE;
+
     // 计算测量值的统计特性
     double variance = akf->measurement_variance;
-    double mean = akf->measurement_mean;
-    
+    double mean     = akf->measurement_mean;
+
     // 计算最大差值
     double max_diff = 0.0;
     for (int i = 0; i < ADAPTIVE_WINDOW_SIZE - 1; i++) {
         double diff = fabs(akf->measurement_history[i] - akf->measurement_history[i + 1]);
         if (diff > max_diff) max_diff = diff;
     }
-    
-    // 判断信号状态
-    if (variance < akf->R_base * 0.01 && max_diff < akf->R_base * 0.1) {
-        return SIGNAL_STABLE;
-    } else if (variance > akf->R_base * 100) {
-        return SIGNAL_NOISY;
-    } else if (max_diff > fabs(mean) * 0.1 && max_diff > akf->R_base * 10) {
+
+    // 新增：检测最新测量值与均值的差异，提高跳变识别灵敏度
+    int last_index = akf->measurement_index ? akf->measurement_index - 1 : ADAPTIVE_WINDOW_SIZE - 1;
+    double latest_diff = fabs(akf->measurement_history[last_index] - mean);
+
+    // 改进的动态阈值：基于信号幅度的自适应阈值
+    double signal_magnitude   = fmax(fabs(mean), 0.1);    // 避免除零，最小0.1V
+    double relative_threshold = signal_magnitude * 0.03;  // 降低到3%相对阈值，提高灵敏度
+    double absolute_threshold = 0.03;                     // 降低绝对阈值至0.03V，提高响应速度
+    double dynamic_threshold  = fmax(relative_threshold, absolute_threshold);
+
+    // 只有在显著跳变时才触发CHANGING状态，增加稳定性检查
+    if (latest_diff > dynamic_threshold && latest_diff > 0.05) {  // 降低二级阈值至0.05V
+        // elog_i(TAG, "Signal changing detected: latest diff=%.4f, mean=%.4f, threshold=%.4f",
+        // latest_diff, mean, dynamic_threshold);
         return SIGNAL_CHANGING;
-    } else if (fabs(mean) > 0.95 * 10.0) {  // 假设满量程为10V
-        return SIGNAL_SATURATED;
     }
-    
-    return SIGNAL_STABLE;
+
+    // 额外检测：连续测量值的大幅度变化（检测突发跳变）
+    int prev_index = last_index ? last_index - 1 : ADAPTIVE_WINDOW_SIZE - 1;
+    double step_diff =
+        fabs(akf->measurement_history[last_index] - akf->measurement_history[prev_index]);
+    double step_threshold = fmax(signal_magnitude * 0.08, 0.05);  // 降低到8%相对阈值或0.05V绝对阈值
+    if (step_diff > step_threshold) {
+        // elog_i(TAG, "Step change detected: step diff=%.4f, threshold=%.4f", step_diff,
+        // step_threshold);
+        return SIGNAL_CHANGING;
+    }
+
+    // 判断信号状态
+    SignalState_t current_state;
+    if (variance < akf->R_base * 0.01 && max_diff < akf->R_base * 0.1) {
+        current_state = SIGNAL_STABLE;
+    } else if (variance > akf->R_base * 100) {
+        current_state = SIGNAL_NOISY;
+    } else if (max_diff > fabs(mean) * 0.1 && max_diff > akf->R_base * 10) {
+        current_state = SIGNAL_CHANGING;
+    } else if (fabs(mean) > 0.95 * 10.0) {  // 假设满量程为10V
+        current_state = SIGNAL_SATURATED;
+    } else {
+        current_state = SIGNAL_STABLE;
+    }
+
+    // 状态持续性检查：增加稳定性，避免频繁切换
+    if (current_state == last_state) {
+        stable_state_counter++;
+    } else {
+        stable_state_counter = 0;
+    }
+
+    // 如果当前是CHANGING状态但跟踪误差已经很小，强制切换到STABLE
+    if (last_state == SIGNAL_CHANGING && current_state == SIGNAL_CHANGING &&
+        akf->tracking_error < 0.002) {  // 降低到2mV，更快速切换
+        // elog_i(TAG, "Force switching from CHANGING to STABLE due to low tracking error: %.4f",
+        // akf->tracking_error);
+        current_state        = SIGNAL_STABLE;
+        stable_state_counter = 0;
+    }
+
+    // 改进状态切换逻辑：对于CHANGING状态立即响应，其他状态需要持续确认
+    if (current_state == SIGNAL_CHANGING) {
+        // 跳变状态立即切换，无需等待
+        if (latest_diff > 0.08 || step_diff > 0.08) {  // 明显的跳变立即响应
+            last_state           = current_state;
+            stable_state_counter = 0;
+            return current_state;
+        }
+    }
+
+    // 其他状态需要持续确认，避免噪声干扰
+    if (stable_state_counter >= 3 || current_state == last_state) {
+        last_state = current_state;
+        return current_state;
+    } else {
+        // 保持之前的状态，增加稳定性
+        stable_state_counter++;
+        return last_state;
+    }
 }
 
 /**
@@ -162,38 +249,39 @@ SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
  */
 void innovation_based_adaptation(AdaptiveKalmanFilter_t *akf, double innovation) {
     if (akf == NULL || !akf->enable_adaptation) return;
-    
+
     // 更新创新序列历史
     akf->innovation_history[akf->innovation_index] = innovation;
     akf->innovation_index = (akf->innovation_index + 1) % INNOVATION_WINDOW_SIZE;
-    
+
     // 计算创新序列统计量
     akf->innovation_mean = calculate_mean(akf->innovation_history, INNOVATION_WINDOW_SIZE);
-    akf->innovation_variance = calculate_variance(akf->innovation_history, INNOVATION_WINDOW_SIZE, akf->innovation_mean);
-    
+    akf->innovation_variance =
+        calculate_variance(akf->innovation_history, INNOVATION_WINDOW_SIZE, akf->innovation_mean);
+
     // 理论创新方差 = P + R
     double theoretical_variance = akf->P + akf->R;
-    
+
     // 计算自适应增益
     if (theoretical_variance > 0) {
         akf->adaptation_gain = akf->innovation_variance / theoretical_variance;
     } else {
         akf->adaptation_gain = 1.0;
     }
-    
+
     // 自适应调整 R（使用遗忘因子）
     double adaptation_rate = ADAPTATION_RATE * akf->forgetting_factor;
-    
+
     if (akf->adaptation_gain > 2.0) {
         // 实际噪声比预期大，增加测量噪声估计
         double new_R = akf->R * (1.0 + adaptation_rate);
-        akf->R = fmin(new_R, akf->R_max);
+        akf->R       = fmin(new_R, akf->R_max);
     } else if (akf->adaptation_gain < 0.5) {
         // 实际噪声比预期小，减少测量噪声估计
         double new_R = akf->R * (1.0 - adaptation_rate);
-        akf->R = fmax(new_R, akf->R_min);
+        akf->R       = fmax(new_R, akf->R_min);
     }
-    
+
     // 计算稳定性指标
     akf->stability_metric = 1.0 / (1.0 + fabs(akf->adaptation_gain - 1.0));
 }
@@ -203,49 +291,68 @@ void innovation_based_adaptation(AdaptiveKalmanFilter_t *akf, double innovation)
  */
 void statistics_based_adaptation(AdaptiveKalmanFilter_t *akf) {
     if (akf == NULL || !akf->enable_adaptation) return;
-    
+
     // 计算测量统计特性
     akf->measurement_mean = calculate_mean(akf->measurement_history, ADAPTIVE_WINDOW_SIZE);
-    akf->measurement_variance = calculate_variance(akf->measurement_history, ADAPTIVE_WINDOW_SIZE, akf->measurement_mean);
-    
-    // 保存上一个状态
-    akf->previous_signal_state = akf->signal_state;
-    
+    akf->measurement_variance =
+        calculate_variance(akf->measurement_history, ADAPTIVE_WINDOW_SIZE, akf->measurement_mean);
+
     // 分析信号状态
     akf->signal_state = analyze_signal_state(akf);
-    
-    // 检测状态变化
-    if (akf->signal_state != akf->previous_signal_state) {
-        akf->state_change_counter++;
-    }
-    
+
     // 根据信号状态调整参数（使用渐进式调整）
     double adaptation_rate = ADAPTATION_RATE * akf->forgetting_factor;
-    
+
     switch (akf->signal_state) {
         case SIGNAL_STABLE:
+            if (akf->previous_signal_state == SIGNAL_CHANGING) {
+                elog_w(TAG, "Signal stabilized from CHANGING to STABLE, adapting parameters");
+                akf->Q = akf->Q_base;
+                akf->R = akf->R_base;
+            }
             // 信号稳定：减少过程噪声，增强平滑性
             akf->Q = akf->Q * (1.0 - adaptation_rate) + akf->Q_base * 0.5 * adaptation_rate;
             akf->R = akf->R * (1.0 - adaptation_rate) + akf->R_base * 0.8 * adaptation_rate;
             akf->Q = fmax(akf->Q, akf->Q_min);
             akf->R = fmax(akf->R, akf->R_min);
+
             break;
-            
+
         case SIGNAL_CHANGING:
-            // 信号变化：大幅增加过程噪声，极大提高响应速度，减小测量噪声权重
-            akf->Q = akf->Q_base * 8.0; // 原来是2.0，改为8.0
-            akf->R = akf->R_base * 0.5; // 原来是1.0，改为0.5
+            // 信号变化：极大幅增加过程噪声，大幅提高响应速度，最小化测量噪声权重
+            akf->Q = akf->Q_base * 100.0;  // 从8.0进一步提升到20.0
+            akf->R = akf->R_base * 0.1;    // 从0.5进一步降低到0.1
             akf->Q = fmin(akf->Q, akf->Q_max);
             akf->R = fmax(akf->R, akf->R_min);
+            // elog_i(TAG, "SIGNAL_CHANGING: Q=%.6f, R=%.6f, tracking_error=%.4f", akf->Q, akf->R,
+            // akf->tracking_error);
+
+            // 添加快速收敛检测：如果跟踪误差很小且连续几次测量稳定，快速切换到稳定状态
+            static int convergence_counter = 0;
+            if (akf->tracking_error < 0.002) {  // 降低到2mV，更快速切换到稳定
+                convergence_counter++;
+                if (convergence_counter >= 2) {  // 连续2次满足条件才切换，避免偶然的小误差
+                    // elog_i(TAG, "Fast convergence detected (error=%.4f, counter=%d), switching to
+                    // stable",
+                    //        akf->tracking_error, convergence_counter);
+                    // 强制设置为稳定状态的参数，加速收敛
+                    akf->Q = akf->Q_base * 0.5;  // 立即降低过程噪声
+                    akf->R = akf->R_base * 1.5;  // 适当增加测量噪声，避免过度响应小变化
+                    convergence_counter = 0;
+                    return;  // 跳过继续的CHANGING状态，让下次检测切换到STABLE
+                }
+            } else {
+                convergence_counter = 0;  // 重置计数器
+            }
             break;
-            
+
         case SIGNAL_NOISY:
             // 噪声较大：减少测量权重，增强滤波
             akf->Q = akf->Q * (1.0 - adaptation_rate) + akf->Q_base * adaptation_rate;
             akf->R = akf->R * (1.0 - adaptation_rate) + akf->R_base * 3.0 * adaptation_rate;
             akf->R = fmin(akf->R, akf->R_max);
             break;
-            
+
         case SIGNAL_SATURATED:
             // 信号饱和：增加过程噪声，减少测量权重
             akf->Q = akf->Q * (1.0 - adaptation_rate) + akf->Q_base * 5.0 * adaptation_rate;
@@ -254,7 +361,11 @@ void statistics_based_adaptation(AdaptiveKalmanFilter_t *akf) {
             akf->R = fmin(akf->R, akf->R_max);
             break;
     }
-    
+    // 检测状态变化
+    if (akf->signal_state != akf->previous_signal_state) {
+        akf->previous_signal_state = akf->signal_state;
+        akf->state_change_counter++;
+    }
     akf->adaptation_counter++;
 }
 /**
@@ -271,37 +382,37 @@ SignalState_t adaptive_kalman_query_signal_state(AdaptiveKalmanFilter_t *akf) {
  */
 double adaptive_kalman_update(AdaptiveKalmanFilter_t *akf, double measurement) {
     if (akf == NULL) return measurement;
-    
+
     // 更新测量历史
     akf->measurement_history[akf->measurement_index] = measurement;
     akf->measurement_index = (akf->measurement_index + 1) % ADAPTIVE_WINDOW_SIZE;
-    
+
     // 预测步骤
     double x_pred = akf->x;
     double P_pred = akf->P + akf->Q;
-    
+
     // 计算创新序列
     double innovation = measurement - x_pred;
-    
+
     // 更新步骤
     akf->K = P_pred / (P_pred + akf->R);
     akf->x = x_pred + akf->K * innovation;
     akf->P = (1.0 - akf->K) * P_pred;
-    
+
     // 计算跟踪误差和收敛指标
-    akf->tracking_error = fabs(innovation);
+    akf->tracking_error     = fabs(innovation);
     akf->convergence_metric = akf->P;
-    
+
     // 自适应调整
     if (akf->enable_adaptation) {
         innovation_based_adaptation(akf, innovation);
-        
+
         // 每隔几次更新进行统计分析
         if (akf->adaptation_counter % 5 == 0) {
             statistics_based_adaptation(akf);
         }
     }
-    
+
     return akf->x;
 }
 
@@ -310,22 +421,22 @@ double adaptive_kalman_update(AdaptiveKalmanFilter_t *akf, double measurement) {
  */
 void adaptive_kalman_reset(AdaptiveKalmanFilter_t *akf, double new_value) {
     if (akf == NULL) return;
-    
+
     akf->x = new_value;
     akf->P = 1.0;
     akf->K = 0.0;
-    
+
     // 重置自适应参数
     akf->Q = akf->Q_base;
     akf->R = akf->R_base;
-    
+
     // 清空历史记录
     memset(akf->innovation_history, 0, sizeof(akf->innovation_history));
     memset(akf->measurement_history, 0, sizeof(akf->measurement_history));
-    akf->innovation_index = 0;
+    akf->innovation_index  = 0;
     akf->measurement_index = 0;
-    
-    akf->signal_state = SIGNAL_STABLE;
+
+    akf->signal_state       = SIGNAL_STABLE;
     akf->adaptation_counter = 0;
 }
 
@@ -339,12 +450,13 @@ void adaptive_kalman_reset(AdaptiveKalmanFilter_t *akf, double new_value) {
  * @param scale 比例校正值
  * @return 标定并滤波后的估计值
  */
-double kalman_update_with_calibration(KalmanFilter_t *kf, double raw_measurement, double offset, double scale) {
+double kalman_update_with_calibration(KalmanFilter_t *kf, double raw_measurement, double offset,
+                                      double scale) {
     if (kf == NULL) return raw_measurement;
-    
+
     // 先进行标定：calibrated = (raw - offset) * scale
     double calibrated_measurement = (raw_measurement - offset) * scale;
-    
+
     // 再进行卡尔曼滤波
     return kalman_update(kf, calibrated_measurement);
 }
@@ -376,7 +488,7 @@ double kalman_get_gain(KalmanFilter_t *kf) {
  */
 void kalman_reset(KalmanFilter_t *kf, double new_value) {
     if (kf == NULL) return;
-    
+
     kf->x = new_value;
     kf->P = 1.0;  // 重置协方差为初始值
     kf->K = 0.0;
@@ -389,9 +501,10 @@ void kalman_reset(KalmanFilter_t *kf, double new_value) {
  * @param num_points 标定点数量
  * @return 标定后的值
  */
-double kalman_linear_interpolation_calibration(double raw_value, const double cal_points[][2], int num_points) {
+double kalman_linear_interpolation_calibration(double raw_value, const double cal_points[][2],
+                                               int num_points) {
     if (num_points < 2) return raw_value;
-    
+
     // 查找插值区间
     for (int i = 0; i < num_points - 1; i++) {
         if (raw_value >= cal_points[i][0] && raw_value <= cal_points[i + 1][0]) {
@@ -400,11 +513,11 @@ double kalman_linear_interpolation_calibration(double raw_value, const double ca
             double y1 = cal_points[i][1];
             double x2 = cal_points[i + 1][0];
             double y2 = cal_points[i + 1][1];
-            
+
             return y1 + (y2 - y1) * (raw_value - x1) / (x2 - x1);
         }
     }
-    
+
     // 超出范围，使用边界值
     if (raw_value < cal_points[0][0]) {
         return cal_points[0][1];
@@ -420,15 +533,15 @@ double kalman_linear_interpolation_calibration(double raw_value, const double ca
  */
 void kalman_set_calibration_mode(KalmanFilter_t *kf, int is_calibrating) {
     if (kf == NULL) return;
-    
+
     static double original_Q = 0.0;
     static double original_R = 0.0;
-    
+
     if (is_calibrating) {
         // 保存原始参数
         original_Q = kf->Q;
         original_R = kf->R;
-        
+
         // 标定模式：降低过程噪声，提高测量噪声权重
         kf->Q = kf->Q * 0.1;  // 降低过程噪声
         kf->R = kf->R * 0.5;  // 降低测量噪声，提高测量可信度
@@ -448,27 +561,27 @@ void kalman_set_calibration_mode(KalmanFilter_t *kf, int is_calibrating) {
  */
 void adaptive_kalman_get_status(AdaptiveKalmanFilter_t *akf, AdaptiveKalmanStatus_t *status) {
     if (akf == NULL || status == NULL) return;
-    
-    status->current_value = akf->x;
-    status->kalman_gain = akf->K;
-    status->process_noise = akf->Q;
+
+    status->current_value     = akf->x;
+    status->kalman_gain       = akf->K;
+    status->process_noise     = akf->Q;
     status->measurement_noise = akf->R;
-    status->covariance = akf->P;
-    
-    status->adaptation_gain = akf->adaptation_gain;
-    status->stability_metric = akf->stability_metric;
-    status->tracking_error = akf->tracking_error;
+    status->covariance        = akf->P;
+
+    status->adaptation_gain    = akf->adaptation_gain;
+    status->stability_metric   = akf->stability_metric;
+    status->tracking_error     = akf->tracking_error;
     status->convergence_metric = akf->convergence_metric;
-    
-    status->signal_state = akf->signal_state;
-    status->adaptation_counter = akf->adaptation_counter;
+
+    status->signal_state         = akf->signal_state;
+    status->adaptation_counter   = akf->adaptation_counter;
     status->state_change_counter = akf->state_change_counter;
-    
-    status->innovation_variance = akf->innovation_variance;
+
+    status->innovation_variance  = akf->innovation_variance;
     status->measurement_variance = akf->measurement_variance;
-    
+
     status->is_adaptation_enabled = akf->enable_adaptation;
-    status->forgetting_factor = akf->forgetting_factor;
+    status->forgetting_factor     = akf->forgetting_factor;
 }
 
 /**
@@ -476,55 +589,55 @@ void adaptive_kalman_get_status(AdaptiveKalmanFilter_t *akf, AdaptiveKalmanStatu
  */
 int adaptive_kalman_self_check(AdaptiveKalmanFilter_t *akf) {
     if (akf == NULL) return -1;
-    
+
     int error_code = 0;
-    
+
     // 检查基本参数
     if (akf->Q <= 0 || akf->R <= 0 || akf->P < 0) {
         error_code |= 0x01;  // 参数错误
     }
-    
+
     // 检查参数边界
-    if (akf->Q < akf->Q_min || akf->Q > akf->Q_max ||
-        akf->R < akf->R_min || akf->R > akf->R_max) {
+    if (akf->Q < akf->Q_min || akf->Q > akf->Q_max || akf->R < akf->R_min || akf->R > akf->R_max) {
         error_code |= 0x02;  // 参数超出边界
     }
-    
+
     // 检查数值稳定性
     if (akf->P > 1e6 || akf->K > 1.0 || akf->K < 0.0) {
         error_code |= 0x04;  // 数值不稳定
     }
-    
+
     // 检查跟踪性能
     if (akf->tracking_error > 10.0 * akf->R_base) {
         error_code |= 0x08;  // 跟踪性能差
     }
-    
+
     // 检查稳定性
     if (akf->stability_metric < 0.1) {
         error_code |= 0x10;  // 稳定性差
     }
-    
+
     return error_code;
 }
 
 /**
  * @brief 动态调整自适应参数
  */
-void adaptive_kalman_tune_parameters(AdaptiveKalmanFilter_t *akf, double responsiveness, double stability_preference) {
+void adaptive_kalman_tune_parameters(AdaptiveKalmanFilter_t *akf, double responsiveness,
+                                     double stability_preference) {
     if (akf == NULL) return;
-    
+
     // 限制参数范围
-    responsiveness = fmax(0.1, fmin(1.0, responsiveness));
+    responsiveness       = fmax(0.1, fmin(1.0, responsiveness));
     stability_preference = fmax(0.1, fmin(1.0, stability_preference));
-    
+
     // 根据响应性调整自适应速率
     double adaptation_rate = 0.05 + 0.25 * responsiveness;
     adaptive_kalman_set_adaptation_rate(akf, adaptation_rate);
-    
+
     // 根据稳定性偏好调整参数边界
     double stability_factor = 1.0 + stability_preference;
-    
+
     akf->Q_min = akf->Q_base * MIN_ADAPTATION_RATIO / stability_factor;
     akf->Q_max = akf->Q_base * MAX_ADAPTATION_RATIO / stability_factor;
     akf->R_min = akf->R_base * MIN_ADAPTATION_RATIO / stability_factor;
@@ -534,18 +647,18 @@ void adaptive_kalman_tune_parameters(AdaptiveKalmanFilter_t *akf, double respons
 /**
  * @brief 批量处理ADC数据
  */
-int adaptive_kalman_batch_process(AdaptiveKalmanFilter_t *akf, const double *input_data, 
-                                 double *output_data, int data_length) {
+int adaptive_kalman_batch_process(AdaptiveKalmanFilter_t *akf, const double *input_data,
+                                  double *output_data, int data_length) {
     if (akf == NULL || input_data == NULL || output_data == NULL || data_length <= 0) {
         return -1;
     }
-    
+
     int processed_count = 0;
-    
+
     for (int i = 0; i < data_length; i++) {
         output_data[i] = adaptive_kalman_update(akf, input_data[i]);
         processed_count++;
-        
+
         // 检查是否需要自检
         if (i % 100 == 0) {
             int check_result = adaptive_kalman_self_check(akf);
@@ -555,37 +668,38 @@ int adaptive_kalman_batch_process(AdaptiveKalmanFilter_t *akf, const double *inp
             }
         }
     }
-    
+
     return processed_count;
 }
 
 /**
  * @brief 获取自适应卡尔曼滤波器的性能统计
  */
-void adaptive_kalman_get_performance_stats(AdaptiveKalmanFilter_t *akf, AdaptiveKalmanPerformance_t *stats) {
+void adaptive_kalman_get_performance_stats(AdaptiveKalmanFilter_t *akf,
+                                           AdaptiveKalmanPerformance_t *stats) {
     if (akf == NULL || stats == NULL) return;
-    
+
     // 计算创新序列的统计信息
-    stats->innovation_mean = akf->innovation_mean;
+    stats->innovation_mean     = akf->innovation_mean;
     stats->innovation_variance = akf->innovation_variance;
-    stats->innovation_std = sqrt(akf->innovation_variance);
-    
+    stats->innovation_std      = sqrt(akf->innovation_variance);
+
     // 计算测量序列的统计信息
-    stats->measurement_mean = akf->measurement_mean;
+    stats->measurement_mean     = akf->measurement_mean;
     stats->measurement_variance = akf->measurement_variance;
-    stats->measurement_std = sqrt(akf->measurement_variance);
-    
+    stats->measurement_std      = sqrt(akf->measurement_variance);
+
     // 性能指标
     stats->adaptation_effectiveness = akf->adaptation_gain;
-    stats->filter_stability = akf->stability_metric;
-    stats->tracking_accuracy = 1.0 / (1.0 + akf->tracking_error);
-    stats->convergence_speed = 1.0 / (1.0 + akf->convergence_metric);
-    
+    stats->filter_stability         = akf->stability_metric;
+    stats->tracking_accuracy        = 1.0 / (1.0 + akf->tracking_error);
+    stats->convergence_speed        = 1.0 / (1.0 + akf->convergence_metric);
+
     // 自适应状态
-    stats->total_adaptations = akf->adaptation_counter;
-    stats->state_changes = akf->state_change_counter;
+    stats->total_adaptations    = akf->adaptation_counter;
+    stats->state_changes        = akf->state_change_counter;
     stats->current_signal_state = akf->signal_state;
-    
+
     // 参数漂移
     stats->Q_drift = fabs(akf->Q - akf->Q_base) / akf->Q_base;
     stats->R_drift = fabs(akf->R - akf->R_base) / akf->R_base;
@@ -601,20 +715,21 @@ void adaptive_kalman_get_performance_stats(AdaptiveKalmanFilter_t *akf, Adaptive
  * @param R_min 最小测量噪声
  * @param R_max 最大测量噪声
  */
-void adaptive_kalman_set_bounds(AdaptiveKalmanFilter_t *akf, double Q_min, double Q_max, double R_min, double R_max) {
+void adaptive_kalman_set_bounds(AdaptiveKalmanFilter_t *akf, double Q_min, double Q_max,
+                                double R_min, double R_max) {
     if (akf == NULL) return;
-    
+
     // 确保参数合理性
     if (Q_min > 0 && Q_max > Q_min) {
         akf->Q_min = Q_min;
         akf->Q_max = Q_max;
     }
-    
+
     if (R_min > 0 && R_max > R_min) {
         akf->R_min = R_min;
         akf->R_max = R_max;
     }
-    
+
     // 约束当前值在边界内
     if (akf->Q < akf->Q_min) akf->Q = akf->Q_min;
     if (akf->Q > akf->Q_max) akf->Q = akf->Q_max;
@@ -690,12 +805,13 @@ void adaptive_kalman_set_forgetting_factor(AdaptiveKalmanFilter_t *akf, double f
  * @param scale 比例校正值
  * @return 标定并滤波后的估计值
  */
-double adaptive_kalman_update_with_calibration(AdaptiveKalmanFilter_t *akf, double raw_measurement, double offset, double scale) {
+double adaptive_kalman_update_with_calibration(AdaptiveKalmanFilter_t *akf, double raw_measurement,
+                                               double offset, double scale) {
     if (akf == NULL || scale == 0.0) return raw_measurement;
-    
+
     // 应用标定
     double calibrated_measurement = (raw_measurement + offset) * scale;
-    
+
     // 进行自适应滤波
     return adaptive_kalman_update(akf, calibrated_measurement);
 }
@@ -708,12 +824,15 @@ double adaptive_kalman_update_with_calibration(AdaptiveKalmanFilter_t *akf, doub
  * @param num_points 标定点数量
  * @return 标定并滤波后的估计值
  */
-double adaptive_kalman_update_with_interpolation(AdaptiveKalmanFilter_t *akf, double raw_measurement, const double cal_points[][2], int num_points) {
+double adaptive_kalman_update_with_interpolation(AdaptiveKalmanFilter_t *akf,
+                                                 double raw_measurement,
+                                                 const double cal_points[][2], int num_points) {
     if (akf == NULL || cal_points == NULL || num_points < 2) return raw_measurement;
-    
+
     // 应用线性插值标定
-    double calibrated_measurement = kalman_linear_interpolation_calibration(raw_measurement, cal_points, num_points);
-    
+    double calibrated_measurement =
+        kalman_linear_interpolation_calibration(raw_measurement, cal_points, num_points);
+
     // 进行自适应滤波
     return adaptive_kalman_update(akf, calibrated_measurement);
 }
