@@ -206,6 +206,10 @@ void adaptive_kalman_tune_parameters(AdaptiveKalmanFilter_t *akf, double respons
 int adaptive_kalman_batch_process(AdaptiveKalmanFilter_t *akf, const double *input_data, double *output_data, int data_length);
 void adaptive_kalman_get_performance_stats(AdaptiveKalmanFilter_t *akf, AdaptiveKalmanPerformance_t *stats);
 SignalState_t adaptive_kalman_query_signal_state(AdaptiveKalmanFilter_t *akf);
+
+// 微小波动检测函数
+double adaptive_kalman_get_voltage_range(AdaptiveKalmanFilter_t *akf);
+int adaptive_kalman_is_micro_fluctuation(AdaptiveKalmanFilter_t *akf);
 // 自检错误码定义
 #define KALMAN_CHECK_OK                0x00    // 正常
 #define KALMAN_CHECK_PARAM_ERROR       0x01    // 参数错误
@@ -222,5 +226,9 @@ SignalState_t adaptive_kalman_query_signal_state(AdaptiveKalmanFilter_t *akf);
 #define KALMAN_GET_ACCURACY(akf)       (1.0 / (1.0 + (akf)->tracking_error))
 #define KALMAN_GET_RESPONSIVENESS(akf) ((akf)->K)
 #define KALMAN_IS_CONVERGED(akf)       ((akf)->convergence_metric < CONVERGENCE_THRESHOLD)
+
+// 微小波动检测宏
+#define MICRO_FLUCTUATION_THRESHOLD    (0.0001 / 4.7)  // 0.0001/4.7V ≈ 21.3μV
+#define KALMAN_IS_MICRO_FLUCTUATION(range) ((range) > 0 && (range) < MICRO_FLUCTUATION_THRESHOLD)
 
 #endif // KALMAN_FILTER_H

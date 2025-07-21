@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(gcc:*)",
+      "Bash(cd /mnt/d/code/OpenIBBOs)"
+    ],
+    "deny": []
+  }
+}
