@@ -232,10 +232,11 @@ void statistics_based_adaptation(AdaptiveKalmanFilter_t *akf) {
             break;
             
         case SIGNAL_CHANGING:
-            // 信号变化：增加过程噪声，提高响应速度
-            akf->Q = akf->Q * (1.0 - adaptation_rate) + akf->Q_base * 2.0 * adaptation_rate;
-            akf->R = akf->R * (1.0 - adaptation_rate) + akf->R_base * adaptation_rate;
+            // 信号变化：大幅增加过程噪声，极大提高响应速度，减小测量噪声权重
+            akf->Q = akf->Q_base * 8.0; // 原来是2.0，改为8.0
+            akf->R = akf->R_base * 0.5; // 原来是1.0，改为0.5
             akf->Q = fmin(akf->Q, akf->Q_max);
+            akf->R = fmax(akf->R, akf->R_min);
             break;
             
         case SIGNAL_NOISY:
@@ -256,7 +257,15 @@ void statistics_based_adaptation(AdaptiveKalmanFilter_t *akf) {
     
     akf->adaptation_counter++;
 }
-
+/**
+ * @brief 查询当前自适应卡尔曼滤波器的信号状态
+ * @param akf 自适应卡尔曼滤波器结构体指针
+ * @return 当前信号状态枚举值
+ */
+SignalState_t adaptive_kalman_query_signal_state(AdaptiveKalmanFilter_t *akf) {
+    if (akf == NULL) return SIGNAL_STABLE;
+    return akf->signal_state;
+}
 /**
  * @brief 自适应卡尔曼滤波更新
  */

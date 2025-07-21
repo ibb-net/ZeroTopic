@@ -205,7 +205,7 @@ int adaptive_kalman_self_check(AdaptiveKalmanFilter_t *akf);
 void adaptive_kalman_tune_parameters(AdaptiveKalmanFilter_t *akf, double responsiveness, double stability_preference);
 int adaptive_kalman_batch_process(AdaptiveKalmanFilter_t *akf, const double *input_data, double *output_data, int data_length);
 void adaptive_kalman_get_performance_stats(AdaptiveKalmanFilter_t *akf, AdaptiveKalmanPerformance_t *stats);
-
+SignalState_t adaptive_kalman_query_signal_state(AdaptiveKalmanFilter_t *akf);
 // 自检错误码定义
 #define KALMAN_CHECK_OK                0x00    // 正常
 #define KALMAN_CHECK_PARAM_ERROR       0x01    // 参数错误
