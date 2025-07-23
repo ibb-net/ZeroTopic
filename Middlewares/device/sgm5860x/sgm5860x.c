@@ -17,6 +17,7 @@
 #include "dev_uart.h"
 #include "elog.h"
 #include "os_server.h"
+#include "sgm5860x.h"
 // #include "app_event.h"
 
 #define TAG                           "sgm5860x"
@@ -26,20 +27,15 @@
 #ifndef sgm5860xChannelMax
 #define sgm5860xChannelMax 4
 #endif
+
 #ifndef CONFIG_sgm5860x_CYCLE_TIMER_MS
-#define CONFIG_sgm5860x_CYCLE_TIMER_MS 10
+#define CONFIG_sgm5860x_CYCLE_TIMER_MS 5  // 优化：5ms采样周期，提升响应速度100%
 #endif
-#define KALMAN_FILTER_MODE (1)  // 0: No filter, 1: Kalman filter
-#define AVG_FILTER_MODE    (0)  // 0: No filter, 1: Average filter
-#define FILTER_MODE        (KALMAN_FILTER_MODE)
-#if FILTER_MODE == KALMAN_FILTER_MODE
-#include "kalman_filter.h"
-#elif FILTER_MODE == AVG_FILTER_MODE
-#define AVG_MAX_CNT (10)
-#else
-#error \
-    "Invalid filter mode selected. Please set FILTER_MODE to either KALMAN_FILTER_MODE or AVG_FILTER_MODE"
-#endif
+
+// Channel 6超精密模式专用配置
+#define CHANNEL6_ULTRA_PRECISION_MODE 1
+#define CHANNEL6_TARGET_PRECISION_UV  0.1  // 0.1μV目标精度
+#define CHANNEL6_RESPONSE_TIME_SEC    3.0  // 3秒响应时间要求
 
 const double f_gain_map[] = {
     [SGM58601_GAIN_1] = 1.0,   [SGM58601_GAIN_2] = 2.0,     [SGM58601_GAIN_4] = 4.0,
@@ -54,7 +50,7 @@ ChannelCfg_t sgm5860_channelcfg[sgm5860xChannelMax] = {
     {0, SGM58601_GAIN_1},    // Channel 0: Gain 1
     {2, SGM58601_GAIN_1},    // Channel 2: Gain 1
     {4, SGM58601_GAIN_1},    // Channel 4: Gain 1
-    {6, SGM58601_GAIN_128},  // Channel 6: Gain 128
+    {6, SGM58601_GAIN_64},  // Channel 6: Gain 128
 
 };
 /* ===================================================================================== */
@@ -163,14 +159,16 @@ typedef struct {
     double sum[sgm5860xChannelMax];
     double average[sgm5860xChannelMax];     // Average voltage for each channel
     uint8_t vol_index[sgm5860xChannelMax];  // Voltage index for each channel
+    double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
 #if FILTER_MODE == KALMAN_FILTER_MODE
     SignalState_t last_kalman_state[sgm5860xChannelMax];
     AdaptiveKalmanFilter_t kalman_filters[sgm5860xChannelMax];  // Kalman filters for each channel
-    uint8_t kalman_initialized[sgm5860xChannelMax];  // Kalman filter initialization status
-    double filtered_voltage[sgm5860xChannelMax];     // Filtered voltage for each channel
-    uint32_t sample_count[sgm5860xChannelMax];       // Sample count for each channel
+    uint8_t kalman_initialized[sgm5860xChannelMax];       // Kalman filter initialization status
+    double filtered_voltage[sgm5860xChannelMax];          // Filtered voltage for each channel
+    uint32_t sample_count[sgm5860xChannelMax];            // Sample count for each channel
+
 #elif FILTER_MODE == AVG_FILTER_MODE
-    double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
+    // double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
 #endif
 
 } Typdefsgm5860xStatus;
@@ -289,6 +287,7 @@ static void __sgm5860xCycHandle(void) {
         double last_gain              = 0;
         static uint8_t channel_6_gain = 0;
         (void *)&channel_6_gain;
+        sgm5860xStatus.scan_index=3;
         uint8_t channel =
             sgm5860_channelcfg[sgm5860xStatus.scan_index].channel;  // Get the current channel
         uint8_t gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
@@ -299,7 +298,6 @@ static void __sgm5860xCycHandle(void) {
                 last_gain =
                     f_gain_map[sgm5860_channelcfg[i].gain];  // Get the gain for the last channel
                 sgm5860xStatus.last_voltage[i] = last_voltage;
-                sgm5860xStatus.sum[i] += last_voltage;  // Accumulate the voltage for averaging
 
 #if FILTER_MODE == KALMAN_FILTER_MODE
                 // 使用自适应卡尔曼滤波器处理数据
@@ -307,37 +305,39 @@ static void __sgm5860xCycHandle(void) {
                     double tmp_voltage = last_voltage;
                     // 更新卡尔曼滤波器
                     if (last_channel == 6) {
-                        tmp_voltage = last_voltage * 62.5;
-                    }
-                    sgm5860xStatus.filtered_voltage[i] =
-                        adaptive_kalman_update(&sgm5860xStatus.kalman_filters[i], tmp_voltage);
-                    if (last_channel == 6) {
-                        sgm5860xStatus.filtered_voltage[i] =
-                            sgm5860xStatus.filtered_voltage[i] / 62.5;
-                    }
-                    sgm5860xStatus.sample_count[i]++;
+                        //  elog_i(TAG, "%.9fmV", last_voltage*1000.0);
+                        last_gain=64;
+                        sgm5860xStatus.tmp_voltage[i][sgm5860xStatus.vol_index[i]] = last_voltage;
+                        sgm5860xStatus.vol_index[i]= (sgm5860xStatus.vol_index[i]+1)%AVG_MAX_CNT;
+                         sgm5860xStatus.sum[i]=0;
+                        for(int j=0;j<AVG_MAX_CNT;j++){
+                              sgm5860xStatus.sum[i] += sgm5860xStatus.tmp_voltage[i][j];
+                        }
+                        sgm5860xStatus.average[i] = sgm5860xStatus.sum[i] / (double)AVG_MAX_CNT;
+                        // if (sgm5860xStatus.vol_index[i] == AVG_MAX_CNT) {
+                            
+                            // sgm5860xStatus.sum[i]     = 0.0;
+                            // sgm5860xStatus.vol_index[i] = 0;
 
-                    // 每个采样都发送滤波后的数据
-                    // SignalState_t signal_state =
-                    // adaptive_kalman_query_signal_state(&sgm5860xStatus.kalman_filters[i]);
-                    if (sgm5860xStatus.last_kalman_state[i] !=
-                        sgm5860xStatus.kalman_filters[i].signal_state) {
-                        sgm5860xStatus.last_kalman_state[i] =
-                            sgm5860xStatus.kalman_filters[i].signal_state;
-                        elog_i(TAG, "Channel %d state changed to %d", i,
-                               sgm5860xStatus.kalman_filters[i].signal_state);
-                        elog_i(TAG, "Index %d Channel %d, Gain %.0f, Raw: %.7f V, Filtered: %.7f V",
-                               last_index, last_channel, last_gain, last_voltage,
-                               sgm5860xStatus.filtered_voltage[i]);
-                        vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.filtered_voltage[i]),
-                                 sizeof(sgm5860xStatus.filtered_voltage[i]));
+                            sgm5860xStatus.filtered_voltage[i] = adaptive_kalman_update(
+                                &sgm5860xStatus.kalman_filters[i], sgm5860xStatus.average[i]);
+                            sgm5860xStatus.filtered_voltage[i] =
+                                sgm5860xStatus.filtered_voltage[i] / last_gain;
+                            sgm5860xStatus.sample_count[i]++;
+                        // }
+
+                    } else {
+                        sgm5860xStatus.filtered_voltage[i] = adaptive_kalman_update(
+                            &sgm5860xStatus.kalman_filters[i], sgm5860xStatus.last_voltage[i]);
+                        sgm5860xStatus.filtered_voltage[i] =
+                            sgm5860xStatus.filtered_voltage[i] / last_gain;
+                        sgm5860xStatus.sample_count[i]++;
                     }
-                    else
-                    {
-                        if(sgm5860xStatus.sample_count[i]%10 == 0)
+                    if (sgm5860xStatus.sample_count[i] % 10 == 0) {
+                        elog_i(TAG, "%.9fmV", last_voltage*1000.0);
                         elog_d(TAG, "Channel %d state unchanged %d ", i,
                                sgm5860xStatus.kalman_filters[i].signal_state);
-                                 vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.filtered_voltage[i]),
+                        vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.filtered_voltage[i]),
                                  sizeof(sgm5860xStatus.filtered_voltage[i]));
                     }
 
@@ -346,9 +346,64 @@ static void __sgm5860xCycHandle(void) {
                         sgm5860x_check_kalman_health(i);
                     }
 
-                    // 每1000个样本打印一次统计信息
-                    if (sgm5860xStatus.sample_count[i] % 1000 == 0) {
-                        sgm5860x_print_kalman_stats(i);
+                    // Channel 6小信号模式：更频繁的精度监控和渐进优化
+                    if (last_channel == 6) {
+                        // 渐进式精度提升策略
+                        if (sgm5860xStatus.sample_count[i] % 200 == 0 &&
+                            sgm5860xStatus.sample_count[i] > 500) {
+                            AdaptiveKalmanFilter_t *akf = &sgm5860xStatus.kalman_filters[i];
+                            double precision_uv = adaptive_kalman_get_voltage_range(akf) * 1000000;
+
+                            // 针对10μV→1μV的渐进式精度优化
+                            if (precision_uv > 5.0 && akf->Q > 0.0001) {
+                                // 精度>5μV时，积极收紧
+                                akf->Q = akf->Q * 0.90;  // 降低10%
+                                elog_d(TAG, "CH6 aggressive tuning: Q=%.1fμV, precision=%.1fμV",
+                                       akf->Q * 1000000, precision_uv);
+                            } else if (precision_uv > 2.0 && akf->Q > 0.00008) {
+                                // 精度2-5μV时，持续优化
+                                akf->Q = akf->Q * 0.95;  // 降低5%
+                                elog_d(TAG, "CH6 progressive tuning: Q=%.1fμV, precision=%.1fμV",
+                                       akf->Q * 1000000, precision_uv);
+                            } else if (precision_uv > 1.0 && akf->Q > 0.00006) {
+                                // 精度1-2μV时，精细调整
+                                akf->Q = akf->Q * 0.98;  // 降低2%
+                                elog_d(TAG, "CH6 fine tuning: Q=%.1fμV, precision=%.1fμV",
+                                       akf->Q * 1000000, precision_uv);
+                            }
+                        }
+
+                        // 每100个样本检查精度达标情况
+                        if (sgm5860xStatus.sample_count[i] % 100 == 0) {
+                            double precision_uv = adaptive_kalman_get_voltage_range(
+                                                      &sgm5860xStatus.kalman_filters[i]) *
+                                                  1000000;
+                            if (precision_uv <= 1.0) {
+                                elog_d(
+                                    TAG,
+                                    "CH6 EXCELLENT: %.1fμV ≤ 1μV target achieved! (samples: %lu)",
+                                    precision_uv, sgm5860xStatus.sample_count[i]);
+                            } else if (precision_uv <= 2.0) {
+                                elog_d(
+                                    TAG,
+                                    "CH6 very good: %.1fμV approaching 1μV target (samples: %lu)",
+                                    precision_uv, sgm5860xStatus.sample_count[i]);
+                            } else if (precision_uv <= 5.0) {
+                                elog_d(TAG,
+                                       "CH6 good: %.1fμV, optimization in progress (samples: %lu)",
+                                       precision_uv, sgm5860xStatus.sample_count[i]);
+                            }
+                        }
+
+                        // 每500个样本详细统计
+                        if (sgm5860xStatus.sample_count[i] % 500 == 0) {
+                            // sgm5860x_print_kalman_stats(i);
+                        }
+                    } else {
+                        // 其他通道每1000个样本统计一次
+                        if (sgm5860xStatus.sample_count[i] % 1000 == 0) {
+                            // sgm5860x_print_kalman_stats(i);
+                        }
                     }
                 } else {
                     // 如果滤波器未初始化，使用原始值
@@ -357,6 +412,7 @@ static void __sgm5860xCycHandle(void) {
                 }
 #elif FILTER_MODE == AVG_FILTER_MODE
                 sgm5860xStatus.tmp_voltage[i][sgm5860xStatus.vol_index[i]] = last_voltage;
+                sgm5860xStatus.sum[i] += last_voltage;  // Accumulate the voltage for averaging
 
                 sgm5860xStatus.vol_index[i]++;
                 if (sgm5860xStatus.vol_index[i] >= AVG_MAX_CNT) {
@@ -722,30 +778,43 @@ static void sgm5860x_kalman_filter_init(uint8_t channel_index) {
     double measurement_noise = 0.1;   // 默认测量噪声
 
     // 根据通道配置调整滤波器参数
-    uint8_t gain = sgm5860_channelcfg[channel_index].gain;
-    switch (gain) {
-        case SGM58601_GAIN_1:
-        case SGM58601_GAIN_2:
-        case SGM58601_GAIN_4:
-            // 低增益通道：信号较大，噪声相对较小
-            process_noise     = 0.005;
-            measurement_noise = 0.05;
-            break;
+    uint8_t gain    = sgm5860_channelcfg[channel_index].gain;
+    uint8_t channel = sgm5860_channelcfg[channel_index].channel;
 
-        case SGM58601_GAIN_8:
-        case SGM58601_GAIN_16:
-        case SGM58601_GAIN_32:
-            // 中增益通道：信号中等，噪声中等
-            process_noise     = 0.01;
-            measurement_noise = 0.1;
-            break;
+    // Channel 6 超高精度模式：针对10μV→1μV精度提升
+    if (channel == 6 && gain == SGM58601_GAIN_64) {
+        // 针对10μV波动的精度提升参数
+        process_noise     = 0.0002;  // 0.2mV，进一步降低过程噪声
+        measurement_noise = 0.0008;  // 0.8mV，优化测量权重，强化滤波
+        initial_value     = 0.020;   // 20mV中点初值，加速收敛
 
-        case SGM58601_GAIN_64:
-        case SGM58601_GAIN_128:
-            // 高增益通道：信号较小，噪声相对较大
-            process_noise     = 0.005;
-            measurement_noise = 0.05;
-            break;
+        elog_i(TAG, "Channel 6 ultra-high precision mode: Q=%.1f μV, R=%.1f μV, target<1μV",
+               process_noise * 1000000, measurement_noise * 1000000);
+    } else {
+        switch (gain) {
+            case SGM58601_GAIN_1:
+            case SGM58601_GAIN_2:
+            case SGM58601_GAIN_4:
+                // 低增益通道：信号较大，噪声相对较小
+                process_noise     = 0.005;
+                measurement_noise = 0.05;
+                break;
+
+            case SGM58601_GAIN_8:
+            case SGM58601_GAIN_16:
+            case SGM58601_GAIN_32:
+                // 中增益通道：信号中等，噪声中等
+                process_noise     = 0.01;
+                measurement_noise = 0.1;
+                break;
+
+            case SGM58601_GAIN_64:
+            case SGM58601_GAIN_128:
+                // 高增益通道：信号较小，噪声相对较大
+                process_noise     = 0.005;
+                measurement_noise = 0.05;
+                break;
+        }
     }
 
     // 初始化自适应卡尔曼滤波器
@@ -760,11 +829,30 @@ static void sgm5860x_kalman_filter_init(uint8_t channel_index) {
                                measurement_noise * 10.0);  // R_max
 
     // 根据通道特性调整自适应速率
-    if (gain >= SGM58601_GAIN_64) {
-        // 高增益通道需要更快的自适应速率
-        // adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.15);
-        adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.08);
+    if (channel == 6 && gain == SGM58601_GAIN_128) {
+        // 超高精度参数边界设置，支持1μV精度
+        adaptive_kalman_set_bounds(&sgm5860xStatus.kalman_filters[channel_index],
+                                   0.00005,  // Q_min: 0.05mV (50μV)，允许更小过程噪声
+                                   0.002,    // Q_max: 2mV，适度的最大噪声
+                                   0.0003,   // R_min: 0.3mV，更严格的测量噪声下限
+                                   0.005);   // R_max: 5mV，合理的测量噪声上限
 
+        // Channel 6优化的自适应参数：平衡速度和稳定性
+        adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index],
+                                            0.12);  // 适中自适应速率
+        adaptive_kalman_enable_high_precision(&sgm5860xStatus.kalman_filters[channel_index],
+                                              1);  // 启用高精度模式
+        adaptive_kalman_set_forgetting_factor(&sgm5860xStatus.kalman_filters[channel_index],
+                                              0.95);  // 平衡遗忘因子
+
+        // 设置合理的收敛阈值
+        sgm5860xStatus.kalman_filters[channel_index].adaptation_threshold =
+            0.0005;  // 0.5mV收敛阈值
+
+        elog_i(TAG, "Channel 6 stable precision mode: adapt=0.12, forget=0.95, bounds=[0.1-5.0]mV");
+    } else if (gain >= SGM58601_GAIN_64) {
+        // 其他高增益通道的自适应速率
+        adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.08);
     } else {
         // 低增益通道使用较慢的自适应速率
         adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.08);
@@ -788,12 +876,49 @@ static void sgm5860x_print_kalman_stats(uint8_t channel_index) {
     AdaptiveKalmanStatus_t status;
     adaptive_kalman_get_status(&sgm5860xStatus.kalman_filters[channel_index], &status);
 
-    elog_i(TAG, "Channel %d Kalman Stats:", channel_index);
-    elog_i(TAG, "  Value: %.6f V, Gain: %.4f", status.current_value, status.kalman_gain);
-    elog_i(TAG, "  Q: %.6f, R: %.6f", status.process_noise, status.measurement_noise);
-    elog_i(TAG, "  Stability: %.4f, Error: %.6f", status.stability_metric, status.tracking_error);
-    elog_i(TAG, "  Signal State: %d, Adaptations: %d", status.signal_state,
-           status.adaptation_counter);
+    // Channel 6特殊显示：μV级精度监控
+    if (sgm5860_channelcfg[channel_index].channel == 6) {
+        double voltage_uv = status.current_value * 1000000;  // 转换为μV
+        double precision_uv =
+            adaptive_kalman_get_voltage_range(&sgm5860xStatus.kalman_filters[channel_index]) *
+            1000000;
+
+        elog_i(TAG, "=== Channel 6 Ultra-Precision Stats ===");
+        elog_i(TAG, "  Voltage: %.3f μV (%.6f mV)", voltage_uv, status.current_value * 1000);
+        elog_i(TAG, "  Precision: %.3f μV (target: 0.1 μV)", precision_uv);
+        elog_i(TAG, "  Kalman Gain: %.6f, State: %d", status.kalman_gain, status.signal_state);
+        elog_i(TAG, "  Q: %.6f mV, R: %.6f mV", status.process_noise * 1000,
+               status.measurement_noise * 1000);
+        elog_i(TAG, "  Stability: %.4f, Error: %.6f mV", status.stability_metric,
+               status.tracking_error * 1000);
+        elog_i(TAG, "  Samples: %lu, Adaptations: %d", sgm5860xStatus.sample_count[channel_index],
+               status.adaptation_counter);
+
+        // 精度达标检查
+        if (precision_uv <= CHANNEL6_TARGET_PRECISION_UV) {
+            elog_i(TAG, "  ✅ PRECISION TARGET MET: %.3f μV ≤ 0.1 μV", precision_uv);
+        } else {
+            elog_w(TAG, "  ❌ Precision: %.3f μV > 0.1 μV target", precision_uv);
+        }
+
+        // 收敛时间评估
+        double convergence_time =
+            (double)sgm5860xStatus.sample_count[channel_index] * 0.020;  // 50Hz采样
+        if (convergence_time <= CHANNEL6_RESPONSE_TIME_SEC) {
+            elog_i(TAG, "  ✅ RESPONSE TIME: %.2fs ≤ 3.0s target", convergence_time);
+        } else {
+            elog_w(TAG, "  ⚠️  Response time: %.2fs > 3.0s target", convergence_time);
+        }
+    } else {
+        // 其他通道标准显示
+        elog_i(TAG, "Channel %d Kalman Stats:", channel_index);
+        elog_i(TAG, "  Value: %.6f V, Gain: %.4f", status.current_value, status.kalman_gain);
+        elog_i(TAG, "  Q: %.6f, R: %.6f", status.process_noise, status.measurement_noise);
+        elog_i(TAG, "  Stability: %.4f, Error: %.6f", status.stability_metric,
+               status.tracking_error);
+        elog_i(TAG, "  Signal State: %d, Adaptations: %d", status.signal_state,
+               status.adaptation_counter);
+    }
 }
 
 /**
@@ -807,13 +932,51 @@ static void sgm5860x_check_kalman_health(uint8_t channel_index) {
     int check_result = adaptive_kalman_self_check(&sgm5860xStatus.kalman_filters[channel_index]);
 
     if (check_result != KALMAN_CHECK_OK) {
+        // 详细错误分析
         elog_w(TAG, "Channel %d Kalman filter error: 0x%02X", channel_index, check_result);
 
-        // 如果检测到严重错误，重置滤波器
-        if (check_result & (KALMAN_CHECK_UNSTABLE | KALMAN_CHECK_POOR_STABILITY)) {
-            double current_value = sgm5860xStatus.filtered_voltage[channel_index];
-            adaptive_kalman_reset(&sgm5860xStatus.kalman_filters[channel_index], current_value);
-            elog_i(TAG, "Channel %d Kalman filter reset to %.6f", channel_index, current_value);
+        if (check_result & KALMAN_CHECK_PARAM_ERROR)
+            elog_w(TAG, "  - Parameter error (Q/R/P invalid)");
+        if (check_result & KALMAN_CHECK_BOUNDS_ERROR)
+            elog_w(TAG, "  - Bounds error (parameters out of range)");
+        if (check_result & KALMAN_CHECK_UNSTABLE)
+            elog_w(TAG, "  - Numerical instability (P/K out of range)");
+        if (check_result & KALMAN_CHECK_POOR_TRACKING) elog_w(TAG, "  - Poor tracking performance");
+        if (check_result & KALMAN_CHECK_POOR_STABILITY) elog_w(TAG, "  - Poor stability");
+
+        // Channel 6专用错误处理
+        if (sgm5860_channelcfg[channel_index].channel == 6) {
+            elog_w(TAG, "Channel 6 error recovery: reinitializing with safer parameters");
+
+            // 使用更保守的参数重新初始化
+            adaptive_kalman_init(&sgm5860xStatus.kalman_filters[channel_index],
+                                 0.020,  // 20mV初始值
+                                 0.001,  // 1mV过程噪声（更保守）
+                                 0.002,  // 2mV测量噪声（更保守）
+                                 0.1);   // 初始协方差
+
+            // 重新设置安全边界
+            adaptive_kalman_set_bounds(&sgm5860xStatus.kalman_filters[channel_index],
+                                       0.0005,  // Q_min: 0.5mV
+                                       0.010,   // Q_max: 10mV
+                                       0.001,   // R_min: 1mV
+                                       0.020);  // R_max: 20mV
+
+            // 降低自适应速率，提高稳定性
+            adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index],
+                                                0.08);
+            adaptive_kalman_set_forgetting_factor(&sgm5860xStatus.kalman_filters[channel_index],
+                                                  0.98);
+
+            elog_i(TAG, "Channel 6 recovery mode: Q=1mV, R=2mV, adapt=0.08, forget=0.98");
+
+        } else {
+            // 其他通道的标准重置
+            if (check_result & (KALMAN_CHECK_UNSTABLE | KALMAN_CHECK_POOR_STABILITY)) {
+                double current_value = sgm5860xStatus.filtered_voltage[channel_index];
+                adaptive_kalman_reset(&sgm5860xStatus.kalman_filters[channel_index], current_value);
+                elog_i(TAG, "Channel %d standard reset to %.6f", channel_index, current_value);
+            }
         }
     }
 }

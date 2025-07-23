@@ -51,7 +51,10 @@
         "span": "c",
         "text_encoding": "c",
         "portmacro.h": "c",
-        "task.h": "c"
+        "task.h": "c",
+        "dev_sgm5860x.h": "c",
+        "sgm5860x.h": "c",
+        "kalman_filter.h": "c"
     },
     "cmake.sourceDirectory": "D:/Code/OpenIBBOs/OS/include"
 }

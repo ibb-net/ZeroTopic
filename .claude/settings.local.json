@@ -3,7 +3,8 @@
     "allow": [
       "Bash(find:*)",
       "Bash(gcc:*)",
-      "Bash(cd /mnt/d/code/OpenIBBOs)"
+      "Bash(cd /mnt/d/code/OpenIBBOs)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

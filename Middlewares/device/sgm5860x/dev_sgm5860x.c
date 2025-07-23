@@ -212,21 +212,24 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
         .bits.ORDER = 0,    // Data Order (0: MSB First, 1: LSB First)
         .bits.ID    = 0x00  // Device ID
     };
+    SGM5860xStatusReg_t read_status_reg;
     SGM5860xMuxReg_t mux_reg = {
 
-        .bits.PSEL = SGM58601_MUXP_AIN0,    // Positive Input Channel Selection
+        .bits.PSEL = SGM58601_MUXP_AIN6,  // Positive Input Channel Selection
         .bits.NSEL = SGM58601_MUXN_AINCOM,  // Negative Input Channel Selection
     };
-
+    SGM5860xMuxReg_t read_mux_reg;
     SGM5860xAdconReg_t adcon_reg = {
-        .bits.CLK      = 0,                // Clock Output Frequency
-        .bits.SDCS     = 0,                // Sensor Detection Current Source
-        .bits.PGA      = SGM58601_GAIN_1,  // Programmable Gain Amplifier
-        .bits.reserved = 0                 // Reserved
+        .bits.CLK      = 0,                 // Clock Output Frequency
+        .bits.SDCS     = 0,                 // Sensor Detection Current Source
+        .bits.PGA      = SGM58601_GAIN_64,  // Programmable Gain Amplifier
+        .bits.reserved = 0                  // Reserved
     };
+    SGM5860xAdconReg_t read_adcon_reg;
     SGM5860xDrateReg_t drate_reg = {
         .bits.DR = SGM58601_DRATE_100SPS  // Data Rate
     };
+    SGM5860xDrateReg_t read_drate_reg;
 
     /*     SGM5860xIoReg_t io_reg = {
             .bits.DIO = 0,  // Digital Input/Output State
@@ -236,26 +239,44 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     elog_d(TAG, "Config Status Register: 0x%02X", status_reg.raw);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&status_reg,
                         sizeof(status_reg));
-    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&status_reg,
+
+    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&read_status_reg,
                        sizeof(status_reg));
     elog_d(TAG, "Read Status Register: 0x%02X", status_reg.raw);
-
+    if (read_status_reg.raw != status_reg.raw) {
+        elog_e(TAG, "Read Status Register: 0x%02X Read 0x%02X", status_reg.raw,
+               read_status_reg.raw);
+    }
     elog_d(TAG, "Config MUX Register: 0x%02X", mux_reg.raw);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg, sizeof(mux_reg));
-    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg, sizeof(mux_reg));
+    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&read_mux_reg,
+                       sizeof(mux_reg));
+    if (mux_reg.raw != read_mux_reg.raw) {
+        elog_e(TAG, "Read SGM58601_MUX Register: 0x%02X Read 0x%02X", read_mux_reg.raw,
+               read_mux_reg.raw);
+    }
     elog_d(TAG, "Read MUX Register: 0x%02X", mux_reg.raw);
     elog_d(TAG, "Config ADCON Register: 0x%02X", adcon_reg.raw);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
                         sizeof(adcon_reg));
-    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
+    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&read_adcon_reg,
                        sizeof(adcon_reg));
+    if (adcon_reg.raw != read_adcon_reg.raw) {
+        elog_e(TAG, "Read SGM58601_ADCON Register: 0x%02X Read 0x%02X", adcon_reg.raw,
+               read_adcon_reg.raw);
+    }
     elog_d(TAG, "Read ADCON Register: 0x%02X", adcon_reg.raw);
     elog_d(TAG, "Config DRATE Register: 0x%02X", drate_reg.raw);
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&drate_reg,
                         sizeof(drate_reg));
-    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&drate_reg,
+    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&read_drate_reg,
                        sizeof(drate_reg));
-    elog_i(TAG, "Read DRATE Register: 0x%02X", drate_reg.raw);
+    if (read_drate_reg.raw != drate_reg.raw) {
+        elog_e(TAG, "Read SGM58601_ADCON Register: 0x%02X Read 0x%02X", drate_reg.raw,
+               read_drate_reg.raw);
+    }
+    elog_i(TAG, "SGM5860 Config Done");
+
     return 1;
 }
 
@@ -296,46 +317,68 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
 
     SGM5860xMuxReg_t tmp_mux_reg;
     SGM5860xAdconReg_t tmp_adcon_reg;
-    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&tmp_mux_reg,
-                       sizeof(tmp_mux_reg));  // Read MUX register
+    // DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&tmp_mux_reg,
+    //                    sizeof(tmp_mux_reg));  // Read MUX register
 
-    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&tmp_adcon_reg,
-                       sizeof(tmp_adcon_reg));  // Read ADCON register
+    // DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&tmp_adcon_reg,
+    //                    sizeof(tmp_adcon_reg));  // Read ADCON register
     uint8_t tmp_channel = tmp_mux_reg.bits.PSEL & 0x0F;
     double tmp_gain     = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
     if (tmp_gain > 1) {
         elog_d(TAG, "Last MUX Register: Channel %d Read Gain %.2f", tmp_channel, tmp_gain);
     }
 
+    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
+                        sizeof(mux_reg));  // Write MUX register
+    // DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
+    //                     sizeof(adcon_reg));  // Write ADCON register    //
     // Write data to register
     elog_d(TAG, "DevGetADCData: MUX Register get to 0x%02X", mux_reg.raw);
-    snd_data[0] = SGM58601_CMD_RDATA;                // Command to read data
+    // snd_data[0] = SGM58601_CMD_SYNC;
+    // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
+    // while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0) {
+    // }
+    // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
+    // DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 1);
+    // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
+
+    // snd_data[0] = SGM58601_CMD_WAKEUP;
+    // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
+    // while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0) {
+    // }
+    // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
+    // DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 1);
+    // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
+
+    snd_data[0] = SGM58601_CMD_SYNC;                // Command to read data
+    snd_data[1] = SGM58601_CMD_WAKEUP;                // Command to read data
+    snd_data[2] = SGM58601_CMD_RDATA;                // Command to read data
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
     elog_d(TAG, "Last MUX Register: Channel %d", tmp_channel);
     while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0) {
     }
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
-    DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 3 + 1);
+    DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 3 + 3);
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
+
     int hex_data =
-        (rcv_data[1] << 16) | (rcv_data[2] << 8) | rcv_data[3];  // Combine the received data
+        (rcv_data[3] << 16) | (rcv_data[4] << 8) | rcv_data[5];  // Combine the received data
     elog_d(TAG, "DevGetADCData: Received data: 0x%06X", hex_data);
     double voltage = 0.0;
     if (hex_data & 0x800000) {                                 // Check if the sign bit is set
         hex_data = ADC_24BIT_MAX_INT - (hex_data - 0x800000);  // Convert to positive value
         double hex_data_double = (double)hex_data;             // Convert to double for calculation
-        voltage = (-1) * hex_data_double * VREF_VOLTAGE / (ADC_24BIT_MAX_DOUBLE) / tmp_gain;
+        voltage                = (-1) * hex_data_double * VREF_VOLTAGE / (ADC_24BIT_MAX_DOUBLE);
     } else {
         double hex_data_double = (double)hex_data;  // Convert to double for calculation
-        voltage                = hex_data_double * VREF_VOLTAGE / (ADC_24BIT_MAX_DOUBLE) /
-                  tmp_gain;  // Calculate voltage
+        voltage = hex_data_double * VREF_VOLTAGE / (ADC_24BIT_MAX_DOUBLE);  // Calculate voltage
     }
 
-    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
-                        sizeof(mux_reg));  // Write MUX register
-    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
-                        sizeof(adcon_reg));  // Write ADCON register    //
-    elog_d(TAG, "DevGetADCData: Calculated voltage: %.10f V %.3f mv  Gain: %.2f", voltage,
+    // DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
+    //                     sizeof(mux_reg));  // Write MUX register
+    // DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
+    //                     sizeof(adcon_reg));  // Write ADCON register    //
+    elog_d(TAG, "DevGetADCData: Calculated voltage: %.10f V %.4f mv  Gain: %d", voltage,
            voltage * 1000.0, gain);
     elog_d(TAG,
            "rcv_data 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X "
@@ -343,8 +386,10 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
            rcv_data[0], rcv_data[1], rcv_data[2], rcv_data[3], rcv_data[4], rcv_data[5],
            rcv_data[6], rcv_data[7], rcv_data[8], rcv_data[9], rcv_data[10], rcv_data[11],
            rcv_data[12], rcv_data[13], rcv_data[14], rcv_data[15]);
+
     *last_channel = tmp_mux_reg.bits.PSEL & 0x0F;  // Update last channel
-    *last_voltage = voltage;                       // Update last voltage
+    *last_channel = 6;
+    *last_voltage = voltage;  // Update last voltage
     elog_d(TAG, "DevGetADCData[%u]:Get channel %d, last voltage %.10f V", cyc, *last_channel,
            *last_voltage);
     cyc++;

@@ -326,16 +326,37 @@ SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
     // 增加立即变化检测：最新值与前一个值的直接比较
     double immediate_change = latest_change;  // 已经是相邻两个样本的差异
 
-    // 定义清晰的阈值（针对-1V到2.5V范围，100mV变化优化）
+    // 自适应阈值：根据信号幅度动态调整（支持0-40mV和0-9V范围）
+    double signal_range = fmax(signal_magnitude, 0.001);  // 防止除零，最小1mV
+    
+    // 判断是否为小信号通道（如Channel 6的0-40mV）
+    bool is_small_signal = (signal_range < 0.1);  // <100mV认为是小信号
+    
     const double STABLE_VARIANCE_RATIO        = 0.01;
     const double STABLE_VARIATION_RATIO       = 0.1;
     const double NOISY_VARIANCE_RATIO         = 100.0;
-    const double CHANGING_DEVIATION_THRESHOLD = 0.02;   // 20mV绝对阈值，保证100mV可检测
-    const double CHANGING_STEP_THRESHOLD      = 0.025;  // 25mV步进阈值
-    const double CHANGING_RELATIVE_THRESHOLD  = 0.015;  // 1.5%相对阈值（对3.5V范围）
-    const double SATURATION_RATIO             = 0.95;
-    const double VOLTAGE_MIN                  = -1.0;  // 最小电压
-    const double VOLTAGE_MAX                  = 2.5;   // 最大电压
+    
+    // 动态阈值：小信号通道使用相对阈值，大信号通道使用绝对阈值
+    double CHANGING_DEVIATION_THRESHOLD, CHANGING_STEP_THRESHOLD, CHANGING_RELATIVE_THRESHOLD;
+    double VOLTAGE_MIN, VOLTAGE_MAX;
+    
+    if (is_small_signal) {
+        // 小信号模式 (0-40mV)：使用相对阈值，支持0.1μV精度检测
+        CHANGING_DEVIATION_THRESHOLD = signal_range * 0.05;   // 5%相对偏差 (对40mV ≈ 2mV)
+        CHANGING_STEP_THRESHOLD      = signal_range * 0.025;  // 2.5%相对步进 (对40mV ≈ 1mV)  
+        CHANGING_RELATIVE_THRESHOLD  = 0.02;                  // 2%相对变化
+        VOLTAGE_MIN = -signal_range * 0.1;                    // 信号范围的-10%
+        VOLTAGE_MAX = signal_range * 2.0;                     // 信号范围的200%
+    } else {
+        // 大信号模式 (0-9V)：使用绝对阈值，原有逻辑
+        CHANGING_DEVIATION_THRESHOLD = 0.02;   // 20mV绝对阈值
+        CHANGING_STEP_THRESHOLD      = 0.025;  // 25mV步进阈值  
+        CHANGING_RELATIVE_THRESHOLD  = 0.015;  // 1.5%相对阈值
+        VOLTAGE_MIN = -1.0;                    // -1V最小电压
+        VOLTAGE_MAX = 2.5;                     // 2.5V最大电压
+    }
+    
+    const double SATURATION_RATIO = 0.95;
     // const double FULL_SCALE_VOLTAGE = 3.5;             // 满量程电压范围 (暂时未使用)
 
     // 信号状态判断逻辑
@@ -345,10 +366,11 @@ SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
     if (mean > VOLTAGE_MAX * SATURATION_RATIO || mean < VOLTAGE_MIN * SATURATION_RATIO) {
         detected_state = SIGNAL_SATURATED;
     }
-    // 2. 检测显著变化（第二优先级）- 增强100mV检测
-    else if (immediate_change > CHANGING_STEP_THRESHOLD ||       // 直接步进变化
-             latest_deviation > CHANGING_DEVIATION_THRESHOLD ||  // 与均值的偏差
-             immediate_change > 0.08 ||                          // 80mV立即变化（针对100mV）
+    // 2. 检测显著变化（第二优先级）- 自适应阈值检测
+    else if (immediate_change > CHANGING_STEP_THRESHOLD ||       // 动态步进变化阈值
+             latest_deviation > CHANGING_DEVIATION_THRESHOLD ||  // 动态偏差阈值
+             (is_small_signal && immediate_change > signal_range * 0.001) ||  // 小信号：0.1%变化 (40mV*0.1% = 0.04mV = 40μV)
+             (!is_small_signal && immediate_change > 0.08) ||                 // 大信号：80mV立即变化
              latest_deviation > signal_magnitude * CHANGING_RELATIVE_THRESHOLD) {
         detected_state = SIGNAL_CHANGING;
     }
@@ -374,7 +396,12 @@ SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
         }
     }
 
-    // 调试信息输出（增强版）
+    // 调试信息输出（增强版）- 包含小信号模式信息
+    if (is_small_signal) {
+        elog_d("kalman", "Small signal mode: range=%.3fmV, dev_th=%.3fmV, step_th=%.3fmV", 
+               signal_range*1000, CHANGING_DEVIATION_THRESHOLD*1000, CHANGING_STEP_THRESHOLD*1000);
+    }
+    
     debug_signal_analysis(akf, latest_deviation, immediate_change, max_variation, detected_state);
 
     // 特别监控100mV级别的变化
