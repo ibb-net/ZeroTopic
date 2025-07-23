@@ -85,20 +85,8 @@ void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     elog_i(TAG, "DevSgm5860xReset: Device reset Started");
     uint32_t timeout = SGM5860_WAIT_TIME_US;
     DevPinWrite(&ptrDevSgm5860xHandle->nest, 0);  // Set NEST pin low
-    DevDelayUs(100);                              // Wait for 100 microseconds
+    vTaskDelay(pdMS_TO_TICKS(1));                 // Wait for 1 millisecond
     DevPinWrite(&ptrDevSgm5860xHandle->nest, 1);  // Set NEST pin high
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0) {
-        DevDelayUs(1);
-        timeout--;
-        if (timeout == 0) {
-            break;
-        }
-    }
-    if (timeout == 0) {
-        elog_e(TAG, "DevSgm5860xReset: Timeout waiting for DRDY after reset");
-    } else {
-        elog_i(TAG, "DevSgm5860xReset: Device reset completed");
-    }
 }
 int DevSgm5860xCommand(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t command) {
     uint8_t snd_data[16] = {0};
@@ -240,7 +228,7 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     __DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle);  // Wait for DRDY to go low
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&status_reg,
                         sizeof(status_reg));
-
+    __DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle);  // Wait for DRDY to go low
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&read_status_reg,
                        sizeof(status_reg));
     elog_d(TAG, "Read Status Register: 0x%02X", status_reg.raw);
@@ -249,7 +237,9 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
                read_status_reg.raw);
     }
     elog_d(TAG, "Config MUX Register: 0x%02X", mux_reg.raw);
+    __DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle);  // Wait for DRDY to go low
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg, sizeof(mux_reg));
+    __DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle);  // Wait for DRDY to go low
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&read_mux_reg,
                        sizeof(mux_reg));
     if (mux_reg.raw != read_mux_reg.raw) {
@@ -258,8 +248,10 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     }
     elog_d(TAG, "Read MUX Register: 0x%02X", mux_reg.raw);
     elog_d(TAG, "Config ADCON Register: 0x%02X", adcon_reg.raw);
+    __DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle);  // Wait for DRDY to go low
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
                         sizeof(adcon_reg));
+    __DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle);  // Wait for DRDY to go low
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&read_adcon_reg,
                        sizeof(adcon_reg));
     if (adcon_reg.raw != read_adcon_reg.raw) {
@@ -268,8 +260,10 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     }
     elog_d(TAG, "Read ADCON Register: 0x%02X", adcon_reg.raw);
     elog_d(TAG, "Config DRATE Register: 0x%02X", drate_reg.raw);
+    __DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle);  // Wait for DRDY to go low
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&drate_reg,
                         sizeof(drate_reg));
+    __DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle);  // Wait for DRDY to go low
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&read_drate_reg,
                        sizeof(drate_reg));
     if (read_drate_reg.raw != drate_reg.raw) {
@@ -334,7 +328,8 @@ void DevSgm5860xISRCallback(const DevSgm5860xHandleStruct *ptrDevPinHandle,
     DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_WAKEUP);  // Read data command
     double voltage   = DevSgm5860xReadValue(ptrDevSgm5860xHandle);
     ptrCurr->voltage = voltage;
-    // printf("[INFO]Current: Channel %d Gain %d Voltage %.6fV\r\n", ptrCurr->channel, ptrCurr->gain,
+    // printf("[INFO]Current: Channel %d Gain %d Voltage %.6fV\r\n", ptrCurr->channel,
+    // ptrCurr->gain,
     //        voltage);
 
     return;
