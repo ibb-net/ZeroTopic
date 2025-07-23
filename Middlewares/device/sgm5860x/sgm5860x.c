@@ -204,7 +204,21 @@ static const VFBTaskStruct sgm5860x_task_cfg = {
 };
 
 /* ===================================================================================== */
-void sgm5860xReadyCallback(void *ptrDevPinHandle) { /* printf("sgm5860xReadyCallback called\r\n"); */ }
+void sgm5860xReadyCallback(void *ptrDevPinHandle) {
+    // printf("sgm5860xReadyCallback called\r\n");
+    DevSgm5860xStruct Curr = {0};
+    DevSgm5860xStruct Next = {
+        .voltage = 0.0,
+        .channel = SGM58601_MUXN_AIN6,
+        .gain    = SGM58601_GAIN_64,
+    };
+
+    // DevGetADCData(&sgm5860_cfg, &last_voltage, &last_channel, SGM58601_MUXP_AIN6,
+    // SGM58601_GAIN_64);
+    DevSgm5860xISRCallback(ptrDevPinHandle, &Curr, &Next);
+    printf("last_voltage = %.6f, last_channel = %d\r\n",
+           Curr.voltage * 1000.0 / 64.0, Curr.channel);
+}
 void sgm5860xDeviceInit(void) {
     elog_i(TAG, "sgm5860xDeviceInit");
 
@@ -264,12 +278,12 @@ static void __sgm5860xRcvHandle(void *msg) {
 #endif
             DevSgm5860xConfig(&sgm5860_cfg);  // Configure the SGM5860x device
             sgm5860xStatus.status = 1;        // Set status to indicate the device is started
-            DevSgm5860xStart(&sgm5860_cfg);  // Start the SGM5860x device
+            DevSgm5860xStart(&sgm5860_cfg);   // Start the SGM5860x device
         } break;
         case sgm5860xStop: {
             elog_i(TAG, "sgm5860xStopTask %d", tmp_msg->frame->head.data);
             DevSgm5860xStop(&sgm5860_cfg);  // Stop the SGM5860x device
-            sgm5860xStatus.status = 0;       // Set status to indicate the device is stopped
+            sgm5860xStatus.status = 0;      // Set status to indicate the device is stopped
         } break;
         case sgm5860xSet: {
             elog_i(TAG, "sgm5860xSetTask %d", tmp_msg->frame->head.data);
@@ -298,7 +312,7 @@ static void __sgm5860xCycHandle(void) {
         uint8_t channel =
             sgm5860_channelcfg[sgm5860xStatus.scan_index].channel;  // Get the current channel
         uint8_t gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
-        DevGetADCData(&sgm5860_cfg, &last_voltage, &last_channel, channel, gain);
+        // DevGetADCData(&sgm5860_cfg, &last_voltage, &last_channel, channel, gain);
         for (int i = 0; i < sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]); i++) {
             if (sgm5860_channelcfg[i].channel == last_channel) {
                 last_index = i;

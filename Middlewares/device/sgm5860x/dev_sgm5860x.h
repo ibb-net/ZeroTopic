@@ -171,6 +171,11 @@ typedef union {
 
 #define ORDER_MSB_FIRST 0  // Most significant bit first (default)
 #define ORDER_LSB_FIRST 1  // Least significant bit first
+typedef struct {
+    double voltage;
+    uint8_t channel;
+    uint8_t gain;  // Gain code
+} DevSgm5860xStruct;
 
 int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
@@ -183,4 +188,6 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
                   uint8_t *last_channel, uint8_t channel, uint8_t gain);
 void DevSgm5860xStart(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 void DevSgm5860xStop(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
+void DevSgm5860xISRCallback(const DevSgm5860xHandleStruct *ptrDevPinHandle,
+                            DevSgm5860xStruct *ptrCurr, DevSgm5860xStruct *ptrNext);
 #endif  // __DEV_Sgm5860x_H

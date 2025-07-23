@@ -33,7 +33,7 @@
 #define PGA_GAIN             1.0        // Gain for PGA (Programmable Gain Amplifier)
 #define ADC_24BIT_MAX_INT    8388608    // 2^23 整数版本
 #define ADC_24BIT_MAX_DOUBLE 8388608.0  // 浮点版本，仅用于最终计算
-#define SGM5860_WAIT_TIME_US 1000
+#define SGM5860_WAIT_TIME_US 1000 * 1000 * 1000
 
 const double gaim_map[SGM58601_GAIN_MAX] = {1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0};
 
@@ -100,29 +100,13 @@ void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
         elog_i(TAG, "DevSgm5860xReset: Device reset completed");
     }
 }
-int DevSgm5860xCMDReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t regaddr) {
+int DevSgm5860xCommand(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t command) {
     uint8_t snd_data[16] = {0};
     uint8_t rcv_data[16] = {0};
     memset(snd_data, 0, sizeof(snd_data));
     memset(rcv_data, 0, sizeof(rcv_data));
-    snd_data[0] = (regaddr & 0x0F);                  // Command to write register
-    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
-    if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
-        elog_e(TAG, "DevSgm5860xCMDReg: Wait for DRDY failed");
-        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);
-        return -1;
-    }
+    snd_data[0] = (command & 0x0F);  // Command to write register
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 1);
-    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
-    // elog_d(TAG, "DevSgm5860xCMDReg regaddr: 0x%02X reglen: %d", regaddr, reglen);
-    // char log_msg[128];
-    // snprintf(log_msg, sizeof(log_msg),
-    //          "DevSgm5860xCMDReg regaddr: 0x%02X, reglen: %d, data: ", regaddr, reglen);
-    // for (size_t i = 0; i < reglen; i++) {
-    //     snprintf(log_msg + strlen(log_msg), sizeof(log_msg) - strlen(log_msg), "0x%02X ",
-    //              snd_data[i + 2]);
-    // }
-    // elog_i(TAG, "%s", log_msg);
     return 1;  // Success
 }
 int DevSgm5860xWriteReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t regaddr,
@@ -147,11 +131,7 @@ int DevSgm5860xWriteReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uin
     snd_data[1] = reglen - 1;
     memcpy(&snd_data[2], regvalue, reglen);
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);
-    if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
-        elog_e(TAG, "DevSgm5860xWriteReg: Wait for DRDY failed");
-        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);
-        return -1;
-    }
+
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, reglen + 2);
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
     // elog_d(TAG, "DevSgm5860xWriteReg regaddr: 0x%02X reglen: %d", regaddr, reglen);
@@ -185,15 +165,8 @@ int DevSgm5860xReadReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint
     memset(rcv_data, 0, sizeof(rcv_data));
     snd_data[0] = SGM58601_CMD_RREG | (regaddr & 0x0F);  // Command to read register
     snd_data[1] = reglen - 1;                            // Number of bytes to read
-    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);      // Set NEST pin low
-    if (__DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle) < 0) {
-        elog_e(TAG, "DevSgm5860xReadReg: Wait for DRDY failed");
-        DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);
-        return -1;
-    }
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, reglen + 2);
-    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
-    memcpy(regvalue, &rcv_data[2], reglen);          // Copy read data to output buffer
+    memcpy(regvalue, &rcv_data[2], reglen);  // Copy read data to output buffer
     // elog_d(TAG, "DevSgm5860xReadReg regaddr: 0x%02X reglen: %d", regaddr, reglen);
     char log_msg[128];
     snprintf(log_msg, sizeof(log_msg), "Read regaddr: 0x%02X, reglen: %d, data: ", regaddr, reglen);
@@ -205,6 +178,32 @@ int DevSgm5860xReadReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint
     elog_d(TAG, "%s", log_msg);
     return 1;  // Success
 }
+double DevSgm5860xReadValue(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
+    if (ptrDevSgm5860xHandle == NULL) {
+        elog_e(TAG, "DevSgm5860xReadValue: ptrDevSgm5860xHandle is NULL");
+        return F_INVAILD;
+    }
+    double voltage       = 0.0;
+    uint8_t snd_data[16] = {0};
+    uint8_t rcv_data[16] = {0};
+    memset(snd_data, 0, sizeof(snd_data));
+    memset(rcv_data, 0, sizeof(rcv_data));
+    snd_data[0] = SGM58601_CMD_RDATA;  // Command to read data
+    DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 1 + 3);
+    int hex_data =
+        (rcv_data[1] << 16) | (rcv_data[2] << 8) | rcv_data[3];  // Combine the received data
+    elog_d(TAG, "DevGetADCData: Received data: 0x%06X", hex_data);
+    if (hex_data & 0x800000) {                                 // Check if the sign bit is set
+        hex_data = ADC_24BIT_MAX_INT - (hex_data - 0x800000);  // Convert to positive value
+        double hex_data_double = (double)hex_data;             // Convert to double for calculation
+        voltage                = (-1) * hex_data_double * VREF_VOLTAGE / (ADC_24BIT_MAX_DOUBLE);
+    } else {
+        double hex_data_double = (double)hex_data;  // Convert to double for calculation
+        voltage = hex_data_double * VREF_VOLTAGE / (ADC_24BIT_MAX_DOUBLE);  // Calculate voltage
+    }
+    return voltage;  // Success
+}
+
 int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     SGM5860xStatusReg_t status_reg = {
         .bits.nDRDY = 0,    // Data Ready (Active Low)
@@ -228,7 +227,7 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     };
     SGM5860xAdconReg_t read_adcon_reg;
     SGM5860xDrateReg_t drate_reg = {
-        .bits.DR = SGM58601_DRATE_100SPS  // Data Rate
+        .bits.DR = SGM58601_DRATE_2_5SPS  // Data Rate
     };
     SGM5860xDrateReg_t read_drate_reg;
 
@@ -238,6 +237,7 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
         }; */
     elog_i(TAG, "DevSgm5860xConfig: Configuring SGM58601 registers");
     elog_d(TAG, "Config Status Register: 0x%02X", status_reg.raw);
+    __DevSgm5860xWaitforDRDY(ptrDevSgm5860xHandle);  // Wait for DRDY to go low
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&status_reg,
                         sizeof(status_reg));
 
@@ -294,6 +294,51 @@ void DevSgm5860xStop(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     }
     DevPinIsStartISR(&ptrDevSgm5860xHandle->drdy, 0);
 }
+void DevSgm5860xISRCallback(const DevSgm5860xHandleStruct *ptrDevPinHandle,
+                            DevSgm5860xStruct *ptrCurr, DevSgm5860xStruct *ptrNext) {
+    if (ptrDevPinHandle == NULL) {
+        printf("[ERROR]DevSgm5860xISRCallback: ptrDevPinHandle is NULL\r\n");
+        return;
+    }
+    SGM5860xMuxReg_t mux_reg          = {0};
+    SGM5860xAdconReg_t adcon_reg      = {0};
+    SGM5860xMuxReg_t read_mux_reg     = {0};
+    SGM5860xAdconReg_t read_adcon_reg = {0};
+
+    DevSgm5860xHandleStruct *ptrDevSgm5860xHandle = (DevSgm5860xHandleStruct *)ptrDevPinHandle;
+    /* STEP0 Wait for DRDY */
+    // PASS  DO NOT CHECK Ready
+
+    /* STEP1 Read Current Information */
+    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&read_mux_reg,
+                       sizeof(read_mux_reg));  // Read MUX register
+    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&read_adcon_reg,
+                       sizeof(read_adcon_reg));  // Read ADCON register
+    ptrCurr->gain    = read_adcon_reg.bits.PGA;
+    ptrCurr->channel = read_mux_reg.bits.PSEL;
+
+    /* STEP2 Write Next Channel config */
+    mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;
+    mux_reg.bits.PSEL  = ptrNext->channel;
+    adcon_reg.bits.PGA = ptrNext->gain;
+
+    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg, sizeof(mux_reg));
+    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
+                        sizeof(adcon_reg));
+
+    // printf("[INFO]Next: Channel %d Gain %d MUX 0x%02X ADCON 0x%02X\r\n", ptrNext->channel,
+    //        ptrNext->gain, mux_reg.raw, adcon_reg.raw);
+
+    /* STEP3 Read Value */
+    DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SYNC);    // Wake up the device
+    DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_WAKEUP);  // Read data command
+    double voltage   = DevSgm5860xReadValue(ptrDevSgm5860xHandle);
+    ptrCurr->voltage = voltage;
+    // printf("[INFO]Current: Channel %d Gain %d Voltage %.6fV\r\n", ptrCurr->channel, ptrCurr->gain,
+    //        voltage);
+
+    return;
+}
 int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *last_voltage,
                   uint8_t *last_channel, uint8_t channel, uint8_t gain) {
     if (ptrDevSgm5860xHandle == NULL || last_voltage == NULL) {
@@ -308,10 +353,10 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
     // uint8_t channel              = 0;
     SGM5860xMuxReg_t mux_reg     = {0};
     SGM5860xAdconReg_t adcon_reg = {
-        .bits.CLK      = 0,                // Clock Output Frequency
-        .bits.SDCS     = 0,                // Sensor Detection Current Source
-        .bits.PGA      = SGM58601_GAIN_1,  // Programmable Gain Amplifier
-        .bits.reserved = 0                 // Reserved
+        .bits.CLK      = 0,                 // Clock Output Frequency
+        .bits.SDCS     = 0,                 // Sensor Detection Current Source
+        .bits.PGA      = SGM58601_GAIN_64,  // Programmable Gain Amplifier
+        .bits.reserved = 0                  // Reserved
     };
     if (channel < 0 || channel > SGM58601_MUXP_AIN7) {
         elog_e(TAG, "DevGetADCData: Invalid channel %d", channel);
@@ -331,11 +376,11 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
 
     SGM5860xMuxReg_t tmp_mux_reg;
     SGM5860xAdconReg_t tmp_adcon_reg;
-    // DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&tmp_mux_reg,
-    //                    sizeof(tmp_mux_reg));  // Read MUX register
+    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&tmp_mux_reg,
+                       sizeof(tmp_mux_reg));  // Read MUX register
 
-    // DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&tmp_adcon_reg,
-    //                    sizeof(tmp_adcon_reg));  // Read ADCON register
+    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&tmp_adcon_reg,
+                       sizeof(tmp_adcon_reg));  // Read ADCON register
     uint8_t tmp_channel = tmp_mux_reg.bits.PSEL & 0x0F;
     double tmp_gain     = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
     if (tmp_gain > 1) {
@@ -344,8 +389,8 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
 
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
                         sizeof(mux_reg));  // Write MUX register
-    // DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
-    //                     sizeof(adcon_reg));  // Write ADCON register    //
+    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
+                        sizeof(adcon_reg));  // Write ADCON register    //
     // Write data to register
     elog_d(TAG, "DevGetADCData: MUX Register get to 0x%02X", mux_reg.raw);
     // snd_data[0] = SGM58601_CMD_SYNC;
@@ -363,14 +408,16 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
     // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
     // DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 1);
     // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
-
+    snd_data[0] = SGM58601_MUX | SGM58601_CMD_WREG;  // Command to read data
+    snd_data[0] = 1 - 1;                             // Command to read data
+    snd_data[0] = mux_reg.raw;                       // Command to read data
     snd_data[0] = SGM58601_CMD_SYNC;                 // Command to read data
     snd_data[1] = SGM58601_CMD_WAKEUP;               // Command to read data
     snd_data[2] = SGM58601_CMD_RDATA;                // Command to read data
-    DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
-    elog_d(TAG, "Last MUX Register: Channel %d", tmp_channel);
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0) {
-    }
+    // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
+    // elog_d(TAG, "Last MUX Register: Channel %d", tmp_channel);
+    // while (DevPinRead(&ptrDevSgm5860xHandle->drdy) == 0) {
+    // }
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 0);  // Set NEST pin low
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 3 + 3);
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
