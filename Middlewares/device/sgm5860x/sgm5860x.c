@@ -334,7 +334,7 @@ static void __sgm5860xCycHandle(void) {
                         sgm5860xStatus.sample_count[i]++;
                     }
                     if (sgm5860xStatus.sample_count[i] % 10 == 0) {
-                        elog_i(TAG, "%.9fmV", last_voltage*1000.0);
+                        elog_d(TAG, "%.9fmV", last_voltage*1000.0);
                         elog_d(TAG, "Channel %d state unchanged %d ", i,
                                sgm5860xStatus.kalman_filters[i].signal_state);
                         vfb_send(sgm5860xCH1 + last_index, 0, &(sgm5860xStatus.filtered_voltage[i]),

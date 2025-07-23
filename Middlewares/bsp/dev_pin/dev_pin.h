@@ -17,6 +17,7 @@ typedef struct
     DevPinModeEnum pin_mode;  // 0: output, 1: input
     uint8_t bit_value;        // 0: low, 1: high
 
+
 } DevPinHandleStruct;
 
 void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle);
@@ -25,5 +26,9 @@ uint8_t DevPinRead(const DevPinHandleStruct *ptrDevPinHandle);
 void DevErrorLED(uint8_t is_on) ;
 void DevErrorLEDToggle() ;
 void DevErrorLED1Toggle();
+void DevPinSetIsrCallback(const DevPinHandleStruct *ptrDevPinHandle,
+                                 void* callback);
 extern const TypedefDevPinMap DevPinMap[GD32H7XXZ_PIN_MAP_MAX];
+extern void EXTI0_IRQHandler(void);
+extern void EXTI9_IRQHandler(void);
 #endif  // __DEV_PIN_H

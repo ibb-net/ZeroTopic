@@ -51,6 +51,7 @@ int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     DevPinInit(&ptrDevSgm5860xHandle->nest);
     DevPinInit(&ptrDevSgm5860xHandle->sync);
     DevSpiInit(&ptrDevSgm5860xHandle->spi);
+    DevPinSetIsrCallback(&ptrDevSgm5860xHandle->drdy, NULL);
     DevPinWrite(&ptrDevSgm5860xHandle->nest, 1);
     DevPinWrite(&ptrDevSgm5860xHandle->sync, 1);
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);

@@ -2,7 +2,7 @@
 #define CONFIG_DEV_PIN_EN 1
 #if CONFIG_DEV_PIN_EN
 #include "dev_pin.h"
-
+#include "stdio.h"
 #include "dev_basic.h"
 
 void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle) {
@@ -117,4 +117,61 @@ void DevErrorLED1Toggle() {
        
     cyc++;
 }
+void DevPinSetIsrCallback(const DevPinHandleStruct *ptrDevPinHandle,
+                                 void* callback) {
+    // if (ptrDevPinHandle == NULL || callback == NULL) {
+    //     printf("Error: Invalid parameters for DevPinSetIsrCallback.\r\n");
+    //     return;
+    // } 
+    //     static const struct {
+    //     uint32_t gpio_base;
+    //     uint8_t exti_port;
+    //     uint8_t exti_pin;
+    //     exti_line_enum exti_line;
+    // exti_trig_type_enum exti_trig;
+    // } dev_exti_map[] = {
+    //     {GPIOA, 0, 0, EXTI_0},
+    //     {GPIOB, 1, 0, EXTI_1},
+    //     {GPIOC, 2, 0, EXTI_2},
+    //     {GPIOD, 3, 0, EXTI_3},
+    //     {GPIOE, 4, 0, EXTI_4},
+    //     {GPIOF, 5, 0, EXTI_5},
+    //     {GPIOG, 6, 0, EXTI_6},
+    //     {GPIOH, 7, 0, EXTI_7},
+    //     {GPIOJ, 8, 0, EXTI_8},
+    //     {GPIOK, 9, 0, EXTI_9},
+    // } ;
+        rcu_periph_clock_enable(RCU_SYSCFG);
+    nvic_irq_enable(EXTI0_IRQn, 2U, 0U);
+    nvic_irq_enable(EXTI5_9_IRQn, 2U, 0U);
+    /* connect key EXTI line to key GPIO pin */
+    syscfg_exti_line_config(EXTI_SOURCE_GPIOD, EXTI_SOURCE_PIN9);
+    /* configure key EXTI line */
+    exti_init(EXTI_9, EXTI_INTERRUPT, EXTI_TRIG_BOTH);
+    exti_interrupt_flag_clear(EXTI_9);
+    printf("DevPinSetIsrCallback called for device: %s\r\n", ptrDevPinHandle->device_name);
+
+    // 这里可以添加中断配置代码
+    // 例如，使用 GPIO 中断配置函数设置中断回调
+    // gpio_interrupt_config(ptrDevPinHandle->base, ptrDevPinHandle->pin, callback);
+}
+
+void EXTI0_IRQHandler(void)
+{
+    if(RESET != exti_interrupt_flag_get(EXTI_0)) {
+        printf("EXTI0_IRQHandler called\r\n");
+        exti_interrupt_flag_clear(EXTI_0);
+    }
+}
+void EXTI5_9_IRQHandler(void)
+{
+    if(RESET != exti_interrupt_flag_get(EXTI_9)) {
+        printf("EXTI5_9_IRQHandler called\r\n");
+        exti_interrupt_flag_clear(EXTI_9);
+    }
+}
+
+
+
+
 #endif
