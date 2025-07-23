@@ -181,4 +181,6 @@ int DevSgm5860xWriteRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle
 int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *last_voltage,
                   uint8_t *last_channel, uint8_t channel, uint8_t gain);
+void DevSgm5860xStart(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
+void DevSgm5860xStop(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 #endif  // __DEV_Sgm5860x_H

@@ -51,7 +51,7 @@ int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     DevPinInit(&ptrDevSgm5860xHandle->nest);
     DevPinInit(&ptrDevSgm5860xHandle->sync);
     DevSpiInit(&ptrDevSgm5860xHandle->spi);
-    DevPinSetIsrCallback(&ptrDevSgm5860xHandle->drdy, NULL);
+    DevPinIsStartISR(&ptrDevSgm5860xHandle->drdy, 0);
     DevPinWrite(&ptrDevSgm5860xHandle->nest, 1);
     DevPinWrite(&ptrDevSgm5860xHandle->sync, 1);
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);
@@ -216,7 +216,7 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     SGM5860xStatusReg_t read_status_reg;
     SGM5860xMuxReg_t mux_reg = {
 
-        .bits.PSEL = SGM58601_MUXP_AIN6,  // Positive Input Channel Selection
+        .bits.PSEL = SGM58601_MUXP_AIN6,    // Positive Input Channel Selection
         .bits.NSEL = SGM58601_MUXN_AINCOM,  // Negative Input Channel Selection
     };
     SGM5860xMuxReg_t read_mux_reg;
@@ -280,7 +280,20 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
 
     return 1;
 }
-
+void DevSgm5860xStart(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
+    if (ptrDevSgm5860xHandle == NULL) {
+        elog_e(TAG, "DevSgm5860xStart: ptrDevSgm5860xHandle is NULL");
+        return;
+    }
+    DevPinIsStartISR(&ptrDevSgm5860xHandle->drdy, 1);
+}
+void DevSgm5860xStop(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
+    if (ptrDevSgm5860xHandle == NULL) {
+        elog_e(TAG, "DevSgm5860xStop: ptrDevSgm5860xHandle is NULL");
+        return;
+    }
+    DevPinIsStartISR(&ptrDevSgm5860xHandle->drdy, 0);
+}
 int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *last_voltage,
                   uint8_t *last_channel, uint8_t channel, uint8_t gain) {
     if (ptrDevSgm5860xHandle == NULL || last_voltage == NULL) {
@@ -351,8 +364,8 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
     // DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 1);
     // DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
 
-    snd_data[0] = SGM58601_CMD_SYNC;                // Command to read data
-    snd_data[1] = SGM58601_CMD_WAKEUP;                // Command to read data
+    snd_data[0] = SGM58601_CMD_SYNC;                 // Command to read data
+    snd_data[1] = SGM58601_CMD_WAKEUP;               // Command to read data
     snd_data[2] = SGM58601_CMD_RDATA;                // Command to read data
     DevPinWrite(&ptrDevSgm5860xHandle->spi.nss, 1);  // Set NEST pin high
     elog_d(TAG, "Last MUX Register: Channel %d", tmp_channel);
