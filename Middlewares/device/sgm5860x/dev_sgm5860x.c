@@ -33,10 +33,10 @@
 #define PGA_GAIN             1.0        // Gain for PGA (Programmable Gain Amplifier)
 #define ADC_24BIT_MAX_INT    8388608    // 2^23 整数版本
 #define ADC_24BIT_MAX_DOUBLE 8388608.0  // 浮点版本，仅用于最终计算
-#define SGM5860_WAIT_TIME_US 1000 * 1000 * 1000
+#define SGM5860_WAIT_TIME_US (1000 * 1000 * 1000)
 
-const double gaim_map[SGM58601_GAIN_MAX] = {1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0};
-
+const double gain_map[SGM58601_GAIN_MAX] = {1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0};
+volatile int ready_trig_flg              = 0;
 /*SGM58601初始化*/
 static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 
@@ -66,8 +66,8 @@ static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860
     }
     uint32_t timeout = SGM5860_WAIT_TIME_US;  // SGM5860_WAIT_TIME_US;
     while (DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
-        // DevDelayUs(1);  // Wait for DRDY to go low
-        vTaskDelay(pdMS_TO_TICKS(1));  // Wait for 1 millisecond
+        DevDelayUs(1);  // Wait for DRDY to go low
+        // vTaskDelay(pdMS_TO_TICKS(1));  // Wait for 1 millisecond
         timeout--;
         if (timeout == 0) {
             // elog_e(TAG, "__DevSgm5860xWaitForDRDY: Timeout waiting for DRDY");
@@ -377,7 +377,7 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
     DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&tmp_adcon_reg,
                        sizeof(tmp_adcon_reg));  // Read ADCON register
     uint8_t tmp_channel = tmp_mux_reg.bits.PSEL & 0x0F;
-    double tmp_gain     = gaim_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
+    double tmp_gain     = gain_map[tmp_adcon_reg.bits.PGA];  // Get the gain from ADCON register
     if (tmp_gain > 1) {
         elog_d(TAG, "Last MUX Register: Channel %d Read Gain %.2f", tmp_channel, tmp_gain);
     }
