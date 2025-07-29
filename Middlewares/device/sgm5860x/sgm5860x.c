@@ -377,11 +377,17 @@ void Sgm5860xStreamRcvTask(void *arg) {
             f_gain                                  = f_gain_map[data->gain];
             ch                                      = data->channel;  // Get the channel number
             scan_index                              = ch / 2;
-            sgm5860xStatus.last_voltage[scan_index] = data->voltage / f_gain;  // Convert to mV
-            sum = sum + data->voltage / f_gain;
+            sgm5860xStatus.last_voltage[scan_index] = data->voltage;  // Convert to mV
+
+            sgm5860xStatus.filtered_voltage[scan_index] =
+                adaptive_kalman_update(&sgm5860xStatus.kalman_filters[scan_index],
+                                       sgm5860xStatus.last_voltage[scan_index]);
+            sgm5860xStatus.sample_count[scan_index]++;
+            // sum = sum + data->voltage / f_gain;
         }
-        vol = sum / (rcv_count / sizeof(DevSgm5860xStruct));
-        elog_d(TAG,"Get ADC CH:%d Vol %.9f",ch,vol);
+        // vol = sum / (rcv_count / sizeof(DevSgm5860xStruct));
+        vol = sgm5860xStatus.filtered_voltage[scan_index] / f_gain;
+        elog_d(TAG, "Get ADC CH:%d Vol %.9f", ch, vol);
         vfb_send(sgm5860xCH1 + scan_index, 0, &vol, sizeof(vol));
     }
 }
@@ -429,10 +435,10 @@ static void __sgm5860xRcvHandle(void *msg) {
                     sgm5860_channelcfg[3].enable = true;  // 9V 3
                 } break;
                 case SGM5860xScanModeSingle40mV: {
-                    sgm5860_channelcfg[0].enable = false;   // 40mv
+                    sgm5860_channelcfg[0].enable = false;  // 40mv
                     sgm5860_channelcfg[1].enable = false;  // 9v 1
                     sgm5860_channelcfg[2].enable = false;  // 9v 2
-                    sgm5860_channelcfg[3].enable = true;  // 9V 3
+                    sgm5860_channelcfg[3].enable = true;   // 9V 3
                 } break;
                 case SGM5860xScanModeSingle9V1: {
                     sgm5860_channelcfg[0].enable = false;  // 40mv
@@ -453,10 +459,10 @@ static void __sgm5860xRcvHandle(void *msg) {
                     sgm5860_channelcfg[3].enable = true;   // 9V 3
                 } break;
                 case SGM5860xScanModeAll9V: {
-                    sgm5860_channelcfg[0].enable = true;  // 40mv
+                    sgm5860_channelcfg[0].enable = true;   // 40mv
                     sgm5860_channelcfg[1].enable = true;   // 9v 1
                     sgm5860_channelcfg[2].enable = true;   // 9v 2
-                    sgm5860_channelcfg[3].enable = false;   // 9V 3
+                    sgm5860_channelcfg[3].enable = false;  // 9V 3
                 } break;
                 default:
                     elog_e(TAG, "TASK %s RCV: unknown mode: %d", taskName, mode);
@@ -592,8 +598,6 @@ static void __sgm5860xCycHandle(void) {
                                        precision_uv, sgm5860xStatus.sample_count[i]);
                             }
                         }
-
-     
                     }
                 } else {
                     // 如果滤波器未初始化，使用原始值
