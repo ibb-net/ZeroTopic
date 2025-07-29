@@ -7,8 +7,7 @@
 #include "dev_dma.h"
 #include "dev_pin.h"
 #include "string.h"
-typedef struct
-{
+typedef struct {
     uint32_t base;
     char device_name[DEVICE_NAME_MAX];
     rcu_periph_enum rcu_clock;
@@ -71,7 +70,7 @@ int DevSpiDMAWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, u
         printf("Error: SPI base %x not found in spi_basic_map.\r\n", ptrDevSpiHandle->base);
         return -1;
     }
-    DevDMAHandleStruct *dma_handle =( DevDMAHandleStruct *) &ptrDevSpiHandle->dam_tx;
+    DevDMAHandleStruct *dma_handle = (DevDMAHandleStruct *)&ptrDevSpiHandle->dam_tx;
     if (dma_handle == NULL) {
         printf("Error: DMA handle is NULL for SPI base %x.\r\n", ptrDevSpiHandle->base);
         return -1;
@@ -93,8 +92,7 @@ int DevSpiDMAWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, u
     dma_init_struct.periph_inc          = DMA_PERIPH_INCREASE_DISABLE;
     dma_init_struct.periph_addr         = spi_info->dma_tx_periph;
     dma_init_struct.priority            = DMA_PRIORITY_HIGH;
-    dma_single_data_mode_init(
-        dma_handle->base, dma_handle->channel, &dma_init_struct);
+    dma_single_data_mode_init(dma_handle->base, dma_handle->channel, &dma_init_struct);
     // DevPinWrite(&ptrDevSpiHandle->nss, 0);                      // Set NSS low (active state)
     // dma_channel_enable(dma_handle->base, dma_handle->channel);
     spi_enable(ptrDevSpiHandle->base);                        // Enable SPI
@@ -104,9 +102,11 @@ int DevSpiDMAWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, u
     spi_master_transfer_start(ptrDevSpiHandle->base, SPI_TRANS_START);
     dma_channel_enable(dma_handle->base, dma_handle->channel);  // Enable DMA channel
 
-    while (dma_flag_get(dma_handle->base, dma_handle->channel, DMA_FLAG_FTF) == RESET);  // Wait for transfer complete
+    while (dma_flag_get(dma_handle->base, dma_handle->channel, DMA_FLAG_FTF) ==
+           RESET);  // Wait for transfer complete
     dma_flag_clear(dma_handle->base, dma_handle->channel, DMA_FLAG_FTF);
-    while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) == RESET);  // Wait until transmit buffer is empty
+    while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) ==
+           RESET);  // Wait until transmit buffer is empty
 
     DevPinWrite(&ptrDevSpiHandle->nss, 1);                     // Set NSS high (inactive state)
     spi_dma_disable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);  // Disable DMA for SPI transmit
@@ -122,21 +122,25 @@ int DevSpiWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, uint
         printf("Error: SPI base %x not found in spi_basic_map.\r\n", ptrDevSpiHandle->base);
         return -1;
     }
-    // spi_reload_data_num_config(ptrDevSpiHandle->base, length);  // Set the number of data to be sent
+    // spi_reload_data_num_config(ptrDevSpiHandle->base, length);  // Set the number of data to be
+    // sent
     DevPinWrite(&ptrDevSpiHandle->nss, 0);  // Set NSS low (active state)
 
-    spi_enable(ptrDevSpiHandle->base);                                  // Enable SPI
-    spi_dma_enable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);            // Enable DMA for SPI transmit
+    spi_enable(ptrDevSpiHandle->base);                        // Enable SPI
+    spi_dma_enable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);  // Enable DMA for SPI transmit
     spi_master_transfer_start(ptrDevSpiHandle->base, SPI_TRANS_START);  // Start SPI transfer
     for (uint32_t i = 0; i < length; i++) {
-        while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) == RESET);  // Wait until transmit buffer is empty
-        spi_i2s_data_transmit(ptrDevSpiHandle->base, buffer[i]);                // Transmit data
+        while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) ==
+               RESET);  // Wait until transmit buffer is empty
+        spi_i2s_data_transmit(ptrDevSpiHandle->base, buffer[i]);  // Transmit data
     }
-    while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) == RESET);  // Wait until transmit buffer is empty
-    DevPinWrite(&ptrDevSpiHandle->nss, 1);                                  // Set NSS high (inactive state)
+    while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) ==
+           RESET);                          // Wait until transmit buffer is empty
+    DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
     return 0;
 }
-uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd, uint8_t *rcv, int size) {
+uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd, uint8_t *rcv,
+                        int size) {
     TypeSpiBasicMap *spi_info = NULL;
     int count                 = 0;
     spi_info                  = get_spi_info(ptrDevSpiHandle->base);
@@ -151,7 +155,8 @@ uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd,
     spi_master_transfer_start(ptrDevSpiHandle->base, SPI_TRANS_START);
     // printf("size  = %d\r\n", size);
     while (count < size) {
-        while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_FLAG_TP));  // Wait until transmit buffer is empty
+        while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base,
+                                         SPI_FLAG_TP));  // Wait until transmit buffer is empty
         if (snd == NULL) {
             spi_i2s_data_transmit(ptrDevSpiHandle->base, 0x00);
         } else {
