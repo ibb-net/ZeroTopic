@@ -278,8 +278,8 @@ uint8_t DevSgm5860xSet(const DevSgm5860xHandleStruct *ptrDevPinHandle, int chann
         return 0;
     }
 
-    printf("[PASS]DevSgm5860xSet: Channel %d Gain %d MUX 0x%02X ADCON 0x%02X\r\n", channel, gain,
-           mux_reg.raw, adcon_reg.raw);
+    // printf("[PASS]DevSgm5860xSet: Channel %d Gain %d MUX 0x%02X ADCON 0x%02X\r\n", channel, gain,
+    //        mux_reg.raw, adcon_reg.raw);
     return 1;
 }
 uint8_t DevSgm5860xStartContinuousMode(const DevSgm5860xHandleStruct *ptrDevPinHandle) {

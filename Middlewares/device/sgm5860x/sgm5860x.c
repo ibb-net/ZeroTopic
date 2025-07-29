@@ -224,7 +224,7 @@ static const VFBTaskStruct sgm5860x_task_cfg = {
 /* ===================================================================================== */
 void sgm5860xReadyCallback(void *ptrDevPinHandle) {
     DevPinHandleStruct *DevPinHandle = ptrDevPinHandle;
-
+    static int sgm5860xCount         = 0;  // Ready count for debugging
     switch (sgm5860xStatus.mode) {
         case SGM5860X_NONE_MODE: {
             // Do nothing, waiting for initialization
@@ -243,11 +243,11 @@ void sgm5860xReadyCallback(void *ptrDevPinHandle) {
         }
         case SGM5860X_STOP_CONTINUES_MODE: {
             sgm5860xStatus.mode = SGM5860X_SET_MODE;
-            printf("sgm5860xReadyCallback: STOP_CONTINUES_MODE\r\n");
+            // printf("sgm5860xReadyCallback: STOP_CONTINUES_MODE\r\n");
             // break;// Do not break here, continue to SET_MODE
         }
         case SGM5860X_SET_MODE: {
-            printf("sgm5860xReadyCallback: SET_MODE\r\n");
+            // printf("sgm5860xReadyCallback: SET_MODE\r\n");
             uint8_t result = DevSgm5860xSet(sgm5860xStatus.cfg, sgm5860xStatus.next_data.channel,
                                             sgm5860xStatus.next_data.gain);
             if (result != 1) {
@@ -257,12 +257,12 @@ void sgm5860xReadyCallback(void *ptrDevPinHandle) {
                 sgm5860xStatus.current_data.channel = sgm5860xStatus.next_data.channel;
                 sgm5860xStatus.current_data.gain    = sgm5860xStatus.next_data.gain;
                 sgm5860xStatus.current_data.voltage = sgm5860xStatus.next_data.voltage;
-                printf("sgm5860xReadyCallback: SET_MODE ,Next Channel: %d, Gain: %d\r\n",
-                       sgm5860xStatus.next_data.channel, sgm5860xStatus.next_data.gain);
+                // printf("sgm5860xReadyCallback: SET_MODE ,Next Channel: %d, Gain: %d\r\n",
+                //        sgm5860xStatus.next_data.channel, sgm5860xStatus.next_data.gain);
             }
         } break;
         case SGM5860X_START_CONTINUES_MODE: {
-            printf("sgm5860xReadyCallback: START_CONTINUES_MODE\r\n");
+            // printf("sgm5860xReadyCallback: START_CONTINUES_MODE\r\n");
             sgm5860xStatus.mode = SGM5860X_READ_MODE;
             DevSgm5860xStartContinuousMode(sgm5860xStatus.cfg);
         } break;
@@ -273,6 +273,21 @@ void sgm5860xReadyCallback(void *ptrDevPinHandle) {
                                          sizeof(DevSgm5860xStruct),
                                          &xHigherPriorityTaskWoken) == 0) {
                 printf("\r\n[ERROR]Sgm5860 Failed to send data to stream buffer from ISR\r\n");
+            }
+            sgm5860xCount++;
+            if (sgm5860xCount >= 3) {
+                sgm5860xCount = 0;
+                sgm5860xStatus.scan_index++;
+                if (sgm5860xStatus.scan_index >
+                    sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]) - 1) {
+                    sgm5860xStatus.scan_index =
+                        0;  // Reset channel to 0 after reaching the last channel
+                }
+                sgm5860xStatus.next_data.channel = sgm5860_channelcfg[sgm5860xStatus.scan_index]
+                                                       .channel;  // Get the current channel
+                sgm5860xStatus.next_data.gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
+
+                sgm5860xStatus.mode = SGM5860X_STOP_CONTINUES_MODE;
             }
         } break;
         default:
@@ -339,6 +354,9 @@ void Sgm5860xStreamRcvTask(void *arg) {
     double voltage                   = 0.0;
     static int max_cnt               = 0;
     uint8_t ch                       = 0;
+    static int count                 = 0;
+    static double tmp_vol[6]         = {0.0};  // Temporary voltage storage for each channel
+
     while (1) {
         rcv_count = xStreamBufferReceive(ptr_status->steam_buffer, &steam_rcv, sizeof(steam_rcv),
                                          portMAX_DELAY);
@@ -351,21 +369,32 @@ void Sgm5860xStreamRcvTask(void *arg) {
         for (int i = 0; i < rcv_count / sizeof(DevSgm5860xStruct); i++) {
             DevSgm5860xStruct *data = &steam_rcv[i];
             f_gain                  = f_gain_map[data->gain];
-            voltage                 = data->voltage/ f_gain;  // Convert to mV
-            ch                      = data->channel;                    // Get the channel number
-            vfb_send(sgm5860xCH1 + ch / 2, 0, &voltage, sizeof(voltage));
-            // switch (ch) {
-            //     case SGM58601_MUXN_AIN0:
-            //     case SGM58601_MUXN_AIN2:
-            //     case SGM58601_MUXN_AIN4:
+            voltage                 = data->voltage / f_gain;  // Convert to mV
+            ch                      = data->channel;           // Get the channel number
+            count++;
+            if (count == 3) {
+                count = 0;
 
-            //         voltage = voltage * 4.7;
-            //         ptr_status->tmp_voltage break;
-            //     case SGM58601_MUXN_AIN6:
-            //         break;
-            //     default:
-            //         break;
-            // }
+                switch (ch) {
+                    case SGM58601_MUXN_AIN0: {
+                        vfb_send(sgm5860xCH1, 0, &voltage, sizeof(voltage));
+                    } break;
+                    case SGM58601_MUXN_AIN2: {
+                        vfb_send(sgm5860xCH2, 0, &voltage, sizeof(voltage));
+                    } break;
+                    case SGM58601_MUXN_AIN4: {
+                        vfb_send(sgm5860xCH3, 0, &voltage, sizeof(voltage));
+                    } break;
+
+                    case SGM58601_MUXN_AIN6: {
+                        vfb_send(sgm5860xCH4, 0, &voltage, sizeof(voltage));
+                    } break;
+
+                    default:
+                        break;
+                }
+            }
+
             // if (voltage < 40.0) {
             //     elog_i(TAG, "Voltage=%.7f mV, offset=%.2f uV, ch=%d, gain=%f", voltage,
             //            (voltage - last_vol) * 1000.0, ch, f_gain);
