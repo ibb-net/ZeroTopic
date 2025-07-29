@@ -5,9 +5,9 @@
 
 #include "dev_basic.h"
 #include "stdio.h"
-#define DEVICE_PIN_MAX 32
+#define DEVICE_PIN_MAX 4
 
-#define PIN_EXIT_IRQ_PRE_PRIORITY 2U
+#define PIN_EXIT_IRQ_PRE_PRIORITY 4U
 #define PIN_EXIT_IRQ_SUB_PRIORITY 0U
 typedef struct {
     uint8_t enable;
@@ -110,17 +110,13 @@ void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle) {
     } else {
         if (ptrDevPinHandle->pin_mode == DevPinModeInput) {
             /* 配置为输入 */
-            gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP,
+            gpio_mode_set(ptrDevPinHandle->base, GPIO_MODE_INPUT, GPIO_PUPD_NONE,
                           ptrDevPinHandle->pin);
             if (ptrDevPinHandle->isrcb != NULL) {
+                rcu_periph_clock_enable(RCU_SYSCFG);
                 // rcu_periph_clock_enable(RCU_SYSCFG);
                 dev_exti_pin_map_t *dev_exti_pin_map   = DevGetPinExtiMap(ptrDevPinHandle);
                 dev_exti_port_map_t *dev_exti_port_map = DevGetPortExtiMap(ptrDevPinHandle);
-                nvic_irq_enable(dev_exti_pin_map->nvic_irq, PIN_EXIT_IRQ_PRE_PRIORITY,
-                                PIN_EXIT_IRQ_SUB_PRIORITY);
-                syscfg_exti_line_config(dev_exti_port_map->exti_port, dev_exti_pin_map->exti_pin);
-                exti_init(dev_exti_pin_map->exti_line, EXTI_INTERRUPT, ptrDevPinHandle->exti_trig);
-                exti_interrupt_flag_clear(dev_exti_pin_map->exti_line);
                 for (int j = 0; j < DEVICE_PIN_MAX; j++) {
                     if (dev_pin_status[j].enable == 0) {
                         dev_pin_status[j].enable          = 1;
@@ -128,8 +124,29 @@ void DevPinInit(const DevPinHandleStruct *ptrDevPinHandle) {
                         dev_pin_status[j].ptrDevPinHandle = (DevPinHandleStruct *)ptrDevPinHandle;
                         dev_pin_status[j].isrcb           = ptrDevPinHandle->isrcb;
                         dev_pin_status[j].linex           = dev_exti_pin_map->exti_line;
-                        printf("DevPinInit: %s pin %d is ready for interrupt.\r\n",
-                               ptrDevPinHandle->device_name, ptrDevPinHandle->pin);
+                        exti_interrupt_disable(dev_pin_status[j].linex);
+                        static const char *trig_strs[] = {"NONE", "RISING", "FALLING", "BOTH"};
+                        uint8_t trig_idx               = 0;
+                        switch (ptrDevPinHandle->exti_trig) {
+                            case EXTI_TRIG_NONE:
+                                trig_idx = 0;
+                                break;
+                            case EXTI_TRIG_RISING:
+                                trig_idx = 1;
+                                break;
+                            case EXTI_TRIG_FALLING:
+                                trig_idx = 2;
+                                break;
+                            case EXTI_TRIG_BOTH:
+                                trig_idx = 3;
+                                break;
+                            default:
+                                trig_idx = 0;
+                                break;
+                        }
+                        printf("DevPinInit: %s pin %d is ready for interrupt, trig mode: %s.\r\n",
+                               ptrDevPinHandle->device_name, ptrDevPinHandle->pin,
+                               trig_strs[trig_idx]);
                         break;
                     }
                 }
@@ -206,6 +223,8 @@ void DevErrorLED1Toggle() {
 }
 void DevPinGetCallback(exti_line_enum linex) {
     uint8_t is_found = 0;
+    // dev_pin_status[0].isrcb((void *)dev_pin_status[0].ptrDevPinHandle);
+
     for (int i = 0; i < DEVICE_PIN_MAX; i++) {
         if (dev_pin_status[i].enable && dev_pin_status[i].ptrDevPinHandle != NULL) {
             if (dev_pin_status[i].linex == linex) {
@@ -233,6 +252,20 @@ void DevPinIsStartISR(const DevPinHandleStruct *ptrDevPinHandle, uint8_t istart)
                 dev_pin_status[i].start = istart;
                 if (istart) {
                     // Enable the EXTI line
+                    if (ptrDevPinHandle->isrcb != NULL) {
+                        rcu_periph_clock_enable(RCU_SYSCFG);
+                        // rcu_periph_clock_enable(RCU_SYSCFG);
+                        dev_exti_pin_map_t *dev_exti_pin_map   = DevGetPinExtiMap(ptrDevPinHandle);
+                        dev_exti_port_map_t *dev_exti_port_map = DevGetPortExtiMap(ptrDevPinHandle);
+                        nvic_irq_enable(dev_exti_pin_map->nvic_irq, PIN_EXIT_IRQ_PRE_PRIORITY,
+                                        PIN_EXIT_IRQ_SUB_PRIORITY);
+                        syscfg_exti_line_config(dev_exti_port_map->exti_port,
+                                                dev_exti_pin_map->exti_pin);
+                        exti_init(dev_exti_pin_map->exti_line, EXTI_INTERRUPT,
+                                  ptrDevPinHandle->exti_trig);
+                        exti_interrupt_flag_clear(dev_exti_pin_map->exti_line);
+                    }
+
                     exti_interrupt_flag_clear(dev_pin_status[i].linex);
                     exti_interrupt_enable(dev_pin_status[i].linex);
                     printf("DevPinIsStartISR: %s pin %d interrupt enabled.\r\n",
