@@ -49,6 +49,7 @@ typedef enum {
     sgm5860xCH3,                         // 1037
     sgm5860xCH4,                         // 1038
     ADCUpdate,                           // 1039
+    sgm5860xMode,                       // 1040
 
     /************************************************* */
     SDK_EVENT_NUM,

@@ -8,7 +8,7 @@
 #include "dev_spi.h"
 
 #define SGM58601_DEFAULT_SPS     SGM58601_DRATE_30SPS
-#define SGM58601_DEFAULT_GAIN    SGM58601_GAIN_64
+#define SGM58601_DEFAULT_GAIN    SGM58601_GAIN_32
 #define SGM58601_DEFAULT_CHANNEL SGM58601_MUXN_AIN6
 typedef struct {
     DevPinHandleStruct drdy;

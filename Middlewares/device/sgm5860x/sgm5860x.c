@@ -33,6 +33,7 @@
 #define CONFIG_sgm5860x_CYCLE_TIMER_MS 300  // 优化：300ms采样周期，提升响应速度100%
 #endif
 #define STEAM_BUFFER_CNT  (16)
+#define SCAN_MAX_CNT      (10)
 #define STEAM_BUFFER_SIZE (sizeof(DevSgm5860xStruct) * STEAM_BUFFER_CNT)
 // Channel 6超精密模式专用配置
 #define CHANNEL6_ULTRA_PRECISION_MODE 1
@@ -47,14 +48,15 @@ const double f_gain_map[] = {
 
 void sgm5860xReadyCallback(void *ptrDevPinHandle);
 typedef struct {
+    uint8_t enable;
     uint8_t channel;  // Channel number
     uint8_t gain;     // Gain setting for the channel
 } ChannelCfg_t;
 ChannelCfg_t sgm5860_channelcfg[sgm5860xChannelMax] = {
-    {SGM58601_MUXN_AIN0, SGM58601_GAIN_1},   // Channel 0: Gain 1
-    {SGM58601_MUXN_AIN2, SGM58601_GAIN_1},   // Channel 2: Gain 1
-    {SGM58601_MUXN_AIN4, SGM58601_GAIN_1},   // Channel 4: Gain 1
-    {SGM58601_MUXN_AIN6, SGM58601_GAIN_32},  // Channel 6: Gain 128
+    {true, SGM58601_MUXN_AIN0, SGM58601_GAIN_1},   // Channel 0: Gain 1
+    {true, SGM58601_MUXN_AIN2, SGM58601_GAIN_1},   // Channel 2: Gain 1
+    {true, SGM58601_MUXN_AIN4, SGM58601_GAIN_1},   // Channel 4: Gain 1
+    {true, SGM58601_MUXN_AIN6, SGM58601_GAIN_32},  // Channel 6: Gain 64
 
 };
 typedef enum {
@@ -161,7 +163,6 @@ void sgm5860xReadReg(unsigned char regaddr, unsigned char databyte);
 // void sgm5860xsend(uint8_t ch, uint16_t data);
 static void sgm5860x_check_kalman_health(uint8_t channel_index);
 static void sgm5860x_kalman_filter_init(uint8_t channel_index);
-static void sgm5860x_print_kalman_stats(uint8_t channel_index);
 int sgm5860xReadSingleData(unsigned char channel);
 void Sgm5860xStreamRcvTask(void *arg);
 
@@ -198,10 +199,7 @@ volatile Typdefsgm5860xStatus sgm5860xStatus = {0};
 
 static const vfb_event_t sgm5860xEventList[] = {
 
-    sgm5860xStart,
-    sgm5860xStop,
-    sgm5860xGet,
-    sgm5860xSet,
+    sgm5860xStart, sgm5860xStop, sgm5860xGet, sgm5860xSet, sgm5860xMode,
 
 };
 
@@ -224,7 +222,8 @@ static const VFBTaskStruct sgm5860x_task_cfg = {
 /* ===================================================================================== */
 void sgm5860xReadyCallback(void *ptrDevPinHandle) {
     DevPinHandleStruct *DevPinHandle = ptrDevPinHandle;
-    static int sgm5860xCount         = 0;  // Ready count for debugging
+    static DevSgm5860xStruct tmp_bffer[SCAN_MAX_CNT];
+    static int sgm5860xCount = 0;  // Ready count for debugging
     switch (sgm5860xStatus.mode) {
         case SGM5860X_NONE_MODE: {
             // Do nothing, waiting for initialization
@@ -267,27 +266,33 @@ void sgm5860xReadyCallback(void *ptrDevPinHandle) {
             DevSgm5860xStartContinuousMode(sgm5860xStatus.cfg);
         } break;
         case SGM5860X_READ_MODE: {
-            sgm5860xStatus.current_data.voltage = DevSgm5860xReadValue(sgm5860xStatus.cfg);
             BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-            if (xStreamBufferSendFromISR(sgm5860xStatus.steam_buffer, &sgm5860xStatus.current_data,
-                                         sizeof(DevSgm5860xStruct),
-                                         &xHigherPriorityTaskWoken) == 0) {
-                printf("\r\n[ERROR]Sgm5860 Failed to send data to stream buffer from ISR\r\n");
-            }
+            tmp_bffer[sgm5860xCount].channel    = sgm5860xStatus.current_data.channel;
+            tmp_bffer[sgm5860xCount].gain       = sgm5860xStatus.current_data.gain;
+            tmp_bffer[sgm5860xCount].voltage    = DevSgm5860xReadValue(sgm5860xStatus.cfg);
             sgm5860xCount++;
-            if (sgm5860xCount >= 3) {
-                sgm5860xCount = 0;
-                sgm5860xStatus.scan_index++;
-                if (sgm5860xStatus.scan_index >
-                    sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]) - 1) {
-                    sgm5860xStatus.scan_index =
-                        0;  // Reset channel to 0 after reaching the last channel
+            if (sgm5860xCount >= SCAN_MAX_CNT) {
+                if (xStreamBufferSendFromISR(sgm5860xStatus.steam_buffer, tmp_bffer,
+                                             sizeof(tmp_bffer), &xHigherPriorityTaskWoken) == 0) {
+                    printf("\r\n[ERROR]Sgm5860 Failed to send data to stream buffer from ISR\r\n");
                 }
+                sgm5860xCount = 0;
+                for (int i = 0; i < SCAN_MAX_CNT; i++) {
+                    sgm5860xStatus.last_voltage[i] = tmp_bffer[i].voltage;
+                }
+                do {
+                    sgm5860xStatus.scan_index++;
+                    if (sgm5860xStatus.scan_index >
+                        sizeof(sgm5860_channelcfg) / sizeof(sgm5860_channelcfg[0]) - 1) {
+                        sgm5860xStatus.scan_index =
+                            0;  // Reset channel to 0 after reaching the last channel
+                    }
+                } while (sgm5860_channelcfg[sgm5860xStatus.scan_index].enable == false);
+                // printf("Scan index %d\r\n", sgm5860xStatus.scan_index);
                 sgm5860xStatus.next_data.channel = sgm5860_channelcfg[sgm5860xStatus.scan_index]
                                                        .channel;  // Get the current channel
                 sgm5860xStatus.next_data.gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
-
-                sgm5860xStatus.mode = SGM5860X_STOP_CONTINUES_MODE;
+                sgm5860xStatus.mode           = SGM5860X_STOP_CONTINUES_MODE;
             }
         } break;
         default:
@@ -348,14 +353,15 @@ SYSTEM_REGISTER_INIT(BoardInitStage, sgm5860xPriority, __sgm5860xCreateTaskHandl
 DevSgm5860xStruct steam_rcv[STEAM_BUFFER_CNT] = {0};
 void Sgm5860xStreamRcvTask(void *arg) {
     Typdefsgm5860xStatus *ptr_status = &sgm5860xStatus;
-    static double last_vol           = 0.0;
     int rcv_count                    = 0;
     double f_gain                    = 0.0;
     double voltage                   = 0.0;
     static int max_cnt               = 0;
     uint8_t ch                       = 0;
-    static int count                 = 0;
-    static double tmp_vol[6]         = {0.0};  // Temporary voltage storage for each channel
+    uint8_t scan_index               = 0;
+    uint8_t last_scan_index          = 0;
+    double vol                       = 0.0;
+    double sum                       = 0.0;
 
     while (1) {
         rcv_count = xStreamBufferReceive(ptr_status->steam_buffer, &steam_rcv, sizeof(steam_rcv),
@@ -365,46 +371,18 @@ void Sgm5860xStreamRcvTask(void *arg) {
         }
         elog_d(TAG, "rcv_count = %d cnt %d max %d", rcv_count,
                rcv_count / sizeof(DevSgm5860xStruct), max_cnt);
-
+        sum = 0.0;
         for (int i = 0; i < rcv_count / sizeof(DevSgm5860xStruct); i++) {
-            DevSgm5860xStruct *data = &steam_rcv[i];
-            f_gain                  = f_gain_map[data->gain];
-            voltage                 = data->voltage / f_gain;  // Convert to mV
-            ch                      = data->channel;           // Get the channel number
-            count++;
-            if (count == 3) {
-                count = 0;
-
-                switch (ch) {
-                    case SGM58601_MUXN_AIN0: {
-                        vfb_send(sgm5860xCH1, 0, &voltage, sizeof(voltage));
-                    } break;
-                    case SGM58601_MUXN_AIN2: {
-                        vfb_send(sgm5860xCH2, 0, &voltage, sizeof(voltage));
-                    } break;
-                    case SGM58601_MUXN_AIN4: {
-                        vfb_send(sgm5860xCH3, 0, &voltage, sizeof(voltage));
-                    } break;
-
-                    case SGM58601_MUXN_AIN6: {
-                        vfb_send(sgm5860xCH4, 0, &voltage, sizeof(voltage));
-                    } break;
-
-                    default:
-                        break;
-                }
-            }
-
-            // if (voltage < 40.0) {
-            //     elog_i(TAG, "Voltage=%.7f mV, offset=%.2f uV, ch=%d, gain=%f", voltage,
-            //            (voltage - last_vol) * 1000.0, ch, f_gain);
-
-            // } else {
-            //     elog_i(TAG, "Voltage=%.7f V, offset=%.2f mV, ch=%d, gain=%f", voltage/1000.0,
-            //            voltage - last_vol, ch, f_gain);
-            // }
-            // last_vol = voltage;  // Update last voltage
+            DevSgm5860xStruct *data                 = &steam_rcv[i];
+            f_gain                                  = f_gain_map[data->gain];
+            ch                                      = data->channel;  // Get the channel number
+            scan_index                              = ch / 2;
+            sgm5860xStatus.last_voltage[scan_index] = data->voltage / f_gain;  // Convert to mV
+            sum = sum + data->voltage / f_gain;
         }
+        vol = sum / (rcv_count / sizeof(DevSgm5860xStruct));
+        elog_d(TAG,"Get ADC CH:%d Vol %.9f",ch,vol);
+        vfb_send(sgm5860xCH1 + scan_index, 0, &vol, sizeof(vol));
     }
 }
 static void __sgm5860xInitHandle(void *msg) {
@@ -440,7 +418,50 @@ static void __sgm5860xRcvHandle(void *msg) {
             sgm5860xStatus.next_data.gain    = ptr->gain;
             sgm5860xStatus.next_data.voltage = F_INVAILD;
             sgm5860xStatus.mode              = SGM5860X_STOP_CONTINUES_MODE;
-
+        } break;
+        case sgm5860xMode: {
+            SGM5860xScanMode_t mode = (SGM5860xScanMode_t)MSG_GET_DATA(tmp_msg);
+            switch (mode) {
+                case SGM5860xScanModeAll: {
+                    sgm5860_channelcfg[0].enable = true;  // 40mv
+                    sgm5860_channelcfg[1].enable = true;  // 9v 1
+                    sgm5860_channelcfg[2].enable = true;  // 9v 2
+                    sgm5860_channelcfg[3].enable = true;  // 9V 3
+                } break;
+                case SGM5860xScanModeSingle40mV: {
+                    sgm5860_channelcfg[0].enable = false;   // 40mv
+                    sgm5860_channelcfg[1].enable = false;  // 9v 1
+                    sgm5860_channelcfg[2].enable = false;  // 9v 2
+                    sgm5860_channelcfg[3].enable = true;  // 9V 3
+                } break;
+                case SGM5860xScanModeSingle9V1: {
+                    sgm5860_channelcfg[0].enable = false;  // 40mv
+                    sgm5860_channelcfg[1].enable = true;   // 9v 1
+                    sgm5860_channelcfg[2].enable = false;  // 9v 2
+                    sgm5860_channelcfg[3].enable = false;  // 9V 3
+                } break;
+                case SGM5860xScanModeSingle9V2: {
+                    sgm5860_channelcfg[0].enable = false;  // 40mv
+                    sgm5860_channelcfg[1].enable = false;  // 9v 1
+                    sgm5860_channelcfg[2].enable = true;   // 9v 2
+                    sgm5860_channelcfg[3].enable = false;  // 9V 3
+                } break;
+                case SGM5860xScanModeSingle9V3: {
+                    sgm5860_channelcfg[0].enable = false;  // 40mv
+                    sgm5860_channelcfg[1].enable = false;  // 9v 1
+                    sgm5860_channelcfg[2].enable = false;  // 9v 2
+                    sgm5860_channelcfg[3].enable = true;   // 9V 3
+                } break;
+                case SGM5860xScanModeAll9V: {
+                    sgm5860_channelcfg[0].enable = true;  // 40mv
+                    sgm5860_channelcfg[1].enable = true;   // 9v 1
+                    sgm5860_channelcfg[2].enable = true;   // 9v 2
+                    sgm5860_channelcfg[3].enable = false;   // 9V 3
+                } break;
+                default:
+                    elog_e(TAG, "TASK %s RCV: unknown mode: %d", taskName, mode);
+                    break;
+            }
         } break;
         default:
             elog_e(TAG, "TASK %s RCV: unknown event: %d", taskName, tmp_msg->frame->head.event);
@@ -572,15 +593,7 @@ static void __sgm5860xCycHandle(void) {
                             }
                         }
 
-                        // 每500个样本详细统计
-                        if (sgm5860xStatus.sample_count[i] % 500 == 0) {
-                            // sgm5860x_print_kalman_stats(i);
-                        }
-                    } else {
-                        // 其他通道每1000个样本统计一次
-                        if (sgm5860xStatus.sample_count[i] % 1000 == 0) {
-                            // sgm5860x_print_kalman_stats(i);
-                        }
+     
                     }
                 } else {
                     // 如果滤波器未初始化，使用原始值
@@ -709,11 +722,17 @@ void CmdSgm5860Set(uint8_t ch, uint8_t gain) {
     set.gain              = gain;
     vfb_send(sgm5860xSet, 0, &set, sizeof(set));
 }
+void CmdSgm5860ScanMode(SGM5860xScanMode_t mode) {
+    elog_i(TAG, "CmdSgm5860ScanMode: Mode %d", mode);
+    vfb_send(sgm5860xMode, mode, NULL, 0);
+}
 static void Cmdsgm5860xHelp(void) {
     printf("Usage: sgm5860x <command>\r\n");
     printf("Commands:\r\n");
     printf("  help          Show this help message\r\n");
     printf("  config        Configure the SGM5860x device\r\n");
+    // scan
+
     printf("  reset         Reset the SGM5860x device\r\n");
     printf("  init          Initialize the SGM5860x device\r\n");
     printf("  data          Read data from the SGM5860x device\r\n");
@@ -775,6 +794,21 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
         elog_i(TAG, "SGM5860x set channel %d, gain %d", channel, gain);
         return 0;
     }
+    // sacn mode
+    if (strcmp(argv[1], "scan") == 0) {
+        if (argc < 3) {
+            elog_e(TAG, "Usage: sgm5860x scan <mode>");
+            return 0;
+        }
+        SGM5860xScanMode_t mode = (SGM5860xScanMode_t)strtol(argv[2], NULL, 10);
+        if (mode < SGM5860xScanModeAll || mode > SGM5860xScanModeAll9V) {
+            elog_e(TAG, "Invalid scan mode");
+            return 0;
+        }
+        CmdSgm5860ScanMode(mode);  // Set the scan mode for the SGM5860x device
+        elog_i(TAG, "SGM5860x scan mode set to %d", mode);
+        return 0;
+    }
     // reset
     if (strcmp(argv[1], "reset") == 0) {
         DevSgm5860xReset(&sgm5860_cfg);  // Reset the SGM5860x device
@@ -804,23 +838,6 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
             printf("  reset [channel]  - Reset Kalman filter\r\n");
             printf("  tune <channel> <responsiveness> <stability> - Tune filter parameters\r\n");
             printf("  check [channel]  - Check filter health\r\n");
-            return 0;
-        }
-
-        if (strcmp(argv[2], "status") == 0) {
-            if (argc >= 4) {
-                int channel = atoi(argv[3]);
-                if (channel >= 0 && channel < sgm5860xChannelMax) {
-                    sgm5860x_print_kalman_stats(channel);
-                } else {
-                    printf("Invalid channel number. Range: 0-%d\r\n", sgm5860xChannelMax - 1);
-                }
-            } else {
-                // 显示所有通道的状态
-                for (int i = 0; i < sgm5860xChannelMax; i++) {
-                    sgm5860x_print_kalman_stats(i);
-                }
-            }
             return 0;
         }
 
@@ -983,41 +1000,8 @@ static void sgm5860x_kalman_filter_init(uint8_t channel_index) {
     uint8_t gain    = sgm5860_channelcfg[channel_index].gain;
     uint8_t channel = sgm5860_channelcfg[channel_index].channel;
 
-    // Channel 6 超高精度模式：针对10μV→1μV精度提升
-    if (channel == 6 && gain == SGM58601_GAIN_64) {
-        // 针对10μV波动的精度提升参数
-        process_noise     = 0.0002;  // 0.2mV，进一步降低过程噪声
-        measurement_noise = 0.0008;  // 0.8mV，优化测量权重，强化滤波
-        initial_value     = 0.020;   // 20mV中点初值，加速收敛
-
-        elog_i(TAG, "Channel 6 ultra-high precision mode: Q=%.1f μV, R=%.1f μV, target<1μV",
-               process_noise * 1000000, measurement_noise * 1000000);
-    } else {
-        switch (gain) {
-            case SGM58601_GAIN_1:
-            case SGM58601_GAIN_2:
-            case SGM58601_GAIN_4:
-                // 低增益通道：信号较大，噪声相对较小
-                process_noise     = 0.005;
-                measurement_noise = 0.05;
-                break;
-
-            case SGM58601_GAIN_8:
-            case SGM58601_GAIN_16:
-            case SGM58601_GAIN_32:
-                // 中增益通道：信号中等，噪声中等
-                process_noise     = 0.01;
-                measurement_noise = 0.1;
-                break;
-
-            case SGM58601_GAIN_64:
-            case SGM58601_GAIN_128:
-                // 高增益通道：信号较小，噪声相对较大
-                process_noise     = 0.005;
-                measurement_noise = 0.05;
-                break;
-        }
-    }
+    process_noise     = 0.005;
+    measurement_noise = 0.05;
 
     // 初始化自适应卡尔曼滤波器
     adaptive_kalman_init(&sgm5860xStatus.kalman_filters[channel_index], initial_value,
@@ -1030,35 +1014,7 @@ static void sgm5860x_kalman_filter_init(uint8_t channel_index) {
                                measurement_noise * 0.1,    // R_min
                                measurement_noise * 10.0);  // R_max
 
-    // 根据通道特性调整自适应速率
-    if (channel == 6 && gain == SGM58601_GAIN_128) {
-        // 超高精度参数边界设置，支持1μV精度
-        adaptive_kalman_set_bounds(&sgm5860xStatus.kalman_filters[channel_index],
-                                   0.00005,  // Q_min: 0.05mV (50μV)，允许更小过程噪声
-                                   0.002,    // Q_max: 2mV，适度的最大噪声
-                                   0.0003,   // R_min: 0.3mV，更严格的测量噪声下限
-                                   0.005);   // R_max: 5mV，合理的测量噪声上限
-
-        // Channel 6优化的自适应参数：平衡速度和稳定性
-        adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index],
-                                            0.12);  // 适中自适应速率
-        adaptive_kalman_enable_high_precision(&sgm5860xStatus.kalman_filters[channel_index],
-                                              1);  // 启用高精度模式
-        adaptive_kalman_set_forgetting_factor(&sgm5860xStatus.kalman_filters[channel_index],
-                                              0.95);  // 平衡遗忘因子
-
-        // 设置合理的收敛阈值
-        sgm5860xStatus.kalman_filters[channel_index].adaptation_threshold =
-            0.0005;  // 0.5mV收敛阈值
-
-        elog_i(TAG, "Channel 6 stable precision mode: adapt=0.12, forget=0.95, bounds=[0.1-5.0]mV");
-    } else if (gain >= SGM58601_GAIN_64) {
-        // 其他高增益通道的自适应速率
-        adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.08);
-    } else {
-        // 低增益通道使用较慢的自适应速率
-        adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.08);
-    }
+    adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index], 0.08);
 
     sgm5860xStatus.kalman_initialized[channel_index] = 1;
     sgm5860xStatus.sample_count[channel_index]       = 0;
@@ -1067,119 +1023,4 @@ static void sgm5860x_kalman_filter_init(uint8_t channel_index) {
     elog_d(TAG, "Kalman filter initialized for channel %d (gain=%d)", channel_index, gain);
 }
 
-/**
- * @brief 获取通道的滤波器性能统计
- * @param channel_index 通道索引
- */
-static void sgm5860x_print_kalman_stats(uint8_t channel_index) {
-    if (channel_index >= sgm5860xChannelMax || !sgm5860xStatus.kalman_initialized[channel_index])
-        return;
-
-    AdaptiveKalmanStatus_t status;
-    adaptive_kalman_get_status(&sgm5860xStatus.kalman_filters[channel_index], &status);
-
-    // Channel 6特殊显示：μV级精度监控
-    if (sgm5860_channelcfg[channel_index].channel == 6) {
-        double voltage_uv = status.current_value * 1000000;  // 转换为μV
-        double precision_uv =
-            adaptive_kalman_get_voltage_range(&sgm5860xStatus.kalman_filters[channel_index]) *
-            1000000;
-
-        elog_i(TAG, "=== Channel 6 Ultra-Precision Stats ===");
-        elog_i(TAG, "  Voltage: %.3f μV (%.6f mV)", voltage_uv, status.current_value * 1000);
-        elog_i(TAG, "  Precision: %.3f μV (target: 0.1 μV)", precision_uv);
-        elog_i(TAG, "  Kalman Gain: %.6f, State: %d", status.kalman_gain, status.signal_state);
-        elog_i(TAG, "  Q: %.6f mV, R: %.6f mV", status.process_noise * 1000,
-               status.measurement_noise * 1000);
-        elog_i(TAG, "  Stability: %.4f, Error: %.6f mV", status.stability_metric,
-               status.tracking_error * 1000);
-        elog_i(TAG, "  Samples: %lu, Adaptations: %d", sgm5860xStatus.sample_count[channel_index],
-               status.adaptation_counter);
-
-        // 精度达标检查
-        if (precision_uv <= CHANNEL6_TARGET_PRECISION_UV) {
-            elog_i(TAG, "  ✅ PRECISION TARGET MET: %.3f μV ≤ 0.1 μV", precision_uv);
-        } else {
-            elog_w(TAG, "  ❌ Precision: %.3f μV > 0.1 μV target", precision_uv);
-        }
-
-        // 收敛时间评估
-        double convergence_time =
-            (double)sgm5860xStatus.sample_count[channel_index] * 0.020;  // 50Hz采样
-        if (convergence_time <= CHANNEL6_RESPONSE_TIME_SEC) {
-            elog_i(TAG, "  ✅ RESPONSE TIME: %.2fs ≤ 3.0s target", convergence_time);
-        } else {
-            elog_w(TAG, "  ⚠️  Response time: %.2fs > 3.0s target", convergence_time);
-        }
-    } else {
-        // 其他通道标准显示
-        elog_i(TAG, "Channel %d Kalman Stats:", channel_index);
-        elog_i(TAG, "  Value: %.6f V, Gain: %.4f", status.current_value, status.kalman_gain);
-        elog_i(TAG, "  Q: %.6f, R: %.6f", status.process_noise, status.measurement_noise);
-        elog_i(TAG, "  Stability: %.4f, Error: %.6f", status.stability_metric,
-               status.tracking_error);
-        elog_i(TAG, "  Signal State: %d, Adaptations: %d", status.signal_state,
-               status.adaptation_counter);
-    }
-}
-
-/**
- * @brief 检查并重置异常的滤波器
- * @param channel_index 通道索引
- */
-static void sgm5860x_check_kalman_health(uint8_t channel_index) {
-    if (channel_index >= sgm5860xChannelMax || !sgm5860xStatus.kalman_initialized[channel_index])
-        return;
-
-    int check_result = adaptive_kalman_self_check(&sgm5860xStatus.kalman_filters[channel_index]);
-
-    if (check_result != KALMAN_CHECK_OK) {
-        // 详细错误分析
-        elog_w(TAG, "Channel %d Kalman filter error: 0x%02X", channel_index, check_result);
-
-        if (check_result & KALMAN_CHECK_PARAM_ERROR)
-            elog_w(TAG, "  - Parameter error (Q/R/P invalid)");
-        if (check_result & KALMAN_CHECK_BOUNDS_ERROR)
-            elog_w(TAG, "  - Bounds error (parameters out of range)");
-        if (check_result & KALMAN_CHECK_UNSTABLE)
-            elog_w(TAG, "  - Numerical instability (P/K out of range)");
-        if (check_result & KALMAN_CHECK_POOR_TRACKING) elog_w(TAG, "  - Poor tracking performance");
-        if (check_result & KALMAN_CHECK_POOR_STABILITY) elog_w(TAG, "  - Poor stability");
-
-        // Channel 6专用错误处理
-        if (sgm5860_channelcfg[channel_index].channel == 6) {
-            elog_w(TAG, "Channel 6 error recovery: reinitializing with safer parameters");
-
-            // 使用更保守的参数重新初始化
-            adaptive_kalman_init(&sgm5860xStatus.kalman_filters[channel_index],
-                                 0.020,  // 20mV初始值
-                                 0.001,  // 1mV过程噪声（更保守）
-                                 0.002,  // 2mV测量噪声（更保守）
-                                 0.1);   // 初始协方差
-
-            // 重新设置安全边界
-            adaptive_kalman_set_bounds(&sgm5860xStatus.kalman_filters[channel_index],
-                                       0.0005,  // Q_min: 0.5mV
-                                       0.010,   // Q_max: 10mV
-                                       0.001,   // R_min: 1mV
-                                       0.020);  // R_max: 20mV
-
-            // 降低自适应速率，提高稳定性
-            adaptive_kalman_set_adaptation_rate(&sgm5860xStatus.kalman_filters[channel_index],
-                                                0.08);
-            adaptive_kalman_set_forgetting_factor(&sgm5860xStatus.kalman_filters[channel_index],
-                                                  0.98);
-
-            elog_i(TAG, "Channel 6 recovery mode: Q=1mV, R=2mV, adapt=0.08, forget=0.98");
-
-        } else {
-            // 其他通道的标准重置
-            if (check_result & (KALMAN_CHECK_UNSTABLE | KALMAN_CHECK_POOR_STABILITY)) {
-                double current_value = sgm5860xStatus.filtered_voltage[channel_index];
-                adaptive_kalman_reset(&sgm5860xStatus.kalman_filters[channel_index], current_value);
-                elog_i(TAG, "Channel %d standard reset to %.6f", channel_index, current_value);
-            }
-        }
-    }
-}
 #endif
