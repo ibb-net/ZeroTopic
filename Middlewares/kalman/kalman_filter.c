@@ -425,7 +425,7 @@ SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
         latest_deviation < 0.01) {      // 和均值偏差很小
         detected_state = SIGNAL_STABLE;
         *state_counter = 3;  // 强制通过持续性检查
-        elog_i(TAG, "Fast convergence: err=%.6f, change=%.6f, dev=%.6f", akf->tracking_error,
+        elog_d(TAG, "Fast convergence: err=%.6f, change=%.6f, dev=%.6f", akf->tracking_error,
                immediate_change, latest_deviation);
     }
 
@@ -453,7 +453,7 @@ SignalState_t analyze_signal_state(AdaptiveKalmanFilter_t *akf) {
         }
         // 小于25mV的微小变化需要更多确认
         if (*state_counter >= 2) {
-            elog_i(TAG, "Minor CHANGING confirmed: immediate=%.1fmV, dev=%.1fmV",
+            elog_d(TAG, "Minor CHANGING confirmed: immediate=%.1fmV, dev=%.1fmV",
                    immediate_change * 1000, latest_deviation * 1000);
             return detected_state;
         }
