@@ -10,8 +10,7 @@ typedef enum {
     DevSpiModeInput,       // 输入模式
     DevSpiModeAF,          // 输入模式
 } DevSpiModeEnum;
-typedef struct
-{
+typedef struct {
     uint32_t base;
     /* GPIO */
     DevPinHandleStruct nss;
@@ -26,7 +25,8 @@ typedef struct
 
 int DevSpiInit(const DevSpiHandleStruct *ptrDevSpiHandle);
 int DevSpiDMAWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, uint32_t length);
-int DevSpiWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, uint32_t length) ;
+int DevSpiWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, uint32_t length);
 uint8_t DevSpiRead(const DevSpiHandleStruct *ptrDevSpiHandle);
-uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd, uint8_t *rcv, int size) ;
+uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd, uint8_t *rcv,
+                        int size);
 #endif  // __DEV_SPI_H
