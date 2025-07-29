@@ -32,7 +32,8 @@
 #ifndef CONFIG_sgm5860x_CYCLE_TIMER_MS
 #define CONFIG_sgm5860x_CYCLE_TIMER_MS 300  // 优化：300ms采样周期，提升响应速度100%
 #endif
-#define STEAM_BUFFER_SIZE (sizeof(DevSgm5860xStruct)*16)
+#define STEAM_BUFFER_CNT  (16)
+#define STEAM_BUFFER_SIZE (sizeof(DevSgm5860xStruct) * STEAM_BUFFER_CNT)
 // Channel 6超精密模式专用配置
 #define CHANNEL6_ULTRA_PRECISION_MODE 1
 #define CHANNEL6_TARGET_PRECISION_UV  0.1  // 0.1μV目标精度
@@ -43,6 +44,7 @@ const double f_gain_map[] = {
     [SGM58601_GAIN_8] = 8.0,   [SGM58601_GAIN_16] = 16.0,   [SGM58601_GAIN_32] = 32.0,
     [SGM58601_GAIN_64] = 64.0, [SGM58601_GAIN_128] = 128.0,
 };
+
 void sgm5860xReadyCallback(void *ptrDevPinHandle);
 typedef struct {
     uint8_t channel;  // Channel number
@@ -52,12 +54,21 @@ ChannelCfg_t sgm5860_channelcfg[sgm5860xChannelMax] = {
     {SGM58601_MUXN_AIN0, SGM58601_GAIN_1},   // Channel 0: Gain 1
     {SGM58601_MUXN_AIN2, SGM58601_GAIN_1},   // Channel 2: Gain 1
     {SGM58601_MUXN_AIN4, SGM58601_GAIN_1},   // Channel 4: Gain 1
-    {SGM58601_MUXN_AIN6, SGM58601_GAIN_64},  // Channel 6: Gain 128
+    {SGM58601_MUXN_AIN6, SGM58601_GAIN_32},  // Channel 6: Gain 128
 
 };
+typedef enum {
+    SGM5860X_NONE_MODE,  // Device is in read mode
+    SGM5860X_INIT_MODE,  // Device is in set mode
+    SGM5860X_STOP_CONTINUES_MODE,
+    SGM5860X_SET_MODE,
+    SGM5860X_START_CONTINUES_MODE,
+    SGM5860X_READ_MODE,  // Device is in set mode
+} SGMSETSTATE_t;
+
 /* ===================================================================================== */
 const DevSgm5860xHandleStruct sgm5860_cfg = {
-
+    .rate = SGM58601_DEFAULT_SPS,
     .drdy =
         {
             .device_name = "sgm5860x_drdy",
@@ -166,6 +177,7 @@ typedef struct {
     uint8_t vol_index[sgm5860xChannelMax];                // Voltage index for each channel
     double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
     StreamBufferHandle_t steam_buffer;
+    SGMSETSTATE_t mode;  // Current mode of the device
     DevSgm5860xStruct current_data;
     DevSgm5860xStruct next_data;
 #if FILTER_MODE == KALMAN_FILTER_MODE
@@ -211,30 +223,61 @@ static const VFBTaskStruct sgm5860x_task_cfg = {
 
 /* ===================================================================================== */
 void sgm5860xReadyCallback(void *ptrDevPinHandle) {
-    // printf("sgm5860xReadyCallback called\r\n");
-    DevSgm5860xStruct Curr = {0};
-    DevSgm5860xStruct Next = {
-        .voltage = 0.0,
-        .channel = SGM58601_MUXN_AIN6,
-        .gain    = SGM58601_GAIN_64,
-    };
-    // sgm5860xStatus.scan_index = 3;
-    // if(sgm5860xStatus.scan_index >= sgm5860xChannelMax) {
-    //     sgm5860xStatus.scan_index = 0;  // Reset scan index if it exceeds the maximum
-    // }
-    // Next.channel =
-    //     sgm5860_channelcfg[sgm5860xStatus.scan_index].channel;  // Get the current channel
-    // Next.gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
-    DevSgm5860xISRCallback(ptrDevPinHandle, &Curr, &Next);
-    // sgm5860xStatus.scan_index =
-    //     (sgm5860xStatus.scan_index + 1) % sgm5860xChannelMax;  // Move to the next channel
+    DevPinHandleStruct *DevPinHandle = ptrDevPinHandle;
 
-    printf("last_voltage = %.6f, last_channel = %d\r\n",
-           Curr.voltage * 1000.0 / f_gain_map[Curr.channel], Curr.channel);
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    if (xStreamBufferSendFromISR(sgm5860xStatus.steam_buffer, &Curr, sizeof(DevSgm5860xStruct),
-                                 &xHigherPriorityTaskWoken) == 0) {
-        printf("\r\n[ERROR]Sgm5860 Failed to send data to stream buffer from ISR\r\n");
+    switch (sgm5860xStatus.mode) {
+        case SGM5860X_NONE_MODE: {
+            // Do nothing, waiting for initialization
+            return;
+        }
+        case SGM5860X_INIT_MODE: {
+            printf("\r\nsgm5860xReadyCallback: INIT_MODE\r\n");
+            uint8_t result = DevSgm5860xConfig(&sgm5860_cfg);  // Configure the SGM5860x device
+            if (result != 1) {
+                printf("[ERROR]sgm5860xReadyCallback: Failed to configure device\r\n");
+            } else {
+                printf("sgm5860xReadyCallback: Device configured successfully\r\n");
+                sgm5860xStatus.mode = SGM5860X_SET_MODE;
+            }
+            break;
+        }
+        case SGM5860X_STOP_CONTINUES_MODE: {
+            sgm5860xStatus.mode = SGM5860X_SET_MODE;
+            printf("sgm5860xReadyCallback: STOP_CONTINUES_MODE\r\n");
+            // break;// Do not break here, continue to SET_MODE
+        }
+        case SGM5860X_SET_MODE: {
+            printf("sgm5860xReadyCallback: SET_MODE\r\n");
+            uint8_t result = DevSgm5860xSet(sgm5860xStatus.cfg, sgm5860xStatus.next_data.channel,
+                                            sgm5860xStatus.next_data.gain);
+            if (result != 1) {
+                printf("[ERROR]sgm5860xReadyCallback: Failed to set mode\r\n");
+            } else {
+                sgm5860xStatus.mode                 = SGM5860X_START_CONTINUES_MODE;
+                sgm5860xStatus.current_data.channel = sgm5860xStatus.next_data.channel;
+                sgm5860xStatus.current_data.gain    = sgm5860xStatus.next_data.gain;
+                sgm5860xStatus.current_data.voltage = sgm5860xStatus.next_data.voltage;
+                printf("sgm5860xReadyCallback: SET_MODE ,Next Channel: %d, Gain: %d\r\n",
+                       sgm5860xStatus.next_data.channel, sgm5860xStatus.next_data.gain);
+            }
+        } break;
+        case SGM5860X_START_CONTINUES_MODE: {
+            printf("sgm5860xReadyCallback: START_CONTINUES_MODE\r\n");
+            sgm5860xStatus.mode = SGM5860X_READ_MODE;
+            DevSgm5860xStartContinuousMode(sgm5860xStatus.cfg);
+        } break;
+        case SGM5860X_READ_MODE: {
+            sgm5860xStatus.current_data.voltage = DevSgm5860xReadValue(sgm5860xStatus.cfg);
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            if (xStreamBufferSendFromISR(sgm5860xStatus.steam_buffer, &sgm5860xStatus.current_data,
+                                         sizeof(DevSgm5860xStruct),
+                                         &xHigherPriorityTaskWoken) == 0) {
+                printf("\r\n[ERROR]Sgm5860 Failed to send data to stream buffer from ISR\r\n");
+            }
+        } break;
+        default:
+            printf("[ERROR]sgm5860xReadyCallback: Invalid device mode %d\r\n", sgm5860xStatus.mode);
+            return;  // Invalid mode, skip callback
     }
 }
 void sgm5860xDeviceInit(void) {
@@ -243,7 +286,14 @@ void sgm5860xDeviceInit(void) {
     DevSgm5860xHandleStruct *sgm5860xBspCfg = (DevSgm5860xHandleStruct *)&sgm5860_cfg;
     sgm5860xStatus.cfg                      = sgm5860xBspCfg;  // Assign the BSP configuration
     strcpy((char *)sgm5860xStatus.device_name, "sgm58601");
-    sgm5860xStatus.scan_index = 0;  // Initialize scan index
+    sgm5860xStatus.scan_index           = 0;  // Initialize scan index
+    sgm5860xStatus.mode                 = SGM5860X_NONE_MODE;
+    sgm5860xStatus.current_data.voltage = F_INVAILD;
+    sgm5860xStatus.current_data.channel = SGM58601_DEFAULT_CHANNEL;
+    sgm5860xStatus.current_data.gain    = SGM58601_DEFAULT_GAIN;
+    sgm5860xStatus.next_data.voltage    = F_INVAILD;
+    sgm5860xStatus.next_data.channel    = SGM58601_DEFAULT_CHANNEL;
+    sgm5860xStatus.next_data.gain       = SGM58601_DEFAULT_GAIN;
     // 初始化所有通道的滤波器状态
     for (int i = 0; i < sgm5860xChannelMax; i++) {
         sgm5860xStatus.last_voltage[i] = 0.0;
@@ -256,6 +306,13 @@ void sgm5860xDeviceInit(void) {
         sgm5860xStatus.sample_count[i]       = 0;
 #endif
     }
+#if FILTER_MODE == KALMAN_FILTER_MODE
+    // 初始化所有通道的卡尔曼滤波器
+    for (int i = 0; i < sgm5860xChannelMax; i++) {
+        sgm5860x_kalman_filter_init(i);
+    }
+    elog_i(TAG, "All Kalman filters initialized");
+#endif
     sgm5860xStatus.steam_buffer = xStreamBufferCreate(STEAM_BUFFER_SIZE, sizeof(DevSgm5860xStruct));
     DevSgm5860xInit(sgm5860xBspCfg);  // Initialize the SGM5860x device
     elog_i(TAG, "sgm5860xDeviceInit completed");
@@ -273,17 +330,51 @@ static void __sgm5860xCreateTaskHandle(void) {
 }
 SYSTEM_REGISTER_INIT(BoardInitStage, sgm5860xPriority, __sgm5860xCreateTaskHandle,
                      __sgm5860xCreateTaskHandle init);
+DevSgm5860xStruct steam_rcv[STEAM_BUFFER_CNT] = {0};
 void Sgm5860xStreamRcvTask(void *arg) {
-    Typdefsgm5860xStatus *ptr_status = arg;
+    Typdefsgm5860xStatus *ptr_status = &sgm5860xStatus;
+    static double last_vol           = 0.0;
     int rcv_count                    = 0;
-    DevSgm5860xStruct steam_rcv      = {0};
+    double f_gain                    = 0.0;
+    double voltage                   = 0.0;
+    static int max_cnt               = 0;
+    uint8_t ch                       = 0;
     while (1) {
-        rcv_count = xStreamBufferReceive(ptr_status->steam_buffer, &steam_rcv,
-                                         sizeof(DevSgm5860xStruct), portMAX_DELAY);
+        rcv_count = xStreamBufferReceive(ptr_status->steam_buffer, &steam_rcv, sizeof(steam_rcv),
+                                         portMAX_DELAY);
+        if (max_cnt < rcv_count / sizeof(DevSgm5860xStruct)) {
+            max_cnt = rcv_count / sizeof(DevSgm5860xStruct);
+        }
+        elog_d(TAG, "rcv_count = %d cnt %d max %d", rcv_count,
+               rcv_count / sizeof(DevSgm5860xStruct), max_cnt);
 
-        if (rcv_count > 0) {
-            elog_i(TAG, "Received: voltage=%.7f, channel=%d, gain=%f", steam_rcv.voltage,
-                   steam_rcv.channel, f_gain_map[steam_rcv.gain]);
+        for (int i = 0; i < rcv_count / sizeof(DevSgm5860xStruct); i++) {
+            DevSgm5860xStruct *data = &steam_rcv[i];
+            f_gain                  = f_gain_map[data->gain];
+            voltage                 = data->voltage/ f_gain;  // Convert to mV
+            ch                      = data->channel;                    // Get the channel number
+            vfb_send(sgm5860xCH1 + ch / 2, 0, &voltage, sizeof(voltage));
+            // switch (ch) {
+            //     case SGM58601_MUXN_AIN0:
+            //     case SGM58601_MUXN_AIN2:
+            //     case SGM58601_MUXN_AIN4:
+
+            //         voltage = voltage * 4.7;
+            //         ptr_status->tmp_voltage break;
+            //     case SGM58601_MUXN_AIN6:
+            //         break;
+            //     default:
+            //         break;
+            // }
+            // if (voltage < 40.0) {
+            //     elog_i(TAG, "Voltage=%.7f mV, offset=%.2f uV, ch=%d, gain=%f", voltage,
+            //            (voltage - last_vol) * 1000.0, ch, f_gain);
+
+            // } else {
+            //     elog_i(TAG, "Voltage=%.7f V, offset=%.2f mV, ch=%d, gain=%f", voltage/1000.0,
+            //            voltage - last_vol, ch, f_gain);
+            // }
+            // last_vol = voltage;  // Update last voltage
         }
     }
 }
@@ -301,17 +392,11 @@ static void __sgm5860xRcvHandle(void *msg) {
     vfb_message_t tmp_msg      = (vfb_message_t)msg;
     switch (tmp_msg->frame->head.event) {
         case sgm5860xStart: {
-            elog_i(TAG, "sgm5860xStartTask %d", tmp_msg->frame->head.data);
-#if FILTER_MODE == KALMAN_FILTER_MODE
-            // 初始化所有通道的卡尔曼滤波器
-            for (int i = 0; i < sgm5860xChannelMax; i++) {
-                sgm5860x_kalman_filter_init(i);
-            }
-            elog_i(TAG, "All Kalman filters initialized");
-#endif
-            DevSgm5860xConfig(&sgm5860_cfg);  // Configure the SGM5860x device
-            sgm5860xStatus.status = 1;        // Set status to indicate the device is started
-            DevSgm5860xStart(&sgm5860_cfg);   // Start the SGM5860x device
+            elog_i(TAG, "sgm5860xStartTask sgm5860xStart");
+            sgm5860xStatus.mode = SGM5860X_INIT_MODE;
+            sgm5860xStatus.status =
+                1;  // Set status to indicate the device is started //TODO 需要修改
+            DevSgm5860xStart(&sgm5860_cfg);  // Start the SGM5860x device
         } break;
         case sgm5860xStop: {
             elog_i(TAG, "sgm5860xStopTask %d", tmp_msg->frame->head.data);
@@ -319,7 +404,14 @@ static void __sgm5860xRcvHandle(void *msg) {
             sgm5860xStatus.status = 0;      // Set status to indicate the device is stopped
         } break;
         case sgm5860xSet: {
-            elog_i(TAG, "sgm5860xSetTask %d", tmp_msg->frame->head.data);
+            DevSgm5860xStruct *ptr = (DevSgm5860xStruct *)MSG_GET_PAYLOAD(tmp_msg);
+            elog_i(TAG, "Set Channel %d ,Gain %d", ptr->channel, ptr->gain);
+            // DevSgm5860xSet(&sgm5860_cfg, ptr->channel, ptr->gain);
+            sgm5860xStatus.next_data.channel = ptr->channel;
+            sgm5860xStatus.next_data.gain    = ptr->gain;
+            sgm5860xStatus.next_data.voltage = F_INVAILD;
+            sgm5860xStatus.mode              = SGM5860X_STOP_CONTINUES_MODE;
+
         } break;
         default:
             elog_e(TAG, "TASK %s RCV: unknown event: %d", taskName, tmp_msg->frame->head.event);
@@ -333,7 +425,7 @@ static void __sgm5860xCycHandle(void) {
         elog_e(TAG, "[ERROR]sgm5860xStatusHandle NULL");
         return;
     }
-#if 1
+#if 0
     if (sgm5860xStatus.status == 2) {
         // sgm5860xStatus.scan_index
         double last_voltage           = 0;
@@ -581,7 +673,13 @@ static void __sgm5860xCycHandle(void) {
 }
 
 #endif
-
+void CmdSgm5860Set(uint8_t ch, uint8_t gain) {
+    elog_i(TAG, "CmdSgm5860Set: Channel %d, Gain %d", ch, gain);
+    DevSgm5860xStruct set = {0};
+    set.channel           = ch;
+    set.gain              = gain;
+    vfb_send(sgm5860xSet, 0, &set, sizeof(set));
+}
 static void Cmdsgm5860xHelp(void) {
     printf("Usage: sgm5860x <command>\r\n");
     printf("Commands:\r\n");
@@ -591,6 +689,7 @@ static void Cmdsgm5860xHelp(void) {
     printf("  init          Initialize the SGM5860x device\r\n");
     printf("  data          Read data from the SGM5860x device\r\n");
     printf("  read <addr>   Read register from SGM5860x device\r\n");
+    printf("  set <ch> <gain> - Set channel and gain for SGM5860x device\r\n");
 #if FILTER_MODE == KALMAN_FILTER_MODE
     printf("  kalman        Kalman filter control commands\r\n");
     printf("    status [ch] - Show filter status\r\n");
@@ -629,6 +728,22 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
                    sgm5860xStatus.average[i] * 1000.0, sgm5860xStatus.average[i] * 1000000.0);
 #endif
         }
+        return 0;
+    }
+    // set
+    if (strcmp(argv[1], "set") == 0) {
+        if (argc < 4) {
+            elog_e(TAG, "Usage: sgm5860x set <channel> <gain>");
+            return 0;
+        }
+        unsigned char channel = (unsigned char)strtol(argv[2], NULL, 10);
+        unsigned char gain    = (unsigned char)strtol(argv[3], NULL, 10);
+        if (channel >= SGM58601_MUXN_AINCOM || gain >= SGM58601_GAIN_MAX) {
+            elog_e(TAG, "Invalid channel or gain value");
+            return 0;
+        }
+        CmdSgm5860Set(channel, gain);  // Set the channel and gain for the SGM5860x device
+        elog_i(TAG, "SGM5860x set channel %d, gain %d", channel, gain);
         return 0;
     }
     // reset
