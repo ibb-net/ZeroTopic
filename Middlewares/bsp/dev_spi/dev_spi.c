@@ -4,6 +4,7 @@
 #include "dev_spi.h"
 
 #include "dev_basic.h"
+#include "dev_delay.h"
 #include "dev_dma.h"
 #include "dev_pin.h"
 #include "string.h"
@@ -15,6 +16,7 @@ typedef struct {
     uint32_t dma_tx_request;  // DMA request for TX
     uint32_t dma_tx_periph;   // Peripheral address for DMA
 } TypeSpiBasicMap;
+#define SPI_TIMEOUT_DEFAULT_US (10 * 1000)
 
 const TypeSpiBasicMap spi_basic_map[] = {
     {SPI0, "SPI0", RCU_SPI0, IDX_SPI0, DMA_REQUEST_SPI0_TX, (uint32_t)(&SPI_TDATA(SPI0))},
@@ -101,12 +103,30 @@ int DevSpiDMAWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, u
 
     spi_master_transfer_start(ptrDevSpiHandle->base, SPI_TRANS_START);
     dma_channel_enable(dma_handle->base, dma_handle->channel);  // Enable DMA channel
-
+    uint32_t dma_timeout = SPI_TIMEOUT_DEFAULT_US;
     while (dma_flag_get(dma_handle->base, dma_handle->channel, DMA_FLAG_FTF) ==
-           RESET);  // Wait for transfer complete
+           RESET) {  // Wait for transfer complete
+        if (dma_timeout-- == 0) {
+            printf("     \r\n[ERROR]DevSpiDMAWrite: Timeout waiting for DMA FTF flag\r\n");
+            DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
+            spi_dma_disable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);
+            return -1;  // Timeout
+        }
+        // DevDelayUs(1);
+    }
     dma_flag_clear(dma_handle->base, dma_handle->channel, DMA_FLAG_FTF);
+
+    uint32_t spi_timeout = SPI_TIMEOUT_DEFAULT_US;
     while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) ==
-           RESET);  // Wait until transmit buffer is empty
+           RESET) {  // Wait until transmit buffer is empty
+        if (spi_timeout-- == 0) {
+            printf("     \r\n[ERROR]DevSpiDMAWrite: Timeout waiting for SPI TC flag\r\n");
+            DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
+            spi_dma_disable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);
+            return -1;  // Timeout
+        }
+        // DevDelayUs(1);
+    }
 
     DevPinWrite(&ptrDevSpiHandle->nss, 1);                     // Set NSS high (inactive state)
     spi_dma_disable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);  // Disable DMA for SPI transmit
@@ -126,16 +146,32 @@ int DevSpiWrite(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *buffer, uint
     // sent
     DevPinWrite(&ptrDevSpiHandle->nss, 0);  // Set NSS low (active state)
 
-    spi_enable(ptrDevSpiHandle->base);                        // Enable SPI
-    spi_dma_enable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);  // Enable DMA for SPI transmit
+    spi_enable(ptrDevSpiHandle->base);  // Enable SPI
+    // spi_dma_enable(ptrDevSpiHandle->base, SPI_DMA_TRANSMIT);  // Enable DMA for SPI transmit
     spi_master_transfer_start(ptrDevSpiHandle->base, SPI_TRANS_START);  // Start SPI transfer
     for (uint32_t i = 0; i < length; i++) {
+        uint32_t tx_timeout = SPI_TIMEOUT_DEFAULT_US;
         while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) ==
-               RESET);  // Wait until transmit buffer is empty
+               RESET) {  // Wait until transmit buffer is empty
+            if (tx_timeout-- == 0) {
+                printf("     \r\n[ERROR]DevSpiWrite: Timeout waiting for TC flag\r\n");
+                DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
+                return -1;                              // Timeout
+            }
+            // DevDelayUs(1);
+        }
         spi_i2s_data_transmit(ptrDevSpiHandle->base, buffer[i]);  // Transmit data
     }
+    uint32_t tx_timeout = SPI_TIMEOUT_DEFAULT_US;
     while (spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_STAT_TC) ==
-           RESET);                          // Wait until transmit buffer is empty
+           RESET) {  // Wait until transmit buffer is empty
+        if (tx_timeout-- == 0) {
+            printf("     \r\n[ERROR]DevSpiWrite: Timeout waiting for TC flag\r\n");
+            DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
+            return -1;                              // Timeout
+        }
+        // DevDelayUs(1);
+    }
     DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
     return 0;
 }
@@ -155,8 +191,16 @@ uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd,
     spi_master_transfer_start(ptrDevSpiHandle->base, SPI_TRANS_START);
     // printf("size  = %d\r\n", size);
     while (count < size) {
+        uint32_t tx_timeout = SPI_TIMEOUT_DEFAULT_US;
         while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base,
-                                         SPI_FLAG_TP));  // Wait until transmit buffer is empty
+                                         SPI_FLAG_TP)) {  // Wait until transmit buffer is empty
+            if (tx_timeout-- == 0) {
+                printf("     \r\n[ERROR]DevSpiWriteRead: Timeout waiting for TP flag\r\n");
+                DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
+                return -1;                              // Timeout
+            }
+            // DevDelayUs(1);
+        }
         if (snd == NULL) {
             spi_i2s_data_transmit(ptrDevSpiHandle->base, 0x00);
         } else {
@@ -164,7 +208,15 @@ uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd,
             // printf("Sending     data[%d]: %02X\r\n", count, snd[count]);
         }
         // while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_FLAG_TC));
-        while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_FLAG_RP));
+        uint32_t rcv_timeout = SPI_TIMEOUT_DEFAULT_US;
+        while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_FLAG_RP)) {
+            if (rcv_timeout-- == 0) {
+                printf("     \r\n[ERROR]DevSpiWriteRead: Timeout waiting for RP flag\r\n");
+                DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
+                return -1;                              // Timeout
+            }
+            // DevDelayUs(1);
+        }
         if (rcv == NULL) {
             spi_i2s_data_receive(ptrDevSpiHandle->base);  // Read data to clear the flag
         } else {
@@ -173,7 +225,15 @@ uint8_t DevSpiWriteRead(const DevSpiHandleStruct *ptrDevSpiHandle, uint8_t *snd,
         }
         count++;
     }
-    while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_FLAG_TC));
+    uint32_t spi_timeout = SPI_TIMEOUT_DEFAULT_US;
+    while (RESET == spi_i2s_flag_get(ptrDevSpiHandle->base, SPI_FLAG_TC)) {
+        if (spi_timeout-- == 0) {
+            printf("     \r\n[ERROR]DevSpiWriteRead: Timeout waiting for TC flag\r\n");
+            DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
+            return -1;                              // Timeout
+        }
+        // DevDelayUs(1);
+    }
     DevPinWrite(&ptrDevSpiHandle->nss, 1);  // Set NSS high (inactive state)
     return 0;
 }
