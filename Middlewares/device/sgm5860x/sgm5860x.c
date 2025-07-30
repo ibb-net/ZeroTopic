@@ -556,6 +556,31 @@ static void __sgm5860xRcvHandle(void *msg) {
                     elog_e(TAG, "TASK %s RCV: unknown mode: %d", taskName, mode);
                     break;
             }
+            const char *mode_name = NULL;
+            switch (mode) {
+                case SGM5860xScanModeAll:
+                    mode_name = "All channels (40mV, 9V1, 9V2, 9V3)";
+                    break;
+                case SGM5860xScanModeSingle40mV:
+                    mode_name = "Single channel 40mV";
+                    break;
+                case SGM5860xScanModeSingle9V1:
+                    mode_name = "Single channel 9V1";
+                    break;
+                case SGM5860xScanModeSingle9V2:
+                    mode_name = "Single channel 9V2";
+                    break;
+                case SGM5860xScanModeSingle9V3:
+                    mode_name = "Single channel 9V3";
+                    break;
+                case SGM5860xScanModeAll9V:
+                    mode_name = "ALL channels 9V";
+                    break;
+                default:
+                    mode_name = "Unknown";
+                    break;
+            }
+            elog_w(TAG, " Set Scan mode: %s ", mode_name);
         } break;
         default:
             elog_e(TAG, "TASK %s RCV: unknown event: %d", taskName, tmp_msg->frame->head.event);
