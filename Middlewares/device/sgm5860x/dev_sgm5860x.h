@@ -7,9 +7,7 @@
 #include "dev_pin.h"
 #include "dev_spi.h"
 
-#define SGM58601_DEFAULT_SPS     SGM58601_DRATE_30SPS
-#define SGM58601_DEFAULT_GAIN    SGM58601_GAIN_32
-#define SGM58601_DEFAULT_CHANNEL SGM58601_MUXN_AIN6
+
 typedef struct {
     DevPinHandleStruct drdy;
     DevPinHandleStruct nest;
@@ -122,6 +120,7 @@ typedef union {
 #define SGM58601_GAIN_128 0x07
 #define SGM58601_GAIN_MAX 0x08
 // define drate codes
+#define SGM58601_DRATE_60000SPS 0xF1
 #define SGM58601_DRATE_30000SPS 0xF0
 #define SGM58601_DRATE_15000SPS 0xE0
 #define SGM58601_DRATE_7500SPS  0xD0
@@ -178,9 +177,10 @@ typedef union {
 
 typedef struct {
     double voltage;
-    int channel;
-    int gain;  // Gain code
-} DevSgm5860xStruct;
+    uint8_t channel;
+    uint8_t gain;  // Gain code
+    uint8_t sps;   // Samples per second
+} DevSgm5860xSetStruct;
 int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 int DevSgm5860xReadRegister(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t reg,
@@ -193,8 +193,8 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
 void DevSgm5860xStart(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 void DevSgm5860xStop(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 void DevSgm5860xISRSetCallback(const DevSgm5860xHandleStruct *ptrDevPinHandle,
-                               DevSgm5860xStruct *ptrCurr, DevSgm5860xStruct *ptrNext);
-uint8_t DevSgm5860xSet(const DevSgm5860xHandleStruct *ptrDevPinHandle, int channel, int gain);
+                               DevSgm5860xSetStruct *ptrCurr, DevSgm5860xSetStruct *ptrNext);
+uint8_t DevSgm5860xSet(const DevSgm5860xHandleStruct *ptrDevPinHandle, DevSgm5860xSetStruct *ptrSet);
 uint8_t DevSgm5860xStartContinuousMode(const DevSgm5860xHandleStruct *ptrDevPinHandle);
-double DevSgm5860xReadValue(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) ;
+double DevSgm5860xReadValue(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 #endif  // __DEV_Sgm5860x_H

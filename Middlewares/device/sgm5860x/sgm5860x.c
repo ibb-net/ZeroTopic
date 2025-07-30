@@ -34,7 +34,7 @@
 #endif
 #define STEAM_BUFFER_CNT  (16)
 #define SCAN_MAX_CNT      (10)
-#define STEAM_BUFFER_SIZE (sizeof(DevSgm5860xStruct) * STEAM_BUFFER_CNT)
+#define STEAM_BUFFER_SIZE (sizeof(DevSgm5860xSetStruct) * STEAM_BUFFER_CNT)
 // Channel 6超精密模式专用配置
 #define CHANNEL6_ULTRA_PRECISION_MODE 1
 #define CHANNEL6_TARGET_PRECISION_UV  0.1  // 0.1μV目标精度
@@ -47,16 +47,23 @@ const double f_gain_map[] = {
 };
 
 void sgm5860xReadyCallback(void *ptrDevPinHandle);
+typedef enum {
+    FILTER_MODE_RAW = 0,  // 原始数据模式
+    FILTER_MODE_KALMAN,   // 卡尔曼滤波
+    FILTER_MODE_AVERAGE,  // 平均值滤波
+    FILTER_MODE_MAX       // 模式最大
+} FilterMode;
 typedef struct {
     uint8_t enable;
     uint8_t channel;  // Channel number
     uint8_t gain;     // Gain setting for the channel
+    uint8_t sps;      // Samples per second setting for the channel
 } ChannelCfg_t;
 ChannelCfg_t sgm5860_channelcfg[sgm5860xChannelMax] = {
-    {true, SGM58601_MUXN_AIN0, SGM58601_GAIN_1},   // Channel 0: Gain 1
-    {true, SGM58601_MUXN_AIN2, SGM58601_GAIN_1},   // Channel 2: Gain 1
-    {true, SGM58601_MUXN_AIN4, SGM58601_GAIN_1},   // Channel 4: Gain 1
-    {true, SGM58601_MUXN_AIN6, SGM58601_GAIN_32},  // Channel 6: Gain 64
+    {true, SGM58601_MUXN_AIN0, SGM58601_GAIN_1, SGM58601_DRATE_30SPS},    // Channel 0: Gain 1
+    {true, SGM58601_MUXN_AIN2, SGM58601_GAIN_1, SGM58601_DRATE_30SPS},    // Channel 2: Gain 1
+    {true, SGM58601_MUXN_AIN4, SGM58601_GAIN_1, SGM58601_DRATE_30SPS},    // Channel 4: Gain 1
+    {true, SGM58601_MUXN_AIN6, SGM58601_GAIN_32, SGM58601_DRATE_2_5SPS},  // Channel 6: Gain 32
 
 };
 typedef enum {
@@ -171,6 +178,7 @@ typedef struct {
     uint32_t id;  // ID
     DevSgm5860xHandleStruct *cfg;
     uint8_t status;                           // Status of the device
+    FilterMode filter_mode;                   // Filter mode
     uint8_t scan_index;                       // Channel to scan
     double last_voltage[sgm5860xChannelMax];  // Last voltage read from each channel
     double sum[sgm5860xChannelMax];
@@ -179,8 +187,8 @@ typedef struct {
     double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
     StreamBufferHandle_t steam_buffer;
     SGMSETSTATE_t mode;  // Current mode of the device
-    DevSgm5860xStruct current_data;
-    DevSgm5860xStruct next_data;
+    DevSgm5860xSetStruct current_data;
+    DevSgm5860xSetStruct next_data;
 #if FILTER_MODE == KALMAN_FILTER_MODE
     SignalState_t last_kalman_state[sgm5860xChannelMax];
     AdaptiveKalmanFilter_t kalman_filters[sgm5860xChannelMax];  // Kalman filters for each channel
@@ -222,7 +230,7 @@ static const VFBTaskStruct sgm5860x_task_cfg = {
 /* ===================================================================================== */
 void sgm5860xReadyCallback(void *ptrDevPinHandle) {
     DevPinHandleStruct *DevPinHandle = ptrDevPinHandle;
-    static DevSgm5860xStruct tmp_bffer[SCAN_MAX_CNT];
+    static DevSgm5860xSetStruct tmp_bffer[SCAN_MAX_CNT];
     static int sgm5860xCount = 0;  // Ready count for debugging
     switch (sgm5860xStatus.mode) {
         case SGM5860X_NONE_MODE: {
@@ -247,8 +255,7 @@ void sgm5860xReadyCallback(void *ptrDevPinHandle) {
         }
         case SGM5860X_SET_MODE: {
             // printf("sgm5860xReadyCallback: SET_MODE\r\n");
-            uint8_t result = DevSgm5860xSet(sgm5860xStatus.cfg, sgm5860xStatus.next_data.channel,
-                                            sgm5860xStatus.next_data.gain);
+            uint8_t result = DevSgm5860xSet(sgm5860xStatus.cfg, &sgm5860xStatus.next_data);
             if (result != 1) {
                 printf("[ERROR]sgm5860xReadyCallback: Failed to set mode\r\n");
             } else {
@@ -256,6 +263,7 @@ void sgm5860xReadyCallback(void *ptrDevPinHandle) {
                 sgm5860xStatus.current_data.channel = sgm5860xStatus.next_data.channel;
                 sgm5860xStatus.current_data.gain    = sgm5860xStatus.next_data.gain;
                 sgm5860xStatus.current_data.voltage = sgm5860xStatus.next_data.voltage;
+                sgm5860xStatus.current_data.sps     = sgm5860xStatus.next_data.sps;
                 // printf("sgm5860xReadyCallback: SET_MODE ,Next Channel: %d, Gain: %d\r\n",
                 //        sgm5860xStatus.next_data.channel, sgm5860xStatus.next_data.gain);
             }
@@ -292,6 +300,7 @@ void sgm5860xReadyCallback(void *ptrDevPinHandle) {
                 sgm5860xStatus.next_data.channel = sgm5860_channelcfg[sgm5860xStatus.scan_index]
                                                        .channel;  // Get the current channel
                 sgm5860xStatus.next_data.gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
+                sgm5860xStatus.next_data.sps  = sgm5860_channelcfg[sgm5860xStatus.scan_index].sps;
                 sgm5860xStatus.mode           = SGM5860X_STOP_CONTINUES_MODE;
             }
         } break;
@@ -314,6 +323,7 @@ void sgm5860xDeviceInit(void) {
     sgm5860xStatus.next_data.voltage    = F_INVAILD;
     sgm5860xStatus.next_data.channel    = SGM58601_DEFAULT_CHANNEL;
     sgm5860xStatus.next_data.gain       = SGM58601_DEFAULT_GAIN;
+    sgm5860xStatus.filter_mode          = FILTER_MODE_KALMAN;
     // 初始化所有通道的滤波器状态
     for (int i = 0; i < sgm5860xChannelMax; i++) {
         sgm5860xStatus.last_voltage[i] = 0.0;
@@ -333,7 +343,8 @@ void sgm5860xDeviceInit(void) {
     }
     elog_i(TAG, "All Kalman filters initialized");
 #endif
-    sgm5860xStatus.steam_buffer = xStreamBufferCreate(STEAM_BUFFER_SIZE, sizeof(DevSgm5860xStruct));
+    sgm5860xStatus.steam_buffer =
+        xStreamBufferCreate(STEAM_BUFFER_SIZE, sizeof(DevSgm5860xSetStruct));
     DevSgm5860xInit(sgm5860xBspCfg);  // Initialize the SGM5860x device
     elog_i(TAG, "sgm5860xDeviceInit completed");
     elog_i(TAG, "sgm5860xStatus.device_name: %s", sgm5860xStatus.device_name);
@@ -350,7 +361,7 @@ static void __sgm5860xCreateTaskHandle(void) {
 }
 SYSTEM_REGISTER_INIT(BoardInitStage, sgm5860xPriority, __sgm5860xCreateTaskHandle,
                      __sgm5860xCreateTaskHandle init);
-DevSgm5860xStruct steam_rcv[STEAM_BUFFER_CNT] = {0};
+DevSgm5860xSetStruct steam_rcv[STEAM_BUFFER_CNT] = {0};
 void Sgm5860xStreamRcvTask(void *arg) {
     Typdefsgm5860xStatus *ptr_status = &sgm5860xStatus;
     int rcv_count                    = 0;
@@ -366,27 +377,104 @@ void Sgm5860xStreamRcvTask(void *arg) {
     while (1) {
         rcv_count = xStreamBufferReceive(ptr_status->steam_buffer, &steam_rcv, sizeof(steam_rcv),
                                          portMAX_DELAY);
-        if (max_cnt < rcv_count / sizeof(DevSgm5860xStruct)) {
-            max_cnt = rcv_count / sizeof(DevSgm5860xStruct);
+        if (max_cnt < rcv_count / sizeof(DevSgm5860xSetStruct)) {
+            max_cnt = rcv_count / sizeof(DevSgm5860xSetStruct);
         }
         elog_d(TAG, "rcv_count = %d cnt %d max %d", rcv_count,
-               rcv_count / sizeof(DevSgm5860xStruct), max_cnt);
+               rcv_count / sizeof(DevSgm5860xSetStruct), max_cnt);
         sum = 0.0;
-        for (int i = 0; i < rcv_count / sizeof(DevSgm5860xStruct); i++) {
-            DevSgm5860xStruct *data                 = &steam_rcv[i];
-            f_gain                                  = f_gain_map[data->gain];
-            ch                                      = data->channel;  // Get the channel number
-            scan_index                              = ch / 2;
-            sgm5860xStatus.last_voltage[scan_index] = data->voltage;  // Convert to mV
+        elog_d(TAG, "Filter Mode: %d, rcv_count: %d", ptr_status->filter_mode, rcv_count);
+        switch (ptr_status->filter_mode) {
+            case FILTER_MODE_RAW: {
+                // 取中位值（中值滤波）
+                int n = rcv_count / sizeof(DevSgm5860xSetStruct);
+                if (n > 0) {
+                    double values[SCAN_MAX_CNT];
+                    for (int i = 0; i < n; i++) {
+                        values[i] = steam_rcv[i].voltage;
+                    }
+                    // 冒泡排序（数据量很小，足够快）
+                    for (int i = 0; i < n - 1; i++) {
+                        for (int j = 0; j < n - i - 1; j++) {
+                            if (values[j] > values[j + 1]) {
+                                double tmp    = values[j];
+                                values[j]     = values[j + 1];
+                                values[j + 1] = tmp;
+                            }
+                        }
+                    }
+                    double median;
+                    if (n % 2 == 0) {
+                        median = (values[n / 2 - 1] + values[n / 2]) / 2.0;
+                    } else {
+                        median = values[n / 2];
+                    }
+                    f_gain                                  = f_gain_map[steam_rcv[0].gain];
+                    ch                                      = steam_rcv[0].channel;
+                    scan_index                              = ch / 2;
+                    sgm5860xStatus.last_voltage[scan_index] = median;
+                    vol                                     = median / f_gain;
+                }
+            } break;
+            case FILTER_MODE_KALMAN: {
+                // Kalman filter mode
+                for (int i = 0; i < rcv_count / sizeof(DevSgm5860xSetStruct); i++) {
+                    DevSgm5860xSetStruct *data = &steam_rcv[i];
+                    f_gain                     = f_gain_map[data->gain];
+                    ch                         = data->channel;  // Get the channel number
+                    scan_index                 = ch / 2;
+                    sgm5860xStatus.last_voltage[scan_index] = data->voltage;  // Convert to mV
 
-            sgm5860xStatus.filtered_voltage[scan_index] =
-                adaptive_kalman_update(&sgm5860xStatus.kalman_filters[scan_index],
-                                       sgm5860xStatus.last_voltage[scan_index]);
-            sgm5860xStatus.sample_count[scan_index]++;
-            // sum = sum + data->voltage / f_gain;
+                    sgm5860xStatus.filtered_voltage[scan_index] =
+                        adaptive_kalman_update(&sgm5860xStatus.kalman_filters[scan_index],
+                                               sgm5860xStatus.last_voltage[scan_index]);
+                    sgm5860xStatus.sample_count[scan_index]++;
+                    vol = sgm5860xStatus.filtered_voltage[scan_index] / f_gain;
+
+                    // sum = sum + data->voltage / f_gain;
+                }
+            } break;
+            case FILTER_MODE_AVERAGE: {
+                // Remove one max and one min, then average the rest
+                int n = rcv_count / sizeof(DevSgm5860xSetStruct);
+                if (n > 2) {
+                    double values[SCAN_MAX_CNT];
+                    for (int i = 0; i < n; i++) {
+                        values[i] = steam_rcv[i].voltage;
+                    }
+                    // Find max and min indices
+                    int max_idx = 0, min_idx = 0;
+                    for (int i = 1; i < n; i++) {
+                        if (values[i] > values[max_idx]) max_idx = i;
+                        if (values[i] < values[min_idx]) min_idx = i;
+                    }
+                    // Calculate sum excluding max and min
+                    double sum = 0.0;
+                    int cnt    = 0;
+                    for (int i = 0; i < n; i++) {
+                        if (i != max_idx && i != min_idx) {
+                            sum += values[i];
+                            cnt++;
+                        }
+                    }
+                    double avg                              = cnt > 0 ? sum / cnt : 0.0;
+                    f_gain                                  = f_gain_map[steam_rcv[0].gain];
+                    ch                                      = steam_rcv[0].channel;
+                    scan_index                              = ch / 2;
+                    sgm5860xStatus.last_voltage[scan_index] = avg;
+                    vol                                     = avg / f_gain;
+                } else {
+                    f_gain                                  = f_gain_map[steam_rcv[0].gain];
+                    ch                                      = steam_rcv[0].channel;
+                    scan_index                              = ch / 2;
+                    sgm5860xStatus.last_voltage[scan_index] = steam_rcv[0].voltage;
+                    vol                                     = steam_rcv[0].voltage / f_gain;
+                }
+            } break;
+            default: {
+                elog_e(TAG, "Invalid filter mode %d", ptr_status->filter_mode);
+            }
         }
-        // vol = sum / (rcv_count / sizeof(DevSgm5860xStruct));
-        vol = sgm5860xStatus.filtered_voltage[scan_index] / f_gain;
         elog_d(TAG, "Get ADC CH:%d Vol %.9f", ch, vol);
         vfb_send(sgm5860xCH1 + scan_index, 0, &vol, sizeof(vol));
     }
@@ -417,12 +505,12 @@ static void __sgm5860xRcvHandle(void *msg) {
             sgm5860xStatus.status = 0;      // Set status to indicate the device is stopped
         } break;
         case sgm5860xSet: {
-            DevSgm5860xStruct *ptr = (DevSgm5860xStruct *)MSG_GET_PAYLOAD(tmp_msg);
+            DevSgm5860xSetStruct *ptr = (DevSgm5860xSetStruct *)MSG_GET_PAYLOAD(tmp_msg);
             elog_i(TAG, "Set Channel %d ,Gain %d", ptr->channel, ptr->gain);
-            // DevSgm5860xSet(&sgm5860_cfg, ptr->channel, ptr->gain);
             sgm5860xStatus.next_data.channel = ptr->channel;
             sgm5860xStatus.next_data.gain    = ptr->gain;
             sgm5860xStatus.next_data.voltage = F_INVAILD;
+            sgm5860xStatus.next_data.sps     = ptr->sps;
             sgm5860xStatus.mode              = SGM5860X_STOP_CONTINUES_MODE;
         } break;
         case sgm5860xMode: {
@@ -719,11 +807,12 @@ static void __sgm5860xCycHandle(void) {
 }
 
 #endif
-void CmdSgm5860Set(uint8_t ch, uint8_t gain) {
-    elog_i(TAG, "CmdSgm5860Set: Channel %d, Gain %d", ch, gain);
-    DevSgm5860xStruct set = {0};
-    set.channel           = ch;
-    set.gain              = gain;
+void CmdSgm5860Set(uint8_t ch, uint8_t gain, uint8_t sps) {
+    elog_i(TAG, "CmdSgm5860Set: Channel %d, Gain %d, SPS %d", ch, gain, sps);
+    DevSgm5860xSetStruct set = {0};
+    set.channel              = ch;
+    set.gain                 = gain;
+    set.sps                  = sps;
     vfb_send(sgm5860xSet, 0, &set, sizeof(set));
 }
 void CmdSgm5860ScanMode(SGM5860xScanMode_t mode) {
@@ -736,6 +825,21 @@ static void Cmdsgm5860xHelp(void) {
     printf("  help          Show this help message\r\n");
     printf("  config        Configure the SGM5860x device\r\n");
     // scan
+
+    //  sgm5860xStatus.filter_mode
+    printf("  scan <mode>   Set scan mode for SGM5860x device\r\n");
+    printf("    0 - All channels (40mV, 9V1, 9V2, 9V3)\r\n");
+    printf("    1 - Single channel 40mV\r\n");
+    printf("    2 - Single channel 9V1\r\n");
+    printf("    3 - Single channel 9V2\r\n");
+    printf("    4 - Single channel 9V3\r\n");
+    printf("    5 - ALL channels 9V\r\n");
+
+    // filter_mode
+    printf("  filter <mode> Set filter mode for SGM5860x device\r\n");
+    printf("    0 - Raw data (no filtering)\r\n");
+    printf("    1 - Kalman filter\r\n");
+    printf("    2 - Average filter\r\n");
 
     printf("  reset         Reset the SGM5860x device\r\n");
     printf("  init          Initialize the SGM5860x device\r\n");
@@ -782,23 +886,43 @@ static int Cmdsgm5860xHandle(int argc, char *argv[]) {
         }
         return 0;
     }
+    // filter_mode
+    if (strcmp(argv[1], "filter") == 0) {
+        if (argc < 3) {
+            printf("\r\n Current filter mode: %d\r\n", sgm5860xStatus.filter_mode);
+            printf("  filter <mode> Set filter mode for SGM5860x device\r\n");
+            printf("    0 - Raw data (no filtering)\r\n");
+            printf("    1 - Kalman filter\r\n");
+            printf("    2 - Average filter\r\n");
+            return 0;
+        }
+        unsigned char mode = (unsigned char)strtol(argv[2], NULL, 10);
+        if (mode >= FILTER_MODE_MAX) {
+            elog_e(TAG, "Invalid filter mode");
+            return 0;
+        }
+        sgm5860xStatus.filter_mode = mode;  // Set the filter mode for the SGM5860x device
+        elog_i(TAG, "SGM5860x filter mode set to %d", mode);
+        return 0;
+    }
     // set
     if (strcmp(argv[1], "set") == 0) {
         if (argc < 4) {
-            elog_e(TAG, "Usage: sgm5860x set <channel> <gain>");
+            elog_e(TAG, "Usage: sgm5860x set <channel> <gain> <sps>");
             return 0;
         }
         unsigned char channel = (unsigned char)strtol(argv[2], NULL, 10);
         unsigned char gain    = (unsigned char)strtol(argv[3], NULL, 10);
+        uint8_t sps           = (uint8_t)strtol(argv[4], NULL, 10);
         if (channel >= SGM58601_MUXN_AINCOM || gain >= SGM58601_GAIN_MAX) {
             elog_e(TAG, "Invalid channel or gain value");
             return 0;
         }
-        CmdSgm5860Set(channel, gain);  // Set the channel and gain for the SGM5860x device
-        elog_i(TAG, "SGM5860x set channel %d, gain %d", channel, gain);
+        CmdSgm5860Set(channel, gain, sps);  // Set the channel and gain for the SGM5860x device
+        elog_i(TAG, "SGM5860x set channel %d, gain %d, sps %d", channel, gain, sps);
         return 0;
     }
-    // sacn mode
+    // scan mode
     if (strcmp(argv[1], "scan") == 0) {
         if (argc < 3) {
             elog_e(TAG, "Usage: sgm5860x scan <mode>");

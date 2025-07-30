@@ -202,8 +202,8 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
         .bits.ID    = 0x00  // Device ID
     };
     SGM5860xStatusReg_t read_status_reg;
-    SGM5860xDrateReg_t drate_reg ;
-    drate_reg.bits.DR=ptrDevSgm5860xHandle->rate;
+    SGM5860xDrateReg_t drate_reg;
+    drate_reg.bits.DR = ptrDevSgm5860xHandle->rate;
     SGM5860xDrateReg_t read_drate_reg;
 
     DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_STATUS, (uint8_t *)&status_reg,
@@ -243,11 +243,24 @@ void DevSgm5860xStop(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
 }
 
 // 需要再中断回调中调用,不能使用elog和阻塞性的函数
-uint8_t DevSgm5860xSet(const DevSgm5860xHandleStruct *ptrDevPinHandle, int channel, int gain) {
+uint8_t DevSgm5860xSet(const DevSgm5860xHandleStruct *ptrDevPinHandle,
+                       DevSgm5860xSetStruct *ptrSet) {
     if (ptrDevPinHandle == NULL) {
         printf("[ERROR]DevSgm5860xISRSetCallback: ptrDevPinHandle is NULL\r\n");
         return 0;
     }
+    if (ptrSet == NULL) {
+        printf("[ERROR]DevSgm5860xISRSetCallback: ptrSet is NULL\r\n");
+        return 0;
+    }
+    uint8_t channel = ptrSet->channel;
+    uint8_t gain    = ptrSet->gain;
+    uint8_t sps     = ptrSet->sps;
+
+    static uint8_t channel_last = -1;
+    static uint8_t gain_last    = -1;
+    static uint8_t sps_last     = 0xFF;
+
     SGM5860xMuxReg_t mux_reg                      = {0};
     mux_reg.raw                                   = 0;
     SGM5860xAdconReg_t adcon_reg                  = {0};
@@ -258,24 +271,50 @@ uint8_t DevSgm5860xSet(const DevSgm5860xHandleStruct *ptrDevPinHandle, int chann
     read_adcon_reg.raw                            = 0;
     DevSgm5860xHandleStruct *ptrDevSgm5860xHandle = (DevSgm5860xHandleStruct *)ptrDevPinHandle;
     DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SDATAC);
-    mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;
-    mux_reg.bits.PSEL  = channel;
-    adcon_reg.bits.PGA = gain;
-    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg, sizeof(mux_reg));
-    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
-                        sizeof(adcon_reg));
-    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&read_mux_reg,
-                       sizeof(mux_reg));
-    DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&read_adcon_reg,
-                       sizeof(adcon_reg));
-    if (mux_reg.raw != read_mux_reg.raw) {
-        printf("[ERROR]MUX: 0x%08X, Expected: 0x%08X\r\n", read_mux_reg.raw, mux_reg.raw);
-        return 0;
+    if (channel_last != channel) {
+        mux_reg.bits.NSEL = SGM58601_MUXN_AINCOM;
+        mux_reg.bits.PSEL = (uint8_t)(channel & 0xFF);
+        DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
+                            sizeof(mux_reg));
+        DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&read_mux_reg,
+                           sizeof(mux_reg));
+        if (mux_reg.raw != read_mux_reg.raw) {
+            printf("[ERROR]MUX: 0x%08X, Expected: 0x%08X\r\n", read_mux_reg.raw, mux_reg.raw);
+            return 0;
+        }
+        channel_last = channel;
     }
+    if (gain_last != gain) {
+        adcon_reg.bits.PGA  = (uint8_t)(gain & 0x07);  // Gain code
+        adcon_reg.bits.SDCS = 0;                       // Sensor Detection Current Source
+        adcon_reg.bits.CLK  = 0;                       // Clock Output Frequency
+        DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
+                            sizeof(adcon_reg));
 
-    if (adcon_reg.raw != read_adcon_reg.raw) {
-        printf("[ERROR]ADCON: 0x%08X, Expected: 0x%08X\r\n", read_adcon_reg.raw, adcon_reg.raw);
-        return 0;
+        DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&read_adcon_reg,
+                           sizeof(adcon_reg));
+
+        if (adcon_reg.raw != read_adcon_reg.raw) {
+            printf("[ERROR]ADCON: 0x%08X, Expected: 0x%08X\r\n", read_adcon_reg.raw, adcon_reg.raw);
+            return 0;
+        }
+        gain_last = gain;
+    }
+    if (sps_last != sps) {
+        SGM5860xDrateReg_t drate_reg = {0};
+        drate_reg.bits.DR            = sps;  // Set the data rate
+        DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&drate_reg,
+                            sizeof(drate_reg));
+        SGM5860xDrateReg_t read_drate_reg = {0};
+        DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&read_drate_reg,
+                           sizeof(drate_reg));
+        if (drate_reg.raw != read_drate_reg.raw) {
+            printf("[ERROR]DRATE: 0x%08X, Expected: 0x%08X\r\n", read_drate_reg.raw, drate_reg.raw);
+            return 0;
+        } else {
+            // printf("[PASS]DRATE: 0x%08X\r\n", read_drate_reg.raw);
+        }
+        sps_last = sps;
     }
 
     // printf("[PASS]DevSgm5860xSet: Channel %d Gain %d MUX 0x%02X ADCON 0x%02X\r\n", channel, gain,
@@ -289,7 +328,7 @@ uint8_t DevSgm5860xStartContinuousMode(const DevSgm5860xHandleStruct *ptrDevPinH
 }
 
 void DevSgm5860xISRSetCallback(const DevSgm5860xHandleStruct *ptrDevPinHandle,
-                               DevSgm5860xStruct *ptrCurr, DevSgm5860xStruct *ptrNext) {
+                               DevSgm5860xSetStruct *ptrCurr, DevSgm5860xSetStruct *ptrNext) {
     if (ptrDevPinHandle == NULL) {
         printf("[ERROR]DevSgm5860xISRSetCallback: ptrDevPinHandle is NULL\r\n");
         return;

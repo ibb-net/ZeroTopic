@@ -14,6 +14,10 @@
     "Invalid filter mode selected. Please set FILTER_MODE to either KALMAN_FILTER_MODE or AVG_FILTER_MODE"
 #endif
 
+#define SGM58601_DEFAULT_SPS     SGM58601_DRATE_30SPS
+#define SGM58601_DEFAULT_GAIN    SGM58601_GAIN_32
+#define SGM58601_DEFAULT_CHANNEL SGM58601_MUXN_AIN6
+
 typedef enum {
     SGM5860xScanModeAll = 0,     // 扫描所有通道
     SGM5860xScanModeSingle40mV,  // 扫描单个通道
@@ -21,5 +25,5 @@ typedef enum {
     SGM5860xScanModeSingle9V2,
     SGM5860xScanModeSingle9V3,
     SGM5860xScanModeAll9V,
-}SGM5860xScanMode_t;
+} SGM5860xScanMode_t;
 #endif  // __DACSgm3533_CFG_H__
