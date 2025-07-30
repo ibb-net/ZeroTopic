@@ -44,6 +44,7 @@ static void __Ds18b20InitHandle(void *msg);
 static void CmdDs18b20Reset(void);
 static double CmdDs18b20Read(uint8_t state);
 static void CmdDs18b20Covert(uint8_t state);
+uint8_t crc8_maxim(const uint8_t *data, uint8_t len);
 const TypdefDs18b20BSPCfg Ds18b20BspCfg[Ds18b20ChannelMax] = {
     {
         .one_wire =
@@ -132,7 +133,7 @@ SYSTEM_REGISTER_INIT(BoardInitStage, Ds18b20Priority, __Ds18b20CreateTaskHandle,
 
 static void __Ds18b20InitHandle(void *msg) {
     elog_i(TAG, "__Ds18b20InitHandle");
-    //elog_set_filter_tag_lvl(TAG, Ds18b20LogLvl);
+    // elog_set_filter_tag_lvl(TAG, Ds18b20LogLvl);
     Ds18b20Status[0].status      = 0;       // Initialize status
     Ds18b20Status[0].step        = 0;       // Initialize step
     Ds18b20Status[0].temperature = -100.0;  // Initialize temperature
@@ -192,6 +193,20 @@ static void __Ds18b20CycHandle(void) {
 }
 
 #endif
+
+uint8_t crc8_maxim(const uint8_t *data, uint8_t len) {
+    uint8_t crc = 0x00;
+    for (uint8_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (uint8_t j = 0; j < 8; j++) {
+            if (crc & 0x01)
+                crc = (crc >> 1) ^ 0x8C;  // 0x8C = 0x31 << 1
+            else
+                crc >>= 1;
+        }
+    }
+    return crc;
+}
 
 static void CmdDs18b20Help(void) {
     elog_i(TAG, "Usage: ds18b20 <command>");
@@ -277,13 +292,13 @@ static double CmdDs18b20Read(uint8_t state) {
     DevOneWireReset(handle);  // Reset the bus before reading ROM
     DevOneWireWriteByte(handle, 0xCC);
     DevOneWireWriteByte(handle, 0xBE);  // Read Scratchpad command
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 9; i++) {
         scratchpad[i] = DevOneWireReadByte(handle);
     }
     xTaskResumeAll();
-    // elog_i(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-    //        scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3],
-    //        scratchpad[4], scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
+    elog_d(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X", scratchpad[0],
+           scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4], scratchpad[5], scratchpad[6],
+           scratchpad[7], scratchpad[8]);
 
     uint16_t temp_raw   = 0;
     int16_t temp_signed = 0;
@@ -292,6 +307,15 @@ static double CmdDs18b20Read(uint8_t state) {
     // 组合两个字节
     temp_raw    = ((uint16_t)scratchpad[1] << 8) | scratchpad[0];
     temp_signed = (int16_t)temp_raw;  // 转换为有符号整数
+
+    uint8_t crc = crc8_maxim(scratchpad, 8);  // 校验CRC
+    if (crc != scratchpad[8]) {
+        elog_e(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+               scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
+               scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
+        elog_e(TAG, "DS18B20 CRC error: expected %02X, got %02X", scratchpad[8], crc);
+        return F_INVAILD;
+    }
 
     // DS18B20使用二进制补码表示负温度
     if (temp_signed < 0) {
