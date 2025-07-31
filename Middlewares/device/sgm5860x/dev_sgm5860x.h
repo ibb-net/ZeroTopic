@@ -224,8 +224,6 @@ int DevSgm5860xSetRead(const DevSgm5860xHandleStruct *ptrDevPinHandle,
                        DevSgm5860xSetStruct *ptrSet);
 uint8_t DevSgm5860xStartContinuousMode(const DevSgm5860xHandleStruct *ptrDevPinHandle);
 double DevSgm5860xReadValue(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
-int DevSgm5860xSelfOffsetCal(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
-int DevSgm5860xSelfOffsetCal2(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 
 int DevSgm5860xSelfOffsetCalRead(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle,
                                  uint8_t *offset, uint8_t *gain_offset);
