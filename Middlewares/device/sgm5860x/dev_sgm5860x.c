@@ -348,30 +348,6 @@ uint8_t DevSgm5860xStartContinuousMode(const DevSgm5860xHandleStruct *ptrDevPinH
     DevSgm5860xCommand(ptrDevPinHandle, SGM58601_CMD_RDATAC);
     return 1;  // Success
 }
-
-/**
- * SGM5860x Offset Self-Calibration (SELFOCAL)
- */
-int DevSgm5860xSelfOffsetCal(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
-    if (!ptrDevSgm5860xHandle) return -1;
-    // DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SDATAC);   // 停止连续采集
-    // DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_STANDBY);  // 停止连续采集
-
-    // 等待 nDRDY 低电平（数据空闲）
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy));
-    // 发送自偏移校准命令
-    DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SELFCAL);
-    // 等待 nDRDY 高电平（校准开始）
-    while (!DevPinRead(&ptrDevSgm5860xHandle->drdy));
-    // 等待 nDRDY 低电平（校准完成）
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy));
-    return 1;
-}
-int DevSgm5860xSelfOffsetCal2(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
-    if (!ptrDevSgm5860xHandle) return -1;
-    // DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SELFOCAL);
-    return 1;
-}
 int DevSgm5860xSelfOffsetCalRead(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle,
                                  uint8_t *offset, uint8_t *gain_offset) {
     if (!ptrDevSgm5860xHandle) return -1;
