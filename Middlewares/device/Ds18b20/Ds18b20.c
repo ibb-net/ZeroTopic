@@ -310,10 +310,10 @@ static double CmdDs18b20Read(uint8_t state) {
 
     uint8_t crc = crc8_maxim(scratchpad, 8);  // 校验CRC
     if (crc != scratchpad[8]) {
-        elog_e(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-               scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
-               scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
-        elog_e(TAG, "DS18B20 CRC error: expected %02X, got %02X", scratchpad[8], crc);
+        // elog_e(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+        //        scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
+        //        scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
+        elog_w(TAG, "DS18B20 CRC error: expected %02X, got %02X", scratchpad[8], crc);
         return F_INVAILD;
     }
 
