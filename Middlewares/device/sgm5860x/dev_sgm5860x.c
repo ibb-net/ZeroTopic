@@ -38,10 +38,11 @@ const double gain_map[SGM58601_GAIN_MAX] = {1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0
 volatile int ready_trig_flg              = 0;
 /*SGM58601初始化*/
 static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
-
+volatile SGM5860xAllReg_t write_regs = {0};
+volatile SGM5860xAllReg_t read_regs  = {0};
 int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     if (ptrDevSgm5860xHandle == NULL) {
-        elog_e(TAG, "DevSgm5860xInit: ptrDevSgm5860xHandle is NULL");
+        printf("         [ERROR] DevSgm5860xInit: ptrDevSgm5860xHandle is NULL");
         return 0;
     }
 
@@ -60,7 +61,7 @@ int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
 
 static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     if (ptrDevSgm5860xHandle == NULL) {
-        elog_e(TAG, "__DevSgm5860xWaitForDRDY: ptrDevSgm5860xHandle is NULL");
+        printf("         [ERROR] __DevSgm5860xWaitForDRDY: ptrDevSgm5860xHandle is NULL");
         return 0;
     }
     uint32_t timeout = SGM5860_WAIT_TIME_US;  // SGM5860_WAIT_TIME_US;
@@ -69,7 +70,7 @@ static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860
         vTaskDelay(pdMS_TO_TICKS(1));  // Wait for 1 millisecond
         timeout--;
         if (timeout == 0) {
-            // elog_e(TAG, "__DevSgm5860xWaitForDRDY: Timeout waiting for DRDY");
+            //  printf("         [ERROR] __DevSgm5860xWaitForDRDY: Timeout waiting for DRDY");
             return -1;
         }
     }
@@ -78,10 +79,10 @@ static int __DevSgm5860xWaitforDRDY(const DevSgm5860xHandleStruct *ptrDevSgm5860
 
 void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     if (ptrDevSgm5860xHandle == NULL) {
-        elog_e(TAG, "DevSgm5860xReset: ptrDevSgm5860xHandle is NULL");
+        printf("         [ERROR] DevSgm5860xReset: ptrDevSgm5860xHandle is NULL");
         return;
     }
-    elog_i(TAG, "DevSgm5860xReset: Device reset Started");
+    printf("         DevSgm5860xReset: Device reset Started");
     uint32_t timeout = SGM5860_WAIT_TIME_US;
     DevPinWrite(&ptrDevSgm5860xHandle->nest, 0);  // Set NEST pin low
     vTaskDelay(pdMS_TO_TICKS(1));                 // Wait for 1 millisecond
@@ -99,15 +100,15 @@ int DevSgm5860xCommand(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint
 int DevSgm5860xWriteReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t regaddr,
                         uint8_t *regvalue, uint8_t reglen) {
     if (ptrDevSgm5860xHandle == NULL || regvalue == NULL) {
-        elog_e(TAG, "DevSgm5860xWriteReg: ptrDevSgm5860xHandle or regvalue is NULL");
+        printf("         [ERROR] DevSgm5860xWriteReg: ptrDevSgm5860xHandle or regvalue is NULL");
         return -1;
     }
     if (reglen < 1 || reglen > 0x0b) {
-        elog_e(TAG, "DevSgm5860xWriteReg: Invalid reglen %d", reglen);
+        printf("         [ERROR] DevSgm5860xWriteReg: Invalid reglen %d", reglen);
         return -1;  // Invalid register length
     }
     if (regaddr > 0x0F) {
-        elog_e(TAG, "DevSgm5860xWriteReg: Invalid regaddr 0x%02X", regaddr);
+        printf("         [ERROR] DevSgm5860xWriteReg: Invalid regaddr 0x%02X", regaddr);
         return -1;  // Invalid register address
     }
     uint8_t snd_data[16] = {0};
@@ -130,21 +131,21 @@ int DevSgm5860xWriteReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uin
         snprintf(log_msg + strlen(log_msg), sizeof(log_msg) - strlen(log_msg), "0x%02X ",
                  snd_data[i + 2]);
     }
-    elog_d(TAG, "%s", log_msg);
+    // elog_d(TAG, "%s", log_msg);
     return 1;  // Success
 }
 int DevSgm5860xReadReg(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t regaddr,
                        uint8_t *regvalue, uint8_t reglen) {
     if (ptrDevSgm5860xHandle == NULL || regvalue == NULL) {
-        elog_e(TAG, "DevSgm5860xReadReg: ptrDevSgm5860xHandle or regvalue is NULL");
+        printf("         [ERROR] DevSgm5860xReadReg: ptrDevSgm5860xHandle or regvalue is NULL");
         return -1;
     }
     if (reglen < 1 || reglen > 0x0b) {
-        elog_e(TAG, "DevSgm5860xReadReg: Invalid reglen %d", reglen);
+        printf("         [ERROR] DevSgm5860xReadReg: Invalid reglen %d", reglen);
         return -1;  // Invalid register length
     }
     if (regaddr > 0x0F) {
-        elog_e(TAG, "DevSgm5860xWriteReg: Invalid regaddr 0x%02X", regaddr);
+        printf("         [ERROR] DevSgm5860xWriteReg: Invalid regaddr 0x%02X", regaddr);
         return -1;  // Invalid register address
     }
     uint8_t snd_data[16] = {0};
@@ -181,7 +182,7 @@ double DevSgm5860xReadValue(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle)
     DevSpiWriteRead(&ptrDevSgm5860xHandle->spi, snd_data, rcv_data, 3);
     int hex_data =
         (rcv_data[0] << 16) | (rcv_data[1] << 8) | rcv_data[2];  // Combine the received data
-    elog_d(TAG, "DevGetADCData: Received data: 0x%06X", hex_data);
+    // elog_d(TAG, "DevGetADCData: Received data: 0x%06X", hex_data);
     if (hex_data & 0x800000) {                                 // Check if the sign bit is set
         hex_data = ADC_24BIT_MAX_INT - (hex_data - 0x800000);  // Convert to positive value
         double hex_data_double = (double)hex_data;             // Convert to double for calculation
@@ -229,14 +230,14 @@ int DevSgm5860xConfig(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
 }
 void DevSgm5860xStart(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     if (ptrDevSgm5860xHandle == NULL) {
-        elog_e(TAG, "DevSgm5860xStart: ptrDevSgm5860xHandle is NULL");
+        printf("         [ERROR] DevSgm5860xStart: ptrDevSgm5860xHandle is NULL");
         return;
     }
     DevPinIsStartISR(&ptrDevSgm5860xHandle->drdy, 1);
 }
 void DevSgm5860xStop(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     if (ptrDevSgm5860xHandle == NULL) {
-        elog_e(TAG, "DevSgm5860xStop: ptrDevSgm5860xHandle is NULL");
+        printf("         [ERROR] DevSgm5860xStop: ptrDevSgm5860xHandle is NULL");
         return;
     }
     DevPinIsStartISR(&ptrDevSgm5860xHandle->drdy, 0);
@@ -246,80 +247,101 @@ void DevSgm5860xStop(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
 uint8_t DevSgm5860xSet(const DevSgm5860xHandleStruct *ptrDevPinHandle,
                        DevSgm5860xSetStruct *ptrSet) {
     if (ptrDevPinHandle == NULL) {
-        printf("[ERROR]DevSgm5860xISRSetCallback: ptrDevPinHandle is NULL\r\n");
+        printf("[ERROR]DevSgm5860xSet: ptrDevPinHandle is NULL\r\n");
         return 0;
     }
     if (ptrSet == NULL) {
-        printf("[ERROR]DevSgm5860xISRSetCallback: ptrSet is NULL\r\n");
+        printf("[ERROR]DevSgm5860xSet: ptrSet is NULL\r\n");
         return 0;
     }
-    uint8_t channel = ptrSet->channel;
-    uint8_t gain    = ptrSet->gain;
-    uint8_t sps     = ptrSet->sps;
-
-    static uint8_t channel_last = -1;
-    static uint8_t gain_last    = -1;
-    static uint8_t sps_last     = 0xFF;
-
-    SGM5860xMuxReg_t mux_reg                      = {0};
-    mux_reg.raw                                   = 0;
-    SGM5860xAdconReg_t adcon_reg                  = {0};
-    adcon_reg.raw                                 = 0;
-    SGM5860xMuxReg_t read_mux_reg                 = {0};
-    read_mux_reg.raw                              = 0;
-    SGM5860xAdconReg_t read_adcon_reg             = {0};
-    read_adcon_reg.raw                            = 0;
+    uint8_t channel                               = ptrSet->channel;
+    uint8_t gain                                  = ptrSet->gain;
+    uint8_t sps                                   = ptrSet->sps;
     DevSgm5860xHandleStruct *ptrDevSgm5860xHandle = (DevSgm5860xHandleStruct *)ptrDevPinHandle;
-    DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SDATAC);
-    if (channel_last != channel) {
-        mux_reg.bits.NSEL = SGM58601_MUXN_AINCOM;
-        mux_reg.bits.PSEL = (uint8_t)(channel & 0xFF);
-        DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg,
-                            sizeof(mux_reg));
-        DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&read_mux_reg,
-                           sizeof(mux_reg));
-        if (mux_reg.raw != read_mux_reg.raw) {
-            printf("[ERROR]MUX: 0x%08X, Expected: 0x%08X\r\n", read_mux_reg.raw, mux_reg.raw);
-            return 0;
-        }
-        channel_last = channel;
-    }
-    if (gain_last != gain) {
-        adcon_reg.bits.PGA  = (uint8_t)(gain & 0x07);  // Gain code
-        adcon_reg.bits.SDCS = 0;                       // Sensor Detection Current Source
-        adcon_reg.bits.CLK  = 0;                       // Clock Output Frequency
-        DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
-                            sizeof(adcon_reg));
+    static uint8_t channel_last                   = -1;
+    static uint8_t gain_last                      = -1;
+    static uint8_t sps_last                       = 0xFF;
 
-        DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&read_adcon_reg,
-                           sizeof(adcon_reg));
+    /* status */
+    write_regs.regs.status.bits.BUFEN = 1;
+    write_regs.regs.status.bits.ACAL  = 0;
+    write_regs.regs.status.bits.ORDER = 0;
+    write_regs.regs.status.bits.ID    = 0x00;
 
-        if (adcon_reg.raw != read_adcon_reg.raw) {
-            printf("[ERROR]ADCON: 0x%08X, Expected: 0x%08X\r\n", read_adcon_reg.raw, adcon_reg.raw);
-            return 0;
-        }
-        gain_last = gain;
-    }
-    if (sps_last != sps) {
-        SGM5860xDrateReg_t drate_reg = {0};
-        drate_reg.bits.DR            = sps;  // Set the data rate
-        DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&drate_reg,
-                            sizeof(drate_reg));
-        SGM5860xDrateReg_t read_drate_reg = {0};
-        DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_DRATE, (uint8_t *)&read_drate_reg,
-                           sizeof(drate_reg));
-        if (drate_reg.raw != read_drate_reg.raw) {
-            printf("[ERROR]DRATE: 0x%08X, Expected: 0x%08X\r\n", read_drate_reg.raw, drate_reg.raw);
-            return 0;
-        } else {
-            // printf("[PASS]DRATE: 0x%08X\r\n", read_drate_reg.raw);
-        }
-        sps_last = sps;
-    }
+    write_regs.regs.mux.bits.NSEL = SGM58601_MUXN_AINCOM;  // Set NSEL to AINCOM
+    write_regs.regs.mux.bits.PSEL = (uint8_t)(channel & 0xFF);
 
-    // printf("[PASS]DevSgm5860xSet: Channel %d Gain %d MUX 0x%02X ADCON 0x%02X\r\n", channel, gain,
-    //        mux_reg.raw, adcon_reg.raw);
+    write_regs.regs.adcon.bits.PGA      = (uint8_t)(gain & 0x07);  // Gain code
+    write_regs.regs.adcon.bits.CLK      = 0;
+    write_regs.regs.adcon.bits.SDCS     = 0;  // Sensor Detection Current Source
+    write_regs.regs.adcon.bits.reserved = 0;  // Reserved bit
+
+    write_regs.regs.drate.bits.DR = sps;  // Set the data rate
+
+    write_regs.regs.io.raw = 0;  // Reserved byte SGM58601_IO
+    if (ptrSet->offset != NULL) {
+        // printf("[INFO] Set Offset: 0x%02X 0x%02X 0x%02X\r\n", ptrSet->offset[0], ptrSet->offset[1], ptrSet->offset[2]);
+        write_regs.regs.ofc0.raw = ptrSet->offset[0];
+        write_regs.regs.ofc1.raw = ptrSet->offset[1];
+        write_regs.regs.ofc2.raw = ptrSet->offset[2];
+    }
+ 
+    if (ptrSet->gain_offset != NULL) {
+        // printf("[INFO] Set Gain Offset: 0x%02X 0x%02X 0x%02X\r\n", ptrSet->gain_offset[0], ptrSet->gain_offset[1], ptrSet->gain_offset[2]);
+        write_regs.regs.fsc0.raw = ptrSet->gain_offset[0];
+        write_regs.regs.fsc1.raw = ptrSet->gain_offset[1];
+        write_regs.regs.fsc2.raw = ptrSet->gain_offset[2];
+    }
+    if ((ptrSet->offset != NULL) || (ptrSet->gain != NULL)) {
+        DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_STATUS, write_regs.raws, 11);
+    } else {
+        printf("[INFO] Set Default Configuration\r\n");
+        DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_STATUS, write_regs.raws, 4);
+    }
     return 1;
+}
+int DevSgm5860xSetRead(const DevSgm5860xHandleStruct *ptrDevPinHandle,DevSgm5860xSetStruct *ptrSet)
+{
+   int result = DevSgm5860xReadReg(ptrDevPinHandle, SGM58601_STATUS, read_regs.raws, 11);
+   if(result != 1)
+       return result;
+    // 对比 read_regs 和 ptrSet 的设置是否一致
+    int mismatch = 0;
+    if (read_regs.regs.mux.bits.PSEL != ptrSet->channel) {
+        printf("[ERROR] Channel mismatch: read=0x%02X, expected=0x%02X\r\n", read_regs.regs.mux.bits.PSEL, ptrSet->channel);
+        mismatch = 1;
+    }
+    if (read_regs.regs.adcon.bits.PGA != ptrSet->gain) {
+        printf("[ERROR] Gain mismatch: read=0x%02X, expected=0x%02X\r\n", read_regs.regs.adcon.bits.PGA, ptrSet->gain);
+        mismatch = 1;
+    }
+    if (read_regs.regs.drate.bits.DR != ptrSet->sps) {
+        printf("[ERROR] SPS mismatch: read=0x%02X, expected=0x%02X\r\n", read_regs.regs.drate.bits.DR, ptrSet->sps);
+        mismatch = 1;
+    }
+    if (ptrSet->offset != NULL &&
+        (read_regs.regs.ofc0.raw != ptrSet->offset[0] ||
+         read_regs.regs.ofc1.raw != ptrSet->offset[1] ||
+         read_regs.regs.ofc2.raw != ptrSet->offset[2])) {
+        printf("[ERROR] Offset mismatch: read=0x%02X%02X%02X, expected=0x%02X%02X%02X\r\n",
+            read_regs.regs.ofc0.raw, read_regs.regs.ofc1.raw, read_regs.regs.ofc2.raw,
+            ptrSet->offset[0], ptrSet->offset[1], ptrSet->offset[2]);
+        mismatch = 1;
+    }
+    if (ptrSet->gain_offset != NULL &&
+        (read_regs.regs.fsc0.raw != ptrSet->gain_offset[0] ||
+         read_regs.regs.fsc1.raw != ptrSet->gain_offset[1] ||
+         read_regs.regs.fsc2.raw != ptrSet->gain_offset[2])) {
+        printf("[ERROR] Gain offset mismatch: read=0x%02X%02X%02X, expected=0x%02X%02X%02X\r\n",
+            read_regs.regs.fsc0.raw, read_regs.regs.fsc1.raw, read_regs.regs.fsc2.raw,
+            ptrSet->gain_offset[0], ptrSet->gain_offset[1], ptrSet->gain_offset[2]);
+        mismatch = 1;
+    }
+    if (!mismatch) {
+        // printf("[PASS] read_regs and ptrSet configuration match.\r\n");
+    }
+  
+   return 1;
 }
 uint8_t DevSgm5860xStartContinuousMode(const DevSgm5860xHandleStruct *ptrDevPinHandle) {
     DevSgm5860xCommand(ptrDevPinHandle, SGM58601_CMD_WAKEUP);
@@ -327,98 +349,38 @@ uint8_t DevSgm5860xStartContinuousMode(const DevSgm5860xHandleStruct *ptrDevPinH
     return 1;  // Success
 }
 
-void DevSgm5860xISRSetCallback(const DevSgm5860xHandleStruct *ptrDevPinHandle,
-                               DevSgm5860xSetStruct *ptrCurr, DevSgm5860xSetStruct *ptrNext) {
-    if (ptrDevPinHandle == NULL) {
-        printf("[ERROR]DevSgm5860xISRSetCallback: ptrDevPinHandle is NULL\r\n");
-        return;
-    }
-    SGM5860xMuxReg_t mux_reg          = {0};
-    SGM5860xAdconReg_t adcon_reg      = {0};
-    SGM5860xMuxReg_t read_mux_reg     = {0};
-    SGM5860xAdconReg_t read_adcon_reg = {0};
-    if (DevPinRead(&ptrDevPinHandle->drdy)) {
-        printf("DevSgm5860xISRSetCallback1: nDRDY is high, skipping ISR callback\r\n");
-        return;  // nDRDY is high, skip the callback
-    }
-    DevSgm5860xHandleStruct *ptrDevSgm5860xHandle = (DevSgm5860xHandleStruct *)ptrDevPinHandle;
-    /* STEP2 Write Next Channel config */
-    mux_reg.bits.NSEL  = SGM58601_MUXN_AINCOM;
-    mux_reg.bits.PSEL  = ptrNext->channel;
-    adcon_reg.bits.PGA = ptrNext->gain;
-
-    if (DevPinRead(&ptrDevPinHandle->drdy)) {
-        printf("DevSgm5860xISRSetCallback5: nDRDY is high, skipping ISR callback\r\n");
-        return;  // nDRDY is high, skip the callback
-    }
-
-    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_MUX, (uint8_t *)&mux_reg, sizeof(mux_reg));
-    if (DevPinRead(&ptrDevPinHandle->drdy)) {
-        printf("DevSgm5860xISRSetCallback6: nDRDY is high, skipping ISR callback\r\n");
-        return;  // nDRDY is high, skip the callback
-    }
-    DevSgm5860xWriteReg(ptrDevSgm5860xHandle, SGM58601_ADCON, (uint8_t *)&adcon_reg,
-                        sizeof(adcon_reg));
-    return;
-}
-
 /**
  * SGM5860x Offset Self-Calibration (SELFOCAL)
  */
 int DevSgm5860xSelfOffsetCal(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
-    elog_i(TAG, "DevSgm5860xSelfOffsetCal: Start SELFOCAL (Offset Self-Calibration)");
     if (!ptrDevSgm5860xHandle) return -1;
-    DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SELFOCAL);
-    while (!DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
-    }
-    elog_d(TAG, "DevSgm5860xSelfOffsetCal: nDRDY high, calibration running");
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
-    }
-    elog_i(TAG, "DevSgm5860xSelfOffsetCal: Calibration complete, nDRDY low");
+    // DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SDATAC);   // 停止连续采集
+    // DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_STANDBY);  // 停止连续采集
+
+    // 等待 nDRDY 低电平（数据空闲）
+    while (DevPinRead(&ptrDevSgm5860xHandle->drdy));
+    // 发送自偏移校准命令
+    DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SELFCAL);
+    // 等待 nDRDY 高电平（校准开始）
+    while (!DevPinRead(&ptrDevSgm5860xHandle->drdy));
+    // 等待 nDRDY 低电平（校准完成）
+    while (DevPinRead(&ptrDevSgm5860xHandle->drdy));
     return 1;
 }
-/**
- * SGM5860x Gain Self-Calibration (SELFGCAL)
- */
-int DevSgm5860xSelfGainCal(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
-    elog_i(TAG, "DevSgm5860xSelfGainCal: Start SELFGCAL (Gain Self-Calibration)");
+int DevSgm5860xSelfOffsetCal2(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
     if (!ptrDevSgm5860xHandle) return -1;
-    DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SELFGCAL);
-    while (!DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
-    }
-    elog_d(TAG, "DevSgm5860xSelfGainCal: nDRDY high, calibration running");
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
-    }
-    elog_i(TAG, "DevSgm5860xSelfGainCal: Calibration complete, nDRDY low");
+    // DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SELFOCAL);
     return 1;
 }
-/**
- * SGM5860x System Offset Calibration (SYSOCAL)
- */
-int DevSgm5860xSysOffsetCal(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
-    elog_i(TAG, "DevSgm5860xSysOffsetCal: Start SYSOCAL (System Offset Calibration)");
+int DevSgm5860xSelfOffsetCalRead(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle,
+                                 uint8_t *offset, uint8_t *gain_offset) {
     if (!ptrDevSgm5860xHandle) return -1;
-    DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SYSOCAL);
-    while (!DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
+
+    if (DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_OFC0, (uint8_t *)offset, 3) != 1) {
+        return -1;
     }
-    elog_d(TAG, "DevSgm5860xSysOffsetCal: nDRDY high, calibration running");
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
+    if (DevSgm5860xReadReg(ptrDevSgm5860xHandle, SGM58601_FSC0, (uint8_t *)gain_offset, 3) != 1) {
+        return -1;
     }
-    elog_i(TAG, "DevSgm5860xSysOffsetCal: Calibration complete, nDRDY low");
-    return 1;
-}
-/**
- * SGM5860x System Gain Calibration (SYSGCAL)
- */
-int DevSgm5860xSysGainCal(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle) {
-    elog_i(TAG, "DevSgm5860xSysGainCal: Start SYSGCAL (System Gain Calibration)");
-    if (!ptrDevSgm5860xHandle) return -1;
-    DevSgm5860xCommand(ptrDevSgm5860xHandle, SGM58601_CMD_SYSGCAL);
-    while (!DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
-    }
-    elog_d(TAG, "DevSgm5860xSysGainCal: nDRDY high, calibration running");
-    while (DevPinRead(&ptrDevSgm5860xHandle->drdy)) {
-    }
-    elog_i(TAG, "DevSgm5860xSysGainCal: Calibration complete, nDRDY low");
     return 1;
 }

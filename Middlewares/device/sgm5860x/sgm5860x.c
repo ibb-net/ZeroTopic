@@ -47,6 +47,7 @@ const double f_gain_map[] = {
 };
 
 void sgm5860xReadyCallback(void *ptrDevPinHandle);
+void Sgm5860UpdateNextCfg(void);
 typedef enum {
     FILTER_MODE_RAW = 0,  // 原始数据模式
     FILTER_MODE_KALMAN,   // 卡尔曼滤波
@@ -55,22 +56,51 @@ typedef enum {
 } FilterMode;
 typedef struct {
     uint8_t enable;
-    uint8_t channel;  // Channel number
-    uint8_t gain;     // Gain setting for the channel
-    uint8_t sps;      // Samples per second setting for the channel
+    uint8_t channel;                   // Channel number
+    uint8_t gain;                      // Gain setting for the channel
+    uint8_t sps;                       // Samples per second setting for the channel
+    uint8_t offset_calibration[3];     // Offset Calibration Byte 0-3
+    uint8_t fullscale_calibration[3];  // Full-Scale Calibration Byte 0-3
+
 } ChannelCfg_t;
-ChannelCfg_t sgm5860_channelcfg[sgm5860xChannelMax] = {
-    {true, SGM58601_MUXN_AIN0, SGM58601_GAIN_1, SGM58601_DRATE_30SPS},    // Channel 0: Gain 1
-    {true, SGM58601_MUXN_AIN2, SGM58601_GAIN_1, SGM58601_DRATE_30SPS},    // Channel 2: Gain 1
-    {true, SGM58601_MUXN_AIN4, SGM58601_GAIN_1, SGM58601_DRATE_30SPS},    // Channel 4: Gain 1
-    {true, SGM58601_MUXN_AIN6, SGM58601_GAIN_32, SGM58601_DRATE_2_5SPS},  // Channel 6: Gain 32
+volatile ChannelCfg_t sgm5860_channelcfg[sgm5860xChannelMax] = {
+    {true,
+     SGM58601_MUXN_AIN0,
+     SGM58601_GAIN_1,
+     SGM58601_DRATE_30SPS,
+     {0, 0, 0},
+     {0x55, 0x55, 0x55}},
+    {true,
+     SGM58601_MUXN_AIN2,
+     SGM58601_GAIN_1,
+     SGM58601_DRATE_30SPS,
+     {0, 0, 0},
+     {0x55, 0x55, 0x55}},
+    {true,
+     SGM58601_MUXN_AIN4,
+     SGM58601_GAIN_1,
+     SGM58601_DRATE_30SPS,
+     {0, 0, 0},
+     {0x55, 0x55, 0x55}},
+    {true,
+     SGM58601_MUXN_AIN6,
+     SGM58601_GAIN_32,
+     SGM58601_DRATE_10SPS,
+     {0, 0, 0},
+     {0x55, 0x55, 0x55}},
 
 };
 typedef enum {
-    SGM5860X_NONE_MODE,  // Device is in read mode
-    SGM5860X_INIT_MODE,  // Device is in set mode
-    SGM5860X_STOP_CONTINUES_MODE,
+    SGM5860X_NONE_MODE,            // Device is in read mode
+    SGM5860X_INIT_MODE,            // Device is in set mode
+    SGM5860X_SELFCAL_START_MODE,   // SELFCAL
+    SGM5860X_SELFCAL_DONING_MODE,  // SELFCAL
+    SGM5860X_SELFCAL_WAITING_MODE,
+    SGM5860X_SELFCAL_READING_MODE,  // SELFCAL
+    SGM5860X_SELFCAL_END_MODE,      // SELFCAL
+    SGM5860X_STOP_CONTINUOUS_MODE,
     SGM5860X_SET_MODE,
+    SGM5860X_SET_VERIFY_MODE,
     SGM5860X_START_CONTINUES_MODE,
     SGM5860X_READ_MODE,  // Device is in set mode
 } SGMSETSTATE_t;
@@ -180,6 +210,7 @@ typedef struct {
     uint8_t status;                           // Status of the device
     FilterMode filter_mode;                   // Filter mode
     uint8_t scan_index;                       // Channel to scan
+    uint8_t self_cal_index;                   // Self-calibration index
     double last_voltage[sgm5860xChannelMax];  // Last voltage read from each channel
     double sum[sgm5860xChannelMax];
     double average[sgm5860xChannelMax];                   // Average voltage for each channel
@@ -187,8 +218,8 @@ typedef struct {
     double tmp_voltage[sgm5860xChannelMax][AVG_MAX_CNT];  // Temporary voltage storage
     StreamBufferHandle_t steam_buffer;
     SGMSETSTATE_t mode;  // Current mode of the device
-    DevSgm5860xSetStruct current_data;
     DevSgm5860xSetStruct next_data;
+
 #if FILTER_MODE == KALMAN_FILTER_MODE
     SignalState_t last_kalman_state[sgm5860xChannelMax];
     AdaptiveKalmanFilter_t kalman_filters[sgm5860xChannelMax];  // Kalman filters for each channel
@@ -207,7 +238,13 @@ volatile Typdefsgm5860xStatus sgm5860xStatus = {0};
 
 static const vfb_event_t sgm5860xEventList[] = {
 
-    sgm5860xStart, sgm5860xStop, sgm5860xGet, sgm5860xSet, sgm5860xMode,
+    sgm5860xStart,
+    sgm5860xStop,
+    sgm5860xGet,
+    sgm5860xSet,
+    sgm5860xMode,
+    sgm5860xSelfCalOffsetStart,  // 1041
+    sgm5860xSelfCalOffsetDone,   // 1042
 
 };
 
@@ -238,51 +275,136 @@ void sgm5860xReadyCallback(void *ptrDevPinHandle) {
             return;
         }
         case SGM5860X_INIT_MODE: {
-            printf("\r\nsgm5860xReadyCallback: INIT_MODE\r\n");
+            printf("       \r\nsgm5860xReadyCallback: INIT_MODE\r\n");
             uint8_t result = DevSgm5860xConfig(&sgm5860_cfg);  // Configure the SGM5860x device
             if (result != 1) {
-                printf("[ERROR]sgm5860xReadyCallback: Failed to configure device\r\n");
+                printf("       [ERROR]sgm5860xReadyCallback: Failed to configure device\r\n");
             } else {
-                printf("sgm5860xReadyCallback: Device configured successfully\r\n");
-                sgm5860xStatus.mode = SGM5860X_SET_MODE;
-            }
-            break;
-        }
-        case SGM5860X_STOP_CONTINUES_MODE: {
-            sgm5860xStatus.mode = SGM5860X_SET_MODE;
-            // printf("sgm5860xReadyCallback: STOP_CONTINUES_MODE\r\n");
-            // break;// Do not break here, continue to SET_MODE
-        }
-        case SGM5860X_SET_MODE: {
-            // printf("sgm5860xReadyCallback: SET_MODE\r\n");
-            uint8_t result = DevSgm5860xSet(sgm5860xStatus.cfg, &sgm5860xStatus.next_data);
-            if (result != 1) {
-                printf("[ERROR]sgm5860xReadyCallback: Failed to set mode\r\n");
-            } else {
-                sgm5860xStatus.mode                 = SGM5860X_START_CONTINUES_MODE;
-                sgm5860xStatus.current_data.channel = sgm5860xStatus.next_data.channel;
-                sgm5860xStatus.current_data.gain    = sgm5860xStatus.next_data.gain;
-                sgm5860xStatus.current_data.voltage = sgm5860xStatus.next_data.voltage;
-                sgm5860xStatus.current_data.sps     = sgm5860xStatus.next_data.sps;
-                // printf("sgm5860xReadyCallback: SET_MODE ,Next Channel: %d, Gain: %d\r\n",
-                //        sgm5860xStatus.next_data.channel, sgm5860xStatus.next_data.gain);
+                printf("       sgm5860xReadyCallback: Device configured successfully\r\n");
+                sgm5860xStatus.mode = SGM5860X_NONE_MODE;
             }
         } break;
+        case SGM5860X_SELFCAL_START_MODE: {
+            // printf(
+            //     "       \r\nsgm5860xReadyCallback: SGM5860X_SELFCAL_START_MODE Self Index
+            //     %d\r\n", sgm5860xStatus.self_cal_index);
+            DevSgm5860xSetStruct tmpSetStruct;
+            tmpSetStruct.channel = sgm5860_channelcfg[sgm5860xStatus.self_cal_index].channel;
+            tmpSetStruct.gain    = sgm5860_channelcfg[sgm5860xStatus.self_cal_index].gain;
+            tmpSetStruct.sps     = sgm5860_channelcfg[sgm5860xStatus.self_cal_index].sps;
+            tmpSetStruct.gain_offset =
+                sgm5860_channelcfg[sgm5860xStatus.self_cal_index].offset_calibration;
+            tmpSetStruct.offset =
+                sgm5860_channelcfg[sgm5860xStatus.self_cal_index].fullscale_calibration;
+            uint8_t result = DevSgm5860xSet(sgm5860xStatus.cfg, &tmpSetStruct);
+            if (result != 1) {
+                printf(
+                    "       \r\n[ERROR]sgm5860xReadyCallback: SGM5860X_SELFCAL_START_MODE Self "
+                    "Index %d "
+                    "Failed\r\n",
+                    sgm5860xStatus.self_cal_index);
+            } else {
+                sgm5860xStatus.mode = SGM5860X_SELFCAL_DONING_MODE;
+                // printf(
+                //     "       \r\nsgm5860xReadyCallback: SGM5860X_SELFCAL_START_MODE Self Index %d
+                //     Done\r\n", sgm5860xStatus.self_cal_index);
+                // printf(
+                //     "       SelfCal Channel: %d, Gain: %d, SPS: %d\r\n",
+                //     tmpSetStruct.channel, tmpSetStruct.gain, tmpSetStruct.sps);
+            }
+
+        } break;
+        case SGM5860X_SELFCAL_DONING_MODE: {
+            // printf("       \r\nsgm5860xReadyCallback: SELFCAL_MODE Self Index %d\r\n",
+            //        sgm5860xStatus.self_cal_index);
+            // DevSgm5860xSelfOffsetCal(sgm5860xStatus.cfg);
+            sgm5860xStatus.mode = SGM5860X_SELFCAL_WAITING_MODE;
+
+        } break;
+        case SGM5860X_SELFCAL_WAITING_MODE: {
+            // DevSgm5860xSelfOffsetCal2(sgm5860xStatus.cfg);
+            sgm5860xStatus.mode = SGM5860X_SELFCAL_READING_MODE;
+
+        } break;
+        case SGM5860X_SELFCAL_READING_MODE: {
+            // Read the self-calibration data
+            // printf("       \r\nsgm5860xReadyCallback: SGM5860X_SELFCAL_READING_MODE\r\n");
+            int result = DevSgm5860xSelfOffsetCalRead(
+                sgm5860xStatus.cfg,
+                sgm5860_channelcfg[sgm5860xStatus.self_cal_index].offset_calibration,
+                sgm5860_channelcfg[sgm5860xStatus.self_cal_index].fullscale_calibration);
+
+            if (result == 1) {
+                printf(
+                    "       Offset Calibration[%d]: [%02X %02X %02X], Fullscale Calibration: [%02X "
+                    "%02X %02X]\r\n",
+                    sgm5860xStatus.self_cal_index,
+                    sgm5860_channelcfg[sgm5860xStatus.self_cal_index].offset_calibration[0],
+                    sgm5860_channelcfg[sgm5860xStatus.self_cal_index].offset_calibration[1],
+                    sgm5860_channelcfg[sgm5860xStatus.self_cal_index].offset_calibration[2],
+                    sgm5860_channelcfg[sgm5860xStatus.self_cal_index].fullscale_calibration[0],
+                    sgm5860_channelcfg[sgm5860xStatus.self_cal_index].fullscale_calibration[1],
+                    sgm5860_channelcfg[sgm5860xStatus.self_cal_index].fullscale_calibration[2]);
+                sgm5860xStatus.self_cal_index++;
+                if (sgm5860xStatus.self_cal_index < sgm5860xChannelMax) {
+                    sgm5860xStatus.mode = SGM5860X_SELFCAL_START_MODE;
+                } else {
+                    printf("       \r\nsgm5860xReadyCallback: SGM5860X_SELFCAL_END_MODE\r\n");
+                    sgm5860xStatus.mode           = SGM5860X_SELFCAL_END_MODE;
+                    sgm5860xStatus.self_cal_index = 0;
+                }
+            } else {
+                printf(
+                    "       \r\n[ERROR]sgm5860xReadyCallback: SGM5860X_SELFCAL_START_MODE "
+                    "error\r\n");
+                sgm5860xStatus.mode = SGM5860X_SELFCAL_START_MODE;
+            }
+
+        } break;
+        case SGM5860X_SELFCAL_END_MODE: {
+            // do nothing
+        } break;
+        case SGM5860X_STOP_CONTINUOUS_MODE: {
+            sgm5860xStatus.mode = SGM5860X_SET_MODE;
+            DevSgm5860xCommand(sgm5860xStatus.cfg, SGM58601_CMD_SDATAC);
+        }
+        case SGM5860X_SET_MODE: {
+            Sgm5860UpdateNextCfg();
+            uint8_t result = DevSgm5860xSet(sgm5860xStatus.cfg, &sgm5860xStatus.next_data);
+            if (result != 1) {
+                printf("       [ERROR]sgm5860xReadyCallback: Failed to set mode\r\n");
+            } else {
+                sgm5860xStatus.mode = SGM5860X_SET_VERIFY_MODE;
+            }
+        } break;
+        case SGM5860X_SET_VERIFY_MODE: {
+            Sgm5860UpdateNextCfg();
+            uint8_t result = DevSgm5860xSetRead(sgm5860xStatus.cfg, &sgm5860xStatus.next_data);
+            if (result != 1) {
+                printf("       [ERROR]sgm5860xReadyCallback: Failed to set mode\r\n");
+                sgm5860xStatus.mode = SGM5860X_SET_MODE;
+            } else {
+                sgm5860xStatus.mode = SGM5860X_START_CONTINUES_MODE;
+            }
+
+        } break;
         case SGM5860X_START_CONTINUES_MODE: {
-            // printf("sgm5860xReadyCallback: START_CONTINUES_MODE\r\n");
+            // printf("       sgm5860xReadyCallback: START_CONTINUES_MODE\r\n");
             sgm5860xStatus.mode = SGM5860X_READ_MODE;
             DevSgm5860xStartContinuousMode(sgm5860xStatus.cfg);
         } break;
         case SGM5860X_READ_MODE: {
             BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-            tmp_bffer[sgm5860xCount].channel    = sgm5860xStatus.current_data.channel;
-            tmp_bffer[sgm5860xCount].gain       = sgm5860xStatus.current_data.gain;
+            tmp_bffer[sgm5860xCount].channel    = sgm5860xStatus.next_data.channel;
+            tmp_bffer[sgm5860xCount].gain       = sgm5860xStatus.next_data.gain;
             tmp_bffer[sgm5860xCount].voltage    = DevSgm5860xReadValue(sgm5860xStatus.cfg);
             sgm5860xCount++;
             if (sgm5860xCount >= SCAN_MAX_CNT) {
                 if (xStreamBufferSendFromISR(sgm5860xStatus.steam_buffer, tmp_bffer,
                                              sizeof(tmp_bffer), &xHigherPriorityTaskWoken) == 0) {
-                    printf("\r\n[ERROR]Sgm5860 Failed to send data to stream buffer from ISR\r\n");
+                    printf(
+                        "       \r\n[ERROR]Sgm5860 Failed to send data to stream buffer from "
+                        "ISR\r\n");
                 }
                 sgm5860xCount = 0;
                 for (int i = 0; i < SCAN_MAX_CNT; i++) {
@@ -296,16 +418,13 @@ void sgm5860xReadyCallback(void *ptrDevPinHandle) {
                             0;  // Reset channel to 0 after reaching the last channel
                     }
                 } while (sgm5860_channelcfg[sgm5860xStatus.scan_index].enable == false);
-                // printf("Scan index %d\r\n", sgm5860xStatus.scan_index);
-                sgm5860xStatus.next_data.channel = sgm5860_channelcfg[sgm5860xStatus.scan_index]
-                                                       .channel;  // Get the current channel
-                sgm5860xStatus.next_data.gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
-                sgm5860xStatus.next_data.sps  = sgm5860_channelcfg[sgm5860xStatus.scan_index].sps;
-                sgm5860xStatus.mode           = SGM5860X_STOP_CONTINUES_MODE;
+                Sgm5860UpdateNextCfg();
+                sgm5860xStatus.mode = SGM5860X_STOP_CONTINUOUS_MODE;
             }
         } break;
         default:
-            printf("[ERROR]sgm5860xReadyCallback: Invalid device mode %d\r\n", sgm5860xStatus.mode);
+            printf("       [ERROR]sgm5860xReadyCallback: Invalid device mode %d\r\n",
+                   sgm5860xStatus.mode);
             return;  // Invalid mode, skip callback
     }
 }
@@ -315,15 +434,11 @@ void sgm5860xDeviceInit(void) {
     DevSgm5860xHandleStruct *sgm5860xBspCfg = (DevSgm5860xHandleStruct *)&sgm5860_cfg;
     sgm5860xStatus.cfg                      = sgm5860xBspCfg;  // Assign the BSP configuration
     strcpy((char *)sgm5860xStatus.device_name, "sgm58601");
-    sgm5860xStatus.scan_index           = 0;  // Initialize scan index
-    sgm5860xStatus.mode                 = SGM5860X_NONE_MODE;
-    sgm5860xStatus.current_data.voltage = F_INVAILD;
-    sgm5860xStatus.current_data.channel = SGM58601_DEFAULT_CHANNEL;
-    sgm5860xStatus.current_data.gain    = SGM58601_DEFAULT_GAIN;
-    sgm5860xStatus.next_data.voltage    = F_INVAILD;
-    sgm5860xStatus.next_data.channel    = SGM58601_DEFAULT_CHANNEL;
-    sgm5860xStatus.next_data.gain       = SGM58601_DEFAULT_GAIN;
-    sgm5860xStatus.filter_mode          = FILTER_MODE_KALMAN;
+    sgm5860xStatus.scan_index = 0;  // Initialize scan index
+    sgm5860xStatus.mode       = SGM5860X_NONE_MODE;
+    Sgm5860UpdateNextCfg();
+    sgm5860xStatus.self_cal_index = 0;  // Initialize self-calibration index
+    sgm5860xStatus.filter_mode    = FILTER_MODE_KALMAN;
     // 初始化所有通道的滤波器状态
     for (int i = 0; i < sgm5860xChannelMax; i++) {
         sgm5860xStatus.last_voltage[i] = 0.0;
@@ -482,7 +597,7 @@ void Sgm5860xStreamRcvTask(void *arg) {
 static void __sgm5860xInitHandle(void *msg) {
     elog_i(TAG, "__sgm5860xInitHandle");
     // elog_set_filter_tag_lvl(TAG, sgm5860xLogLvl);
-    vTaskDelay(pdMS_TO_TICKS(1));  // Delay to ensure the system is ready
+    vTaskDelay(pdMS_TO_TICKS(1000));  // Delay to ensure the system is ready
     // Initialize the SGM5860x device
     vfb_send(sgm5860xStart, 0, NULL, 0);
 }
@@ -494,10 +609,21 @@ static void __sgm5860xRcvHandle(void *msg) {
     switch (tmp_msg->frame->head.event) {
         case sgm5860xStart: {
             elog_i(TAG, "sgm5860xStartTask sgm5860xStart");
-            sgm5860xStatus.mode = SGM5860X_INIT_MODE;
-            sgm5860xStatus.status =
-                1;  // Set status to indicate the device is started //TODO 需要修改
+            sgm5860xStatus.mode   = SGM5860X_INIT_MODE;
+            sgm5860xStatus.status = 1;       // TODO 需要修改
             DevSgm5860xStart(&sgm5860_cfg);  // Start the SGM5860x device
+        } break;
+        case sgm5860xSelfCalOffsetStart: {
+            elog_i(TAG, "sgm5860xSelfCalOffsetStart ");
+            vTaskDelay(pdMS_TO_TICKS(1000));  // Delay to ensure the system is ready
+
+            sgm5860xStatus.mode           = SGM5860X_SELFCAL_START_MODE;
+            sgm5860xStatus.self_cal_index = 0;  // Reset self-calibration index
+        } break;
+
+        case sgm5860xSelfCalOffsetDone: {
+            sgm5860xStatus.mode = SGM5860X_STOP_CONTINUOUS_MODE;
+
         } break;
         case sgm5860xStop: {
             elog_i(TAG, "sgm5860xStopTask %d", tmp_msg->frame->head.data);
@@ -507,11 +633,7 @@ static void __sgm5860xRcvHandle(void *msg) {
         case sgm5860xSet: {
             DevSgm5860xSetStruct *ptr = (DevSgm5860xSetStruct *)MSG_GET_PAYLOAD(tmp_msg);
             elog_i(TAG, "Set Channel %d ,Gain %d", ptr->channel, ptr->gain);
-            sgm5860xStatus.next_data.channel = ptr->channel;
-            sgm5860xStatus.next_data.gain    = ptr->gain;
-            sgm5860xStatus.next_data.voltage = F_INVAILD;
-            sgm5860xStatus.next_data.sps     = ptr->sps;
-            sgm5860xStatus.mode              = SGM5860X_STOP_CONTINUES_MODE;
+            sgm5860xStatus.mode = SGM5860X_STOP_CONTINUOUS_MODE;
         } break;
         case sgm5860xMode: {
             SGM5860xScanMode_t mode = (SGM5860xScanMode_t)MSG_GET_DATA(tmp_msg);
@@ -594,6 +716,18 @@ static void __sgm5860xCycHandle(void) {
         elog_e(TAG, "[ERROR]sgm5860xStatusHandle NULL");
         return;
     }
+    if (sgm5860xStatus.mode == SGM5860X_SELFCAL_END_MODE) {
+        elog_w(TAG, "Self-calibration completed, publishing event");
+        vfb_publish(sgm5860xSelfCalOffsetDone);
+    } else if (sgm5860xStatus.mode == SGM5860X_SELFCAL_START_MODE) {
+        // vfb_send(sgm5860xSelfCalOffsetPercent, 0, NULL, 0);
+    } else if (sgm5860xStatus.mode == SGM5860X_SELFCAL_DONING_MODE) {
+        float percent     = sgm5860xStatus.scan_index / (float)sgm5860xChannelMax * 100;
+        int intpercent    = (int)percent;
+        uint8_t u8_pecent = vfb_send(sgm5860xSelfCalOffsetPercent, intpercent, NULL, 0);
+    }
+
+    //
 #if 0
     if (sgm5860xStatus.status == 2) {
         // sgm5860xStatus.scan_index
@@ -832,6 +966,17 @@ static void __sgm5860xCycHandle(void) {
 }
 
 #endif
+void Sgm5860UpdateNextCfg(void) {
+    sgm5860xStatus.next_data.channel =
+        sgm5860_channelcfg[sgm5860xStatus.scan_index].channel;  // Get the current channel
+    sgm5860xStatus.next_data.gain = sgm5860_channelcfg[sgm5860xStatus.scan_index].gain;
+    sgm5860xStatus.next_data.sps  = sgm5860_channelcfg[sgm5860xStatus.scan_index].sps;
+    sgm5860xStatus.mode           = SGM5860X_STOP_CONTINUOUS_MODE;
+    sgm5860xStatus.next_data.offset =
+        sgm5860_channelcfg[sgm5860xStatus.scan_index].offset_calibration;  // Get the offset
+    sgm5860xStatus.next_data.gain_offset =
+        sgm5860_channelcfg[sgm5860xStatus.scan_index].fullscale_calibration;  // Get the gain offset
+}
 void CmdSgm5860Set(uint8_t ch, uint8_t gain, uint8_t sps) {
     elog_i(TAG, "CmdSgm5860Set: Channel %d, Gain %d, SPS %d", ch, gain, sps);
     DevSgm5860xSetStruct set = {0};

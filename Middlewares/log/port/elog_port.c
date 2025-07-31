@@ -109,15 +109,26 @@ void elog_port_output_lock(void) {
         }
     }
 #endif
+ uint32_t cnt = 0;
+    while (print_busy_flag) {
+        vTaskDelay(pdMS_TO_TICKS(10));  // Adjust the delay as needed
+        cnt++;
+        if (cnt > 10) {  // Timeout after 1 second
+            VFB_E("\r\nOutput lock timeout\r\n");
+            break;
+        }
+    }
 }
 /**
  * output unlock
  */
 void elog_port_output_unlock(void) {
     /* add your code here */
+    #if 0
     if (elogLockSemaphore != NULL) {
         xSemaphoreGive(elogLockSemaphore);
     }
+    #endif
 }
 
 /**

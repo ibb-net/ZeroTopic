@@ -7,7 +7,6 @@
 #include "dev_pin.h"
 #include "dev_spi.h"
 
-
 typedef struct {
     DevPinHandleStruct drdy;
     DevPinHandleStruct nest;
@@ -88,10 +87,33 @@ typedef union {
 } SGM5860xFsc0Reg_t;      // 0x08 FSC0: Full-Scale Calibration Byte 0
 typedef union {
     struct {
-        uint8_t FSC : 8;          // Bits 0-7: Full-Scale Calibration Byte 2 (Most Significant Byte)
-    } bits;                       // Bit-field structure
-    uint8_t raw;                  // Raw register value
-} SGM5860xFsc2Reg_t;              // 0x0A FSC2: Full-Scale Calibration Byte 2
+        uint8_t FSC : 8;  // Bits 0-7: Full-Scale Calibration Byte 0 (Least Significant Byte)
+    } bits;               // Bit-field structure
+    uint8_t raw;          // Raw register value
+} SGM5860xFsc1Reg_t;      // 0x09 FSC1: Full-Scale Calibration Byte 1
+typedef union {
+    struct {
+        uint8_t FSC : 8;  // Bits 0-7: Full-Scale Calibration Byte 2 (Most Significant Byte)
+    } bits;               // Bit-field structure
+    uint8_t raw;          // Raw register value
+} SGM5860xFsc2Reg_t;      // 0x0A FSC2: Full-Scale Calibration Byte 2
+
+typedef union {
+    uint8_t raws[0x0B];
+    struct {
+        SGM5860xStatusReg_t status;  // 0x00 STATUS: Status Register
+        SGM5860xMuxReg_t mux;        // 0x01 MUX: Input Multiplexer Control Register
+        SGM5860xAdconReg_t adcon;    // 0x02 ADCON: A/D Control Register
+        SGM5860xDrateReg_t drate;    // 0x03 DRATE: A/D Data Rate Register
+        SGM5860xIoReg_t io;          // 0x04 IO: GPIO Control Register
+        SGM5860xOfc0Reg_t ofc0;      // 0x05 OFC0: Offset Calibration Byte 0
+        SGM5860xOfc1Reg_t ofc1;      // 0x06 OFC1: Offset Calibration Byte 1
+        SGM5860xOfc2Reg_t ofc2;      // 0x07 OFC2: Offset Calibration Byte 2
+        SGM5860xFsc0Reg_t fsc0;      // 0x08 FSC0: Full-Scale Calibration Byte 0
+        SGM5860xFsc1Reg_t fsc1;      // 0x09 FSC1: Full-Scale Calibration Byte 1
+        SGM5860xFsc2Reg_t fsc2;      // 0x0A FSC2: Full-Scale Calibration Byte 2
+    } regs;
+} SGM5860xAllReg_t;
 #define SGM_GAIN_128_MAX (0.030)  // 30mv
 // define commands
 #define SGM58601_CMD_WAKEUP   0x00
@@ -180,6 +202,9 @@ typedef struct {
     uint8_t channel;
     uint8_t gain;  // Gain code
     uint8_t sps;   // Samples per second
+    uint8_t *offset;
+    uint8_t *gain_offset;
+
 } DevSgm5860xSetStruct;
 int DevSgm5860xInit(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 void DevSgm5860xReset(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
@@ -192,9 +217,18 @@ int DevGetADCData(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, double *l
                   uint8_t *last_channel, uint8_t channel, uint8_t gain);
 void DevSgm5860xStart(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
 void DevSgm5860xStop(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
-void DevSgm5860xISRSetCallback(const DevSgm5860xHandleStruct *ptrDevPinHandle,
-                               DevSgm5860xSetStruct *ptrCurr, DevSgm5860xSetStruct *ptrNext);
-uint8_t DevSgm5860xSet(const DevSgm5860xHandleStruct *ptrDevPinHandle, DevSgm5860xSetStruct *ptrSet);
+
+uint8_t DevSgm5860xSet(const DevSgm5860xHandleStruct *ptrDevPinHandle,
+                       DevSgm5860xSetStruct *ptrSet);
+int DevSgm5860xSetRead(const DevSgm5860xHandleStruct *ptrDevPinHandle,
+                       DevSgm5860xSetStruct *ptrSet);
 uint8_t DevSgm5860xStartContinuousMode(const DevSgm5860xHandleStruct *ptrDevPinHandle);
 double DevSgm5860xReadValue(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
+int DevSgm5860xSelfOffsetCal(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
+int DevSgm5860xSelfOffsetCal2(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle);
+
+int DevSgm5860xSelfOffsetCalRead(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle,
+                                 uint8_t *offset, uint8_t *gain_offset);
+int DevSgm5860xCommand(const DevSgm5860xHandleStruct *ptrDevSgm5860xHandle, uint8_t command);
+
 #endif  // __DEV_Sgm5860x_H
