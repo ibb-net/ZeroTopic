@@ -88,7 +88,14 @@ int basic_putc(int ch, FILE *f) {
         return ch;  // Error handling
     }
     usart_data_transmit(USART0, (uint8_t)ch);
-    while (RESET == usart_flag_get(USART0, USART_FLAG_TBE));
+    uint32_t timeout = 100000; // 超时时间阈值
+    while (RESET == usart_flag_get(USART0, USART_FLAG_TBE) && timeout--) {
+        // 可以适当插入__NOP()或其他低功耗指令
+    }
+    if (timeout == 0) {
+        // 超时处理，可以记录错误或返回特殊值
+        // printf("USART0 transmit timeout\r\n");
+    }
     return ch;
 }
 int fputc(int ch, FILE *f) {
@@ -100,7 +107,14 @@ int fputc(int ch, FILE *f) {
         return ch;  // Error handling
     }
     usart_data_transmit(USART0, (uint8_t)ch);
-    while (RESET == usart_flag_get(USART0, USART_FLAG_TBE));
+    uint32_t timeout = 100000; // 超时时间阈值
+    while (RESET == usart_flag_get(USART0, USART_FLAG_TBE) && timeout--) {
+        // 可以适当插入__NOP()或其他低功耗指令
+    }
+    if (timeout == 0) {
+        // 超时处理，可以记录错误或返回特殊值
+        // printf("USART0 transmit timeout\r\n");
+    }
     return ch;
 }
 int __io_putchar(int ch) {
