@@ -109,16 +109,13 @@ void Ds18b20DeviceInit(void) {
         memset(Ds18b20StatusHandle->device_name, 0, sizeof(Ds18b20StatusHandle->device_name));
         snprintf(Ds18b20StatusHandle->device_name, sizeof(Ds18b20StatusHandle->device_name),
                  "Ds18b20%d", i);
-        DevOneWireInit((DevOneWireHandleStruct *)&(Ds18b20BspCfg[i].one_wire));
-        // extern const TypedefDevPinMap DevPinMap[GD32H7XXZ_PIN_MAP_MAX];
-        elog_i(TAG, "Ds18b20 Channel %d initialized with pin %s %s", i,
-               Ds18b20BspCfg[i].one_wire.device_name,
-               DevPinMap[Ds18b20BspCfg[i].one_wire.dev_pin_id].pin_name);
-    }
+        // DevOneWireInit((DevOneWireHandleStruct *)&(Ds18b20BspCfg[i].one_wire));
 
-    DevOneWireStop(
-        &(Ds18b20BspCfg[0]
-              .one_wire));  // Stop the OneWire bus to ensure no interference during initialization
+        // elog_i(TAG, "Ds18b20 Channel %d initialized with pin %s %s", i,
+        //        Ds18b20BspCfg[i].one_wire.device_name,
+        //        DevPinMap[Ds18b20BspCfg[i].one_wire.dev_pin_id].pin_name);
+    }
+    onewire_usart_init();
 }
 SYSTEM_REGISTER_INIT(MCUInitStage, Ds18b20Priority, Ds18b20DeviceInit, Ds18b20DeviceInit);
 
@@ -223,79 +220,31 @@ static void CmdDs18b20Help(void) {
 }
 static void CmdDs18b20Reset(void) {
     elog_i(TAG, "Resetting DS18B20...");
-    int status = 0;
-    vTaskSuspendAll();
-    status = DevOneWireReset(&(Ds18b20BspCfg[0].one_wire));
-    xTaskResumeAll();
-    elog_i(TAG, "Ds18b20StartTask DS18B20 status: %s", (status == 0) ? "OK" : "FAIL");
-    if (status != 0) {
-        elog_e(TAG, "Failed to reset DS18B20 Status %d", status);
-    } else {
-        // vfb_send(Ds18b20Covert, 0, NULL, 0);  // Start conversion
-    }
-    // Reset logic for DS18B20 can be added here
+    onewire_reset();
 }
-// DevOneWirePinWrite
-static void CmdDs18b20DelayTest(int delay_us) {
-    elog_i(TAG, "Testing DS18B20 delay with %d us...", delay_us);
-    vTaskDelay(pdMS_TO_TICKS(
-        100));  // Delay to ensure all devices are initialized before starting the task
 
-    vTaskSuspendAll();
-    NVIC_DisableIRQ(SysTick_IRQn);
-
-    DevOneWirePinWrite(&(Ds18b20BspCfg[0].one_wire), 1);  // Set pin HIGH
-    DevDelayUs(delay_us);                                 // Delay for 1 millisecond
-    DevOneWirePinWrite(&(Ds18b20BspCfg[0].one_wire), 0);  // Set pin LOW
-    DevDelayUs(delay_us);                                 // Delay for 1 millisecond
-    DevOneWirePinWrite(&(Ds18b20BspCfg[0].one_wire), 1);  // Set pin HIGH again
-    NVIC_EnableIRQ(SysTick_IRQn);
-
-    xTaskResumeAll();
-    elog_i(TAG, "DS18B20 delay test completed");
-}
 static void CmdDs18b20ReadRom(void) {
     elog_i(TAG, "Reading DS18B20 ROM code...");
-    int status = 0;
-    vTaskDelay(pdMS_TO_TICKS(100));
-    vTaskSuspendAll();
-    NVIC_DisableIRQ(SysTick_IRQn);
-    status = DevOneWireReadRom(&(Ds18b20BspCfg[0].one_wire), Ds18b20Status[0].rom);
-    NVIC_EnableIRQ(SysTick_IRQn);
-    xTaskResumeAll();
-    if (status != 0) {
-        elog_e(TAG, "Failed to read ROM code from DS18B20 Status %d", status);
-    } else {
-        elog_i(TAG, "DS18B20 ROM code: %02X%02X%02X%02X%02X%02X%02X%02X", Ds18b20Status[0].rom[0],
-               Ds18b20Status[0].rom[1], Ds18b20Status[0].rom[2], Ds18b20Status[0].rom[3],
-               Ds18b20Status[0].rom[4], Ds18b20Status[0].rom[5], Ds18b20Status[0].rom[6],
-               Ds18b20Status[0].rom[7]);
-    }
+    onewire_rom(Ds18b20Status[0].rom);
+
+    elog_i(TAG, "DS18B20 ROM code: %02X%02X%02X%02X%02X%02X%02X%02X", Ds18b20Status[0].rom[0],
+           Ds18b20Status[0].rom[1], Ds18b20Status[0].rom[2], Ds18b20Status[0].rom[3],
+           Ds18b20Status[0].rom[4], Ds18b20Status[0].rom[5], Ds18b20Status[0].rom[6],
+           Ds18b20Status[0].rom[7]);
 }
 static void CmdDs18b20Covert(uint8_t state) {
     elog_d(TAG, "Starting DS18B20 conversion...");
-
-    DevOneWireHandleStruct *handle = (DevOneWireHandleStruct *)&(Ds18b20BspCfg[0].one_wire);
-    vTaskSuspendAll();
-    DevOneWireReset(handle);
-    DevOneWireWriteByte(handle, 0xCC);
-    DevOneWireWriteByte(handle, 0x44);
-    xTaskResumeAll();
-    // delay 100ms
-    // vTaskDelay(pdMS_TO_TICKS(1000));
+    onewire_reset();
+    uint8_t cmd[2] = {0xCC, 0x44};
+    onewire_write_byte(cmd, 2);
 }
 static double CmdDs18b20Read(uint8_t state) {
-    DevOneWireHandleStruct *handle = (DevOneWireHandleStruct *)&(Ds18b20BspCfg[0].one_wire);
-    elog_d(TAG, "Reading DS18B20 temperature...");
+    static uint8_t err_cnt = 0;
+    onewire_reset();
+    uint8_t cmd[2] = {0xCC, 0xBE};
+    onewire_write_byte(cmd, 2);
     uint8_t scratchpad[9] = {0};
-    vTaskSuspendAll();
-    DevOneWireReset(handle);  // Reset the bus before reading ROM
-    DevOneWireWriteByte(handle, 0xCC);
-    DevOneWireWriteByte(handle, 0xBE);  // Read Scratchpad command
-    for (int i = 0; i < 9; i++) {
-        scratchpad[i] = DevOneWireReadByte(handle);
-    }
-    xTaskResumeAll();
+    onewire_read_byte(scratchpad, 9);
     elog_d(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X", scratchpad[0],
            scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4], scratchpad[5], scratchpad[6],
            scratchpad[7], scratchpad[8]);
@@ -310,11 +259,17 @@ static double CmdDs18b20Read(uint8_t state) {
 
     uint8_t crc = crc8_maxim(scratchpad, 8);  // 校验CRC
     if (crc != scratchpad[8]) {
-        // elog_e(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-        //        scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
-        //        scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
-        elog_w(TAG, "DS18B20 CRC error: expected %02X, got %02X", scratchpad[8], crc);
+        err_cnt++;
+
+        if (err_cnt > 3) {
+            elog_e(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+                   scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
+                   scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
+            elog_w(TAG, "DS18B20 CRC error: expected %02X, got %02X", scratchpad[8], crc);
+        }
         return F_INVAILD;
+    } else {
+        err_cnt = 0;
     }
 
     // DS18B20使用二进制补码表示负温度
@@ -365,23 +320,6 @@ static int CmdDs18b20Handle(int argc, char *argv[]) {
     } else if (strcmp(argv[1], "convert") == 0) {
         elog_i(TAG, "Converting DS18B20 temperature...");
         CmdDs18b20Covert(1);
-        return 0;
-    }
-    /* else if (strcmp(argv[1], "pin_low") == 0) {
-       CmdDs18b20Pin(0);
-       return 0;
-   }  */
-    else if (strcmp(argv[1], "delay_test") == 0) {
-        if (argc != 3) {
-            elog_e(TAG, "Usage: ds18b20 delay_test <delay_us>");
-            return -1;
-        }
-        int delay_us = atoi(argv[2]);
-        if (delay_us <= 0) {
-            elog_e(TAG, "Invalid delay value: %d", delay_us);
-            return -1;
-        }
-        CmdDs18b20DelayTest(delay_us);
         return 0;
     } else {
         elog_e(TAG, "Unknown command: %s", argv[1]);

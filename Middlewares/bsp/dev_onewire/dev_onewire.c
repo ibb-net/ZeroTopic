@@ -5,16 +5,7 @@
 
 #include "dev_basic.h"
 #include "dev_delay.h"
-#define ONEWIRE_ROM_SIZE              8
-#define ONEWIRE_MAX_DEVICES           1
-#define ONEWIRE_RESET_TIME            480 /*!< us */
-#define ONEWIRE_RESET_START_WAIT_TIME 15  /*!< us */
-#define ONEWIRE_RESET_WAIT_STEP       15  /*!< us */
-#define ONEWIRE_RESET_DURATION_START  60  /*!< us */
-#define ONEWIRE_RESET_DURATION_END    240 /*!< us */
-#define ONEWIRE_RESET_WAIT_STEP       15  /*!< us */
 
-#define ONEWIRE_READ_ROM_CMD 0x33
 int DevOneWireReleaseBus(const DevOneWireHandleStruct *handle);
 void DevOneWireInit(DevOneWireHandleStruct *handle) {
     TypedefDevPinMap *ptrDevPinMap = (TypedefDevPinMap *)&DevPinMap[handle->dev_pin_id];

@@ -17,13 +17,13 @@
 #define RESET_BAUDRATE      9600
 #define DATA_BAUDRATE       115200
 #define MAX_ONEWIRE_DEVICES 8
-void onewire_dma_init(void);
-static void start_dma_transfer(uint8_t tx_len, uint8_t rx_len, uint8_t simultaneous);
+#define ONEWIRE_RESET_DATA  0xF0
+
 #define ONE_WIRE_BUFFER_SIZE 32
 // DMA缓冲区
 
-__attribute__((aligned(32))) uint8_t ow_tx_buffer[ONE_WIRE_BUFFER_SIZE];
-__attribute__((aligned(32))) uint8_t ow_rx_buffer[ONE_WIRE_BUFFER_SIZE] = {0x05, 0x06, 0x07};
+__attribute__((aligned(256))) uint8_t ow_tx_buffer[ONE_WIRE_BUFFER_SIZE];
+__attribute__((aligned(256))) uint8_t ow_rx_buffer[ONE_WIRE_BUFFER_SIZE] = {0x05, 0x06, 0x07};
 static volatile uint8_t tx_complete;
 static volatile uint8_t rx_complete;
 static volatile uint8_t transfer_error;
@@ -70,12 +70,7 @@ void ow_usart_init(void) {
     /* 配置PA0为UART3_TX/RX (单线模式) */
     gpio_af_set(GPIOA, GPIO_AF_8, GPIO_PIN_0);
     gpio_mode_set(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_PIN_0);
-    gpio_output_options_set(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, GPIO_PIN_0);
-
-    /* configure USART RX as alternate function push-pull */
-    // gpio_af_set(GPIOA, GPIO_AF_8, GPIO_PIN_1);
-    // gpio_mode_set(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_PIN_1);
-    // gpio_output_options_set(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, GPIO_PIN_1);
+    gpio_output_options_set(GPIOA, GPIO_OTYPE_OD, GPIO_OSPEED_100_220MHZ, GPIO_PIN_0);
     /* USART3初始化 */
     usart_deinit(UART3);
     usart_word_length_set(UART3, USART_WL_8BIT);
@@ -95,9 +90,6 @@ void ow_usart_init(void) {
 }
 void onewire_usart_init(void) {
     ow_usart_init();
-
-    onewire_dma_init();
-
     // 10. 清除缓冲区和标志
     memset(ow_tx_buffer, 0, sizeof(ow_tx_buffer));
     memset(ow_rx_buffer, 0, sizeof(ow_rx_buffer));
@@ -109,15 +101,11 @@ SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC), 
                  onewire_usart_init, onewire init);
 #if 1 /* onewire_dma_init */
 
-void onewire_dma_init(void) {}
 void ow_uart_dma_send(uint8_t *data, uint8_t len) {
     rcu_periph_clock_enable(RCU_DMA1);
     /* enable DMAMUX clock */
     rcu_periph_clock_enable(RCU_DMAMUX);
     dma_single_data_parameter_struct dma_init_struct;
-
-    // 配置发送缓冲区
-    // SCB_InvalidateDCache_by_Addr((uint32_t *)ow_tx_buffer, len);
     memset(ow_tx_buffer, 0, sizeof(ow_tx_buffer));
     memcpy(ow_tx_buffer, data, len);
     SCB_CleanDCache_by_Addr((uint32_t *)ow_tx_buffer, len);
@@ -137,28 +125,36 @@ void ow_uart_dma_send(uint8_t *data, uint8_t len) {
     dma_single_data_mode_init(DMA1, DMA_CH3, &dma_init_struct);
 
     dma_circulation_disable(DMA1, DMA_CH3);
-    // dma_interrupt_enable(DMA1, DMA_CH3, DMA_CHXCTL_FTFIE);
-
-    // USART DMA enable for transmission
     dma_channel_enable(DMA1, DMA_CH3);
     usart_dma_transmit_config(UART3, USART_TRANSMIT_DMA_ENABLE);
-
-    // 启动DMA发送
-
-    // 等待DMA发送完成
     while (RESET == dma_flag_get(DMA1, DMA_CH3, DMA_FLAG_FTF));
 
     // 清除发送完成标志
     dma_flag_clear(DMA1, DMA_CH3, DMA_FLAG_FTF);
+}
 
-    // invalidate d-cache by address
-    // SCB_InvalidateDCache_by_Addr((uint32_t *)ow_tx_buffer, len);
+void ow_uart_dma_recv(uint8_t *data, size_t len) {
+    dma_deinit(DMA0, DMA_CH3);
+    dma_single_data_parameter_struct dma_init_struct;
+    SCB_CleanDCache_by_Addr((uint32_t *)data, len);
+    dma_init_struct.request             = DMA_REQUEST_UART3_RX;
+    dma_init_struct.direction           = DMA_PERIPH_TO_MEMORY;
+    dma_init_struct.memory0_addr        = (uint32_t)data;
+    dma_init_struct.memory_inc          = DMA_MEMORY_INCREASE_ENABLE;
+    dma_init_struct.periph_memory_width = DMA_PERIPH_WIDTH_8BIT;
+    dma_init_struct.number              = len;
+    dma_init_struct.periph_addr         = (uint32_t)(&USART_RDATA(UART3));
+    dma_init_struct.periph_inc          = DMA_PERIPH_INCREASE_DISABLE;
+    dma_init_struct.priority            = DMA_PRIORITY_ULTRA_HIGH;
+    dma_single_data_mode_init(DMA0, DMA_CH3, &dma_init_struct);
 
-    printf("\r\n[INFO]DMA Send Done. Data: ");
-    for (uint8_t i = 0; i < len; i++) {
-        printf("%02X ", ow_tx_buffer[i]);
-    }
-    printf("\r\n");
+    /* configure DMA mode */
+    dma_circulation_disable(DMA0, DMA_CH3);
+    dma_interrupt_enable(DMA0, DMA_CH3, DMA_CHXCTL_FTFIE);
+    dma_channel_enable(DMA0, DMA_CH3);
+    /* USART DMA enable for reception */
+    usart_dma_receive_config(UART3, USART_RECEIVE_DMA_ENABLE);
+    SCB_InvalidateDCache_by_Addr((uint32_t *)data, len);
 }
 #endif /* onewire_dma_init */
 static void switch_baudrate(uint32_t baudrate) {
@@ -168,41 +164,23 @@ static void switch_baudrate(uint32_t baudrate) {
     usart_enable(UART3);
     for (volatile int i = 0; i < 100; i++);
 }
-uint8_t buffer_tmp[3] = {0x01, 0x02, 0x03};
-uint8_t cnt           = 0;
 uint8_t onewire_reset(void) {
-    // switch_baudrate(RESET_BAUDRATE);
-    // ow_tx_buffer[0] = 0x55;  // 0xF0;  // 发送复位脉冲
-    // ow_tx_buffer[1] = 0xAA;  // 发送复位脉冲
-    // printf("ow_tx_buffer[0] = %2X\r\n", ow_tx_buffer[0]);
-    // ow_rx_buffer[0] = 0;
-    buffer_tmp[0] = cnt++;
-    buffer_tmp[1] = cnt++;
-    buffer_tmp[2] = cnt++;
-
-#if 0
-    while (RESET == usart_flag_get(UART3, USART_FLAG_TBE));
-    usart_data_transmit(UART3, buffer_tmp[0]);
-
-    // while (RESET == usart_flag_get(UART3, USART_FLAG_RBNE)) {
-    // }
-
-    /* store the received byte in the receiver_buffer1 */
-    // ow_rx_buffer[0] = usart_data_receive(UART3);
-#else
-    // start_dma_transfer(2, 0, 0);
-
-#endif
-
-    ow_uart_dma_send(buffer_tmp, 3);
-    uint8_t presence = (ow_rx_buffer[0] != 0xF0) && (ow_rx_buffer[0] < 0xF0);
-    elog_i(TAG, "onewire_reset: %s ,Rcv %2X", presence ? "Pass" : "Failed", ow_rx_buffer[0]);
-    elog_i(TAG, "Snd %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
+    switch_baudrate(RESET_BAUDRATE);
+    uint8_t buffer_tmp[1] = {ONEWIRE_RESET_DATA};
+    ow_uart_dma_recv(ow_rx_buffer, 1);
+    ow_uart_dma_send(buffer_tmp, 1);
+    uint8_t presence = (ow_rx_buffer[0] != 0xF0) && (ow_rx_buffer[0] < ONEWIRE_RESET_DATA);
+    if(presence) {
+        // elog_i(TAG, "onewire_reset: Pass ,Rcv %2X", ow_rx_buffer[0]);
+    } else {
+        elog_d(TAG, "onewire_reset: Failed ,Rcv %2X", ow_rx_buffer[0]);
+    }
+    elog_d(TAG, "Snd %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
            ow_tx_buffer[0], ow_tx_buffer[1], ow_tx_buffer[2], ow_tx_buffer[3], ow_tx_buffer[4],
            ow_tx_buffer[5], ow_tx_buffer[6], ow_tx_buffer[7], ow_tx_buffer[8], ow_tx_buffer[9],
            ow_tx_buffer[10], ow_tx_buffer[11], ow_tx_buffer[12], ow_tx_buffer[13], ow_tx_buffer[14],
            ow_tx_buffer[15]);
-    elog_i(TAG, "Rcv %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
+    elog_d(TAG, "Rcv %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
            ow_rx_buffer[0], ow_rx_buffer[1], ow_rx_buffer[2], ow_rx_buffer[3], ow_rx_buffer[4],
            ow_rx_buffer[5], ow_rx_buffer[6], ow_rx_buffer[7], ow_rx_buffer[8], ow_rx_buffer[9],
            ow_rx_buffer[10], ow_rx_buffer[11], ow_rx_buffer[12], ow_rx_buffer[13], ow_rx_buffer[14],
@@ -212,4 +190,84 @@ uint8_t onewire_reset(void) {
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC), onewire_reset,
                  onewire_reset, onewire reset);
 
+int onewire_write_byte(uint8_t *data, uint8_t len) {
+    switch_baudrate(DATA_BAUDRATE);
+    uint8_t tmp[256] = {0};
+    int cnt          = 0;
+    if (data == NULL || len == 0) {
+        return -1;
+    }
+
+    for (int i = 0; i < len; i++) {
+        for (int j = 0; j < 8; j++) {
+            tmp[i * 8 + j] = (data[i] & (1 << j)) ? 0xFF : 0x00;
+        }
+    }
+    ow_uart_dma_send(tmp, len * 8);
+    return 0;
+}
+int onewire_read_byte(uint8_t *data, uint8_t len) {
+    switch_baudrate(DATA_BAUDRATE);
+    if (data == NULL || len == 0) {
+        return -1;
+    }
+    uint8_t tmp[256] = {0};
+    uint8_t read_tmp_byte[64];
+    memset(tmp, 0xFF, sizeof(tmp));
+    ow_uart_dma_recv(ow_rx_buffer, len * 8);
+    ow_uart_dma_send(tmp, len * 8);
+
+    // LSB解析: ow_rx_buffer每个字节小于0xFF则为0，否则为1，按位组装成data
+    for (int i = 0; i < len; i++) {
+        uint8_t value = 0;
+        for (int j = 0; j < 8; j++) {
+            value |= (ow_rx_buffer[i * 8 + j] < 0xFF ? 0 : 1) << j;
+        }
+        data[i] = value;
+    }
+    elog_d(TAG, "Rcv %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
+           ow_rx_buffer[0], ow_rx_buffer[1], ow_rx_buffer[2], ow_rx_buffer[3], ow_rx_buffer[4],
+           ow_rx_buffer[5], ow_rx_buffer[6], ow_rx_buffer[7], ow_rx_buffer[8], ow_rx_buffer[9],
+           ow_rx_buffer[10], ow_rx_buffer[11], ow_rx_buffer[12], ow_rx_buffer[13], ow_rx_buffer[14],
+           ow_rx_buffer[15]);
+    return 0;
+}
+
+int onewire_rom(uint8_t *rom_code) {
+    uint8_t rom_tmp[ONEWIRE_ROM_SIZE] = {0};
+    onewire_reset();  // Reset the bus before reading ROM
+    uint8_t cmd = ONEWIRE_READ_ROM_CMD;
+    onewire_write_byte(&cmd, 1);
+    onewire_read_byte(rom_tmp, ONEWIRE_ROM_SIZE);  // Read ROM code
+    elog_i(TAG, "OneWire ROM code: %02X %02X %02X %02X %02X %02X %02X %02X", rom_tmp[0], rom_tmp[1],
+           rom_tmp[2], rom_tmp[3], rom_tmp[4], rom_tmp[5], rom_tmp[6], rom_tmp[7]);
+    memcpy(rom_code, rom_tmp, ONEWIRE_ROM_SIZE);
+    return 0;  // Read ROM successful
+}
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC), onewire_rom,
+                 onewire_rom, onewire rom);
+
+void onewire_convert_temperature(void) {
+    onewire_reset();
+    uint8_t cmd[2] = {0xCC, 0x44};
+    onewire_write_byte(cmd, 2);
+}
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+                 onewire_convert_temperature, onewire_convert_temperature,
+                 onewire convert temperature);
+
+double onewire_read_temperature(void) {
+    onewire_reset();
+    uint8_t cmd[2] = {0xCC, 0xBE};
+    onewire_write_byte(cmd, 2);
+    uint8_t scratchpad[9] = {0};
+    onewire_read_byte(scratchpad, 9);
+    // Convert the temperature from the scratchpad
+    int16_t raw_temp = (scratchpad[1] << 8) | scratchpad[0];
+    double celsius   = raw_temp * 0.0625;
+    elog_i(TAG, "OneWire temperature: %.2f", celsius);
+    return celsius;
+}
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+                 onewire_read_temperature, onewire_read_temperature, onewire read temperature);
 #endif  // CONFIG_DEV_ONEWRIE_EN
