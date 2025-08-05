@@ -13,17 +13,21 @@
 #include "string.h"
 /* Device */
 #include "Device.h"
-#define TAG                 "OW_Uart"
-#define RESET_BAUDRATE      9600
-#define DATA_BAUDRATE       115200
+#define TAG            "OW_Uart"
+#define RESET_BAUDRATE 9600
+#define DATA_BAUDRATE  115200
+
 #define MAX_ONEWIRE_DEVICES 8
 #define ONEWIRE_RESET_DATA  0xF0
 
-#define ONE_WIRE_BUFFER_SIZE 32
+#define ONE_WIRE_BUFFER_SIZE 128
+#define ONE_WIRE_HIGH_BIT     0xFF
+#define ONE_WIRE_LOW_BIT     0x00  // 0x00
+#define ONE_WIRE_STOP_BIT    USART_STB_1BIT
 // DMA缓冲区
 
-__attribute__((aligned(256))) uint8_t ow_tx_buffer[ONE_WIRE_BUFFER_SIZE];
-__attribute__((aligned(256))) uint8_t ow_rx_buffer[ONE_WIRE_BUFFER_SIZE] = {0x05, 0x06, 0x07};
+__attribute__((aligned(32))) uint8_t ow_tx_buffer[ONE_WIRE_BUFFER_SIZE];
+__attribute__((aligned(32))) uint8_t ow_rx_buffer[ONE_WIRE_BUFFER_SIZE] = {0};
 static volatile uint8_t tx_complete;
 static volatile uint8_t rx_complete;
 static volatile uint8_t transfer_error;
@@ -74,7 +78,7 @@ void ow_usart_init(void) {
     /* USART3初始化 */
     usart_deinit(UART3);
     usart_word_length_set(UART3, USART_WL_8BIT);
-    usart_stop_bit_set(UART3, USART_STB_1BIT);
+    usart_stop_bit_set(UART3, ONE_WIRE_STOP_BIT);
     usart_parity_config(UART3, USART_PM_NONE);
     usart_hardware_flow_rts_config(UART3, USART_RTS_DISABLE);
     usart_hardware_flow_cts_config(UART3, USART_CTS_DISABLE);
@@ -127,7 +131,9 @@ void ow_uart_dma_send(uint8_t *data, uint8_t len) {
     dma_circulation_disable(DMA1, DMA_CH3);
     dma_channel_enable(DMA1, DMA_CH3);
     usart_dma_transmit_config(UART3, USART_TRANSMIT_DMA_ENABLE);
-    while (RESET == dma_flag_get(DMA1, DMA_CH3, DMA_FLAG_FTF));
+    while (RESET == dma_flag_get(DMA1, DMA_CH3, DMA_FLAG_FTF)) {
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
 
     // 清除发送完成标志
     dma_flag_clear(DMA1, DMA_CH3, DMA_FLAG_FTF);
@@ -150,7 +156,7 @@ void ow_uart_dma_recv(uint8_t *data, size_t len) {
 
     /* configure DMA mode */
     dma_circulation_disable(DMA0, DMA_CH3);
-    dma_interrupt_enable(DMA0, DMA_CH3, DMA_CHXCTL_FTFIE);
+    // dma_interrupt_enable(DMA0, DMA_CH3, DMA_CHXCTL_FTFIE);
     dma_channel_enable(DMA0, DMA_CH3);
     /* USART DMA enable for reception */
     usart_dma_receive_config(UART3, USART_RECEIVE_DMA_ENABLE);
@@ -158,33 +164,29 @@ void ow_uart_dma_recv(uint8_t *data, size_t len) {
 }
 #endif /* onewire_dma_init */
 static void switch_baudrate(uint32_t baudrate) {
-    while (!usart_flag_get(UART3, USART_FLAG_TC));
+    while (!usart_flag_get(UART3, USART_FLAG_TC)) {
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
     usart_disable(UART3);
     usart_baudrate_set(UART3, baudrate);
     usart_enable(UART3);
-    for (volatile int i = 0; i < 100; i++);
+    vTaskDelay(pdMS_TO_TICKS(2));
+    // for (volatile int i = 0; i < 1000; i++);
 }
 uint8_t onewire_reset(void) {
     switch_baudrate(RESET_BAUDRATE);
     uint8_t buffer_tmp[1] = {ONEWIRE_RESET_DATA};
     ow_uart_dma_recv(ow_rx_buffer, 1);
     ow_uart_dma_send(buffer_tmp, 1);
-    uint8_t presence = (ow_rx_buffer[0] != 0xF0) && (ow_rx_buffer[0] < ONEWIRE_RESET_DATA);
-    if(presence) {
+    vTaskDelay(pdMS_TO_TICKS(1));
+
+    uint8_t presence = (ow_rx_buffer[0] != 0xF0) /*  && (ow_rx_buffer[0] < ONEWIRE_RESET_DATA )*/;
+    if (presence) {
         // elog_i(TAG, "onewire_reset: Pass ,Rcv %2X", ow_rx_buffer[0]);
     } else {
-        elog_d(TAG, "onewire_reset: Failed ,Rcv %2X", ow_rx_buffer[0]);
+        elog_i(TAG, "onewire_reset: Failed ,Rcv %2X", ow_rx_buffer[0]);
     }
-    elog_d(TAG, "Snd %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
-           ow_tx_buffer[0], ow_tx_buffer[1], ow_tx_buffer[2], ow_tx_buffer[3], ow_tx_buffer[4],
-           ow_tx_buffer[5], ow_tx_buffer[6], ow_tx_buffer[7], ow_tx_buffer[8], ow_tx_buffer[9],
-           ow_tx_buffer[10], ow_tx_buffer[11], ow_tx_buffer[12], ow_tx_buffer[13], ow_tx_buffer[14],
-           ow_tx_buffer[15]);
-    elog_d(TAG, "Rcv %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
-           ow_rx_buffer[0], ow_rx_buffer[1], ow_rx_buffer[2], ow_rx_buffer[3], ow_rx_buffer[4],
-           ow_rx_buffer[5], ow_rx_buffer[6], ow_rx_buffer[7], ow_rx_buffer[8], ow_rx_buffer[9],
-           ow_rx_buffer[10], ow_rx_buffer[11], ow_rx_buffer[12], ow_rx_buffer[13], ow_rx_buffer[14],
-           ow_rx_buffer[15]);
+
     return presence;
 }
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC), onewire_reset,
@@ -192,15 +194,14 @@ SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC), 
 
 int onewire_write_byte(uint8_t *data, uint8_t len) {
     switch_baudrate(DATA_BAUDRATE);
-    uint8_t tmp[256] = {0};
-    int cnt          = 0;
+    uint8_t tmp[ONE_WIRE_BUFFER_SIZE] = {0};
     if (data == NULL || len == 0) {
         return -1;
     }
 
     for (int i = 0; i < len; i++) {
         for (int j = 0; j < 8; j++) {
-            tmp[i * 8 + j] = (data[i] & (1 << j)) ? 0xFF : 0x00;
+            tmp[i * 8 + j] = (data[i] & (1 << j)) ? ONE_WIRE_HIGH_BIT : 0x00;
         }
     }
     ow_uart_dma_send(tmp, len * 8);
@@ -221,15 +222,22 @@ int onewire_read_byte(uint8_t *data, uint8_t len) {
     for (int i = 0; i < len; i++) {
         uint8_t value = 0;
         for (int j = 0; j < 8; j++) {
-            value |= (ow_rx_buffer[i * 8 + j] < 0xFF ? 0 : 1) << j;
+            value |= (ow_rx_buffer[i * 8 + j] < ONE_WIRE_HIGH_BIT ? 0 : 1) << j;
         }
         data[i] = value;
     }
-    elog_d(TAG, "Rcv %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
-           ow_rx_buffer[0], ow_rx_buffer[1], ow_rx_buffer[2], ow_rx_buffer[3], ow_rx_buffer[4],
-           ow_rx_buffer[5], ow_rx_buffer[6], ow_rx_buffer[7], ow_rx_buffer[8], ow_rx_buffer[9],
-           ow_rx_buffer[10], ow_rx_buffer[11], ow_rx_buffer[12], ow_rx_buffer[13], ow_rx_buffer[14],
-           ow_rx_buffer[15]);
+    // 打印ow_rx_buffer八个一组，并计算出每组拼包后的单总线字节
+    // for (int i = 0; i < len; i++) {
+    //     uint8_t value = 0;
+    //     printf("[Group %d] Raw: ", i);
+    //     for (int j = 0; j < 8; j++) {
+    //         printf("%02X ", ow_rx_buffer[i * 8 + j]);
+    //         value |= (ow_rx_buffer[i * 8 + j] < ONE_WIRE_HIGH_BIT ? 0 : 1) << j;
+    //     }
+    //     printf("-> OneWire Byte: %02X\r\n", value);
+    // }
+    // printf("\r\n");
+
     return 0;
 }
 

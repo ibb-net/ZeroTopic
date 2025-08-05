@@ -161,6 +161,8 @@ static void __Ds18b20RcvHandle(void *msg) {
 static void __Ds18b20CycHandle(void) {
     TypdefDs18b20Status *Ds18b20StatusTmp = &Ds18b20Status[0];
     static uint32_t conter                = 0;
+    static uint32_t err_cnt               = 0;
+    static uint8_t delay_cnt=15;
     if (Ds18b20StatusTmp == NULL) {
         elog_e(TAG, "[ERROR]Ds18b20StatusHandle NULL");
         return;
@@ -172,12 +174,24 @@ static void __Ds18b20CycHandle(void) {
                 CmdDs18b20Covert(0);
                 Ds18b20StatusTmp->step = 1;
             } else {
-                double temp_reading           = CmdDs18b20Read(0);  // Read temperature
-                Ds18b20StatusTmp->temperature = temp_reading;
+                double temp_reading = CmdDs18b20Read(0);  // Read temperature
+
+                if (temp_reading == F_INVAILD) {
+                    err_cnt++;
+                    if (err_cnt > 3) {
+                        Ds18b20StatusTmp->temperature = temp_reading;
+                        vfb_send(Ds18b20GetTemperature, 0, &Ds18b20StatusTmp->temperature,
+                                 sizeof(Ds18b20StatusTmp->temperature));
+                    }
+                } else {
+                    err_cnt                       = 0;
+                    Ds18b20StatusTmp->temperature = temp_reading;
+                    vfb_send(Ds18b20GetTemperature, 0, &Ds18b20StatusTmp->temperature,
+                             sizeof(Ds18b20StatusTmp->temperature));
+                }
                 elog_d(TAG, "Ds18b20 temperature: %.2f", Ds18b20StatusTmp->temperature);
                 // Send temperature to HMI
-                vfb_send(Ds18b20GetTemperature, 0, &Ds18b20StatusTmp->temperature,
-                         sizeof(Ds18b20StatusTmp->temperature));
+
                 elog_d(TAG, "Send Ds18b20GetTemperature done %u ", conter);
                 Ds18b20StatusTmp->step = 0;
             }
@@ -261,14 +275,20 @@ static double CmdDs18b20Read(uint8_t state) {
     if (crc != scratchpad[8]) {
         err_cnt++;
 
-        if (err_cnt > 3) {
+         if (err_cnt > 3) {
             elog_e(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
                    scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
                    scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
-            elog_w(TAG, "DS18B20 CRC error: expected %02X, got %02X", scratchpad[8], crc);
+            elog_w(TAG, "DS18B20 CRC error: got %02X, expected %02X", scratchpad[8], crc);
         }
         return F_INVAILD;
     } else {
+#if 1
+        elog_d(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+               scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
+               scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
+        elog_d(TAG, "DS18B20 CRC PASS");
+#endif
         err_cnt = 0;
     }
 
