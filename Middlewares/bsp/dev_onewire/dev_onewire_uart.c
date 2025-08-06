@@ -204,7 +204,7 @@ uint8_t onewire_reset(void) {
     if (presence) {
         // elog_i(TAG, "onewire_reset: Pass ,Rcv %2X", ow_rx_buffer[0]);
     } else {
-        elog_i(TAG, "onewire_reset: Failed ,Rcv %2X", ow_rx_buffer[0]);
+        elog_e(TAG, "onewire_reset: Failed ,Rcv %2X", ow_rx_buffer[0]);
     }
 
     return presence;
@@ -246,6 +246,7 @@ int onewire_read_byte(uint8_t *data, uint8_t len) {
         }
         data[i] = value;
     }
+    #if 0
     // 打印ow_rx_buffer八个一组，并计算出每组拼包后的单总线字节
     for (int i = 0; i < len; i++) {
         uint8_t value = 0;
@@ -257,7 +258,7 @@ int onewire_read_byte(uint8_t *data, uint8_t len) {
         printf("-> OneWire Byte: %02X\r\n", value);
     }
     printf("\r\n");
-
+    #endif
     return 0;
 }
 

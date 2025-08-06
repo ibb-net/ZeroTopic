@@ -162,7 +162,7 @@ static void __Ds18b20CycHandle(void) {
     TypdefDs18b20Status *Ds18b20StatusTmp = &Ds18b20Status[0];
     static uint32_t conter                = 0;
     static uint32_t err_cnt               = 0;
-    static uint8_t delay_cnt=15;
+    static uint8_t delay_cnt              = 15;
     if (Ds18b20StatusTmp == NULL) {
         elog_e(TAG, "[ERROR]Ds18b20StatusHandle NULL");
         return;
@@ -253,7 +253,9 @@ static void CmdDs18b20Covert(uint8_t state) {
     onewire_write_byte(cmd, 2);
 }
 static double CmdDs18b20Read(uint8_t state) {
-    static uint8_t err_cnt = 0;
+    static uint8_t err_cnt      = 0;
+    static uint32_t tot_err_cnt = 0;
+    static uint32_t tot_cnt     = 0;
     onewire_reset();
     uint8_t cmd[2] = {0xCC, 0xBE};
     onewire_write_byte(cmd, 2);
@@ -272,18 +274,22 @@ static double CmdDs18b20Read(uint8_t state) {
     temp_signed = (int16_t)temp_raw;  // 转换为有符号整数
 
     uint8_t crc = crc8_maxim(scratchpad, 8);  // 校验CRC
+    tot_cnt++;
     if (crc != scratchpad[8]) {
         err_cnt++;
-
-         /* if (err_cnt > 3) */ {
+        tot_err_cnt++;
+        elog_w(TAG, "OneWire CRC error count: %u, total count: %u, error rate: %.2f%%", tot_err_cnt,
+               tot_cnt, tot_cnt ? ((float)tot_err_cnt / tot_cnt) * 100.0f : 0.0f);
+        if (err_cnt > 3) {
             elog_e(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
                    scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
                    scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
             elog_w(TAG, "DS18B20 CRC error: got %02X, expected %02X", scratchpad[8], crc);
+            
         }
         return F_INVAILD;
     } else {
-#if 1
+#if 0
         elog_i(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
                scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
                scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
