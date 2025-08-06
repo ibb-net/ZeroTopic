@@ -285,7 +285,6 @@ static double CmdDs18b20Read(uint8_t state) {
                    scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
                    scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
             elog_w(TAG, "DS18B20 CRC error: got %02X, expected %02X", scratchpad[8], crc);
-            
         }
         return F_INVAILD;
     } else {
@@ -296,6 +295,10 @@ static double CmdDs18b20Read(uint8_t state) {
         elog_i(TAG, "DS18B20 CRC PASS");
 #endif
         err_cnt = 0;
+        if (tot_cnt%100==0) {
+            elog_i(TAG, "OneWire CRC error count: %u, total count: %u, error rate: %.2f%%",
+                   tot_err_cnt, tot_cnt, tot_cnt ? ((float)tot_err_cnt / tot_cnt) * 100.0f : 0.0f);
+        }
     }
 
     // DS18B20使用二进制补码表示负温度
