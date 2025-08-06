@@ -275,7 +275,7 @@ static double CmdDs18b20Read(uint8_t state) {
     if (crc != scratchpad[8]) {
         err_cnt++;
 
-         if (err_cnt > 3) {
+         /* if (err_cnt > 3) */ {
             elog_e(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
                    scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
                    scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
@@ -284,10 +284,10 @@ static double CmdDs18b20Read(uint8_t state) {
         return F_INVAILD;
     } else {
 #if 1
-        elog_d(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+        elog_i(TAG, "DS18B20 Scratchpad: %02X %02X %02X %02X %02X %02X %02X %02X %02X",
                scratchpad[0], scratchpad[1], scratchpad[2], scratchpad[3], scratchpad[4],
                scratchpad[5], scratchpad[6], scratchpad[7], scratchpad[8]);
-        elog_d(TAG, "DS18B20 CRC PASS");
+        elog_i(TAG, "DS18B20 CRC PASS");
 #endif
         err_cnt = 0;
     }

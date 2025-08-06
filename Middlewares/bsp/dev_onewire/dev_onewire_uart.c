@@ -20,10 +20,13 @@
 #define MAX_ONEWIRE_DEVICES 8
 #define ONEWIRE_RESET_DATA  0xF0
 
-#define ONE_WIRE_BUFFER_SIZE 128
-#define ONE_WIRE_HIGH_BIT     0xFF
-#define ONE_WIRE_LOW_BIT     0x00  // 0x00
-#define ONE_WIRE_STOP_BIT    USART_STB_1BIT
+#define ONE_WIRE_BUFFER_SIZE     128
+#define ONE_WIRE_HIGH_BIT        0xFF
+#define ONE_WIRE_LOW_BIT         0x00  // 0x00
+#define ONE_WIRE_STOP_BIT        USART_STB_1BIT
+#define ONE_WIRE_MODE_SIGNAL_PIN 0
+#define ONE_WIRE_MODE_DUAL_PIN   1
+#define ONE_WIRE_MODE            ONE_WIRE_MODE_DUAL_PIN
 // DMA缓冲区
 
 __attribute__((aligned(32))) uint8_t ow_tx_buffer[ONE_WIRE_BUFFER_SIZE];
@@ -72,9 +75,22 @@ void ow_usart_init(void) {
     rcu_periph_clock_enable(RCU_UART3);
 
     /* 配置PA0为UART3_TX/RX (单线模式) */
+
+#if (ONE_WIRE_MODE == ONE_WIRE_MODE_SIGNAL_PIN)
     gpio_af_set(GPIOA, GPIO_AF_8, GPIO_PIN_0);
     gpio_mode_set(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_PIN_0);
     gpio_output_options_set(GPIOA, GPIO_OTYPE_OD, GPIO_OSPEED_100_220MHZ, GPIO_PIN_0);
+#else
+    gpio_af_set(GPIOA, GPIO_AF_8, GPIO_PIN_0);
+    gpio_mode_set(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_PIN_0);
+    gpio_output_options_set(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, GPIO_PIN_0);
+
+    gpio_af_set(GPIOA, GPIO_AF_8, GPIO_PIN_1);
+    gpio_mode_set(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_PIN_1);
+    gpio_output_options_set(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, GPIO_PIN_1);
+
+#endif
+
     /* USART3初始化 */
     usart_deinit(UART3);
     usart_word_length_set(UART3, USART_WL_8BIT);
@@ -84,8 +100,12 @@ void ow_usart_init(void) {
     usart_hardware_flow_cts_config(UART3, USART_CTS_DISABLE);
     usart_baudrate_set(UART3, RESET_BAUDRATE);
 
-    /* 配置为单线半双工模式 */
+/* 配置为单线半双工模式 */
+#if (ONE_WIRE_MODE == ONE_WIRE_MODE_SIGNAL_PIN)
     usart_halfduplex_enable(UART3);
+#else
+
+#endif
     usart_transmit_config(UART3, USART_TRANSMIT_ENABLE);
     usart_receive_config(UART3, USART_RECEIVE_ENABLE);
 
@@ -227,16 +247,16 @@ int onewire_read_byte(uint8_t *data, uint8_t len) {
         data[i] = value;
     }
     // 打印ow_rx_buffer八个一组，并计算出每组拼包后的单总线字节
-    // for (int i = 0; i < len; i++) {
-    //     uint8_t value = 0;
-    //     printf("[Group %d] Raw: ", i);
-    //     for (int j = 0; j < 8; j++) {
-    //         printf("%02X ", ow_rx_buffer[i * 8 + j]);
-    //         value |= (ow_rx_buffer[i * 8 + j] < ONE_WIRE_HIGH_BIT ? 0 : 1) << j;
-    //     }
-    //     printf("-> OneWire Byte: %02X\r\n", value);
-    // }
-    // printf("\r\n");
+    for (int i = 0; i < len; i++) {
+        uint8_t value = 0;
+        printf("[Group %d] Raw: ", i);
+        for (int j = 0; j < 8; j++) {
+            printf("%02X ", ow_rx_buffer[i * 8 + j]);
+            value |= (ow_rx_buffer[i * 8 + j] < ONE_WIRE_HIGH_BIT ? 0 : 1) << j;
+        }
+        printf("-> OneWire Byte: %02X\r\n", value);
+    }
+    printf("\r\n");
 
     return 0;
 }
