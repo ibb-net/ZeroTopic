@@ -295,8 +295,8 @@ static double CmdDs18b20Read(uint8_t state) {
         elog_i(TAG, "DS18B20 CRC PASS");
 #endif
         err_cnt = 0;
-        if (tot_cnt%100==0) {
-            elog_i(TAG, "OneWire CRC error count: %u, total count: %u, error rate: %.2f%%",
+        if (tot_cnt % 100 == 0) {
+            elog_d(TAG, "OneWire CRC error count: %u, total count: %u, error rate: %.2f%%",
                    tot_err_cnt, tot_cnt, tot_cnt ? ((float)tot_err_cnt / tot_cnt) * 100.0f : 0.0f);
         }
     }
