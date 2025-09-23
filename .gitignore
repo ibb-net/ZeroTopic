@@ -1,3 +1,4 @@
 Projects/GD32H757Z_START/01_GPIO_Running_LED/build/
 Tools/xpack-arm-none-eabi-gcc-14.2.1-1.1/
 pro/
+OpenIBBOs/tool/arm-none-eabi-gcc/Linux/*
