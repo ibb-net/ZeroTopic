@@ -61,6 +61,7 @@ const TypdefDACSgm3533BSPCfg DACSgm3533BspCfg[DACSgm3533ChannelMax] = {
                             .af          = 0,
                             .pin         = GPIO_PIN_15,
                             .pin_mode    = DevPinModeOutput,
+                            .isrcb       = NULL,
                             .bit_value   = 1,  // Active low
                         },
                     .clk =
@@ -233,7 +234,7 @@ SYSTEM_REGISTER_INIT(ServerInitStage, DACSgm3533Priority, __DACSgm3533CreateTask
 
 static void __DACSgm3533InitHandle(void *msg) {
     elog_i(TAG, "__DACSgm3533InitHandle");
-    //elog_set_filter_tag_lvl(TAG, DACSgm3533LogLvl);
+    // elog_set_filter_tag_lvl(TAG, DACSgm3533LogLvl);
     vfb_send(DACSgm3533Start, 0, NULL, 0);
 }
 // 接收消息的回调函数
