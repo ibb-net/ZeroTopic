@@ -1,7 +1,7 @@
 #ifndef __DEV_Sgm5860x_H
 #define __DEV_Sgm5860x_H
 // #include "semphr.h"
-#include "dev_Sgm5860x.h"
+// #include "dev_Sgm5860x.h"
 #include "dev_basic.h"
 #include "dev_dma.h"
 #include "dev_pin.h"
