@@ -41,6 +41,31 @@ extern void    os_thread_sleep_ms(size_t Ms);
 
 extern ssize_t os_thread_list(char* pBuffer, size_t BufferLength);
 
+/**
+ * @brief 获取当前线程句柄
+ * 
+ * @return OsThread_t* 当前线程句柄，失败返回NULL
+ */
+extern OsThread_t* os_thread_get_current(void);
+
+/**
+ * @brief 获取线程名称
+ * 
+ * @param pThread 线程句柄
+ * @param pName 接收名称的缓冲区
+ * @param name_length 缓冲区长度
+ * @return ssize_t 0成功，-1失败
+ */
+extern ssize_t os_thread_get_name(OsThread_t* pThread, char* pName, size_t name_length);
+
+/**
+ * @brief 获取线程优先级
+ * 
+ * @param pThread 线程句柄
+ * @return ssize_t 优先级，-1失败
+ */
+extern ssize_t os_thread_get_priority(OsThread_t* pThread);
+
 #ifdef __cplusplus
 }
 #endif

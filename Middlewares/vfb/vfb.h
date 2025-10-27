@@ -1,17 +1,18 @@
 
 #ifndef __VFB_SERVER_H__
 #define __VFB_SERVER_H__
-#include "FreeRTOS.h"
-#include "list.h"
-#include "queue.h"
-#include "semphr.h"
 #include "vfb_config.h"
+#include "os_list.h"
+#include "os_queue.h"
+#include "os_thread.h"
+#include "os_semaphore.h"
+#include "os_tick.h"
 
 #define QUEUE_LENGTH 10
 #define QUEUE_ITEM_SIZE sizeof(char)
 
 #define MAX_EVENT 256
-#define MAX_THREAD_NUM MAX_THEAD_COUNT  // 32
+#define MAX_THREAD_NUM 32  // 最大线程数量
 
 #define FD_PASS 0
 #define FD_FAIL 1
@@ -68,26 +69,26 @@ typedef vfb_message *vfb_message_t;
 typedef struct
 {
     vfb_event_t event;  // EVENT_LIST
-    List_t queue_list;  // List of QueueHandle_t queue_handle
+    OsList_t queue_list;  // List of OsQueue_t* queue_handle
 } EventList_t;
 
 typedef struct {
-    List_t event_list;  // List of events EventList_t list
+    OsList_t event_list;  // List of events EventList_t list
     uint16_t event_num;
-    SemaphoreHandle_t xFDSemaphore;
+    OsSemaphore_t* xFDSemaphore;
 } vfb_info_struct;
 typedef vfb_info_struct *vfb_info_t;
 
 typedef struct {
     const char *name;
-    UBaseType_t uxPriority;  // not used
+    int uxPriority;  // not used
     void *pvParameters;
     uint8_t queue_num;
     const vfb_event_t *event_list;
     uint8_t event_num;
     const vfb_event_t *startup_wait_event_list;
     uint8_t startup_wait_event_num;
-    TickType_t xTicksToWait;
+    uint32_t xTicksToWait;
     void (*init_msg_cb)(void *msg);
     void (*rcv_msg_cb)(void *msg);
     void (*rcv_timeout_cb)(void);
@@ -95,9 +96,9 @@ typedef struct {
 
 void vfb_server_init(void);
 
-QueueHandle_t vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, uint16_t event_num);
-void VFB_MsgReceive(QueueHandle_t xQueue,
-                    TickType_t xTicksToWait,
+OsQueue_t* vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, uint16_t event_num);
+void VFB_MsgReceive(OsQueue_t* xQueue,
+                    uint32_t xTicksToWait,
                     void (*rcv_msg_cb)(void *),
                     void (*rcv_timeout_cb)(void));
 uint8_t vfb_send(vfb_event_t event, uint32_t data, void *payload, uint16_t length);

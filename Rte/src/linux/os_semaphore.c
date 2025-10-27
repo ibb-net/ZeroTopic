@@ -220,3 +220,10 @@ ssize_t os_semaphore_give(OsSemaphore_t* pSem)
 
     return sem_post(pInSem->pSem);
 }
+
+ssize_t os_semaphore_give_isr(OsSemaphore_t* pSem)
+{
+    // 在Linux中，ISR上下文下的信号量操作与普通上下文相同
+    // 因为Linux的sem_post是线程安全的
+    return os_semaphore_give(pSem);
+}

@@ -148,5 +148,54 @@ __error:
     return ExitCode;
 }
 
+/**
+ * @brief 获取当前线程句柄
+ */
+OsThread_t* os_thread_get_current(void)
+{
+    TaskHandle_t xCurrentTask = xTaskGetCurrentTaskHandle();
+    if (xCurrentTask == NULL) {
+        return NULL;
+    }
+    
+    // 返回当前任务的句柄
+    return (OsThread_t*)xCurrentTask;
+}
+
+/**
+ * @brief 获取线程名称
+ */
+ssize_t os_thread_get_name(OsThread_t* pThread, char* pName, size_t name_length)
+{
+    if (pThread == NULL || pName == NULL || name_length == 0) {
+        return -1;
+    }
+    
+    TaskHandle_t xTask = (TaskHandle_t)pThread;
+    const char* pcTaskName = pcTaskGetName(xTask);
+    
+    if (pcTaskName == NULL) {
+        return -1;
+    }
+    
+    strncpy(pName, pcTaskName, name_length - 1);
+    pName[name_length - 1] = '\0';
+    
+    return 0;
+}
+
+/**
+ * @brief 获取线程优先级
+ */
+ssize_t os_thread_get_priority(OsThread_t* pThread)
+{
+    if (pThread == NULL) {
+        return -1;
+    }
+    
+    TaskHandle_t xTask = (TaskHandle_t)pThread;
+    return (ssize_t)uxTaskPriorityGet(xTask);
+}
+
 /* TODO: per thread cpu usage; all thread cpu usage;
  */
