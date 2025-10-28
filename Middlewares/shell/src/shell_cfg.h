@@ -233,7 +233,9 @@
  * @brief shell默认用户密码
  *        若默认用户不需要密码，设为""
  */
-#define     SHELL_DEFAULT_USER_PASSWORD "borui2024"
+// #define     SHELL_DEFAULT_USER_PASSWORD "borui2024"
+#define     SHELL_DEFAULT_USER_PASSWORD ""
+
 #endif /** SHELL_DEFAULT_USER_PASSWORD */
 
 #ifndef SHELL_LOCK_TIMEOUT
