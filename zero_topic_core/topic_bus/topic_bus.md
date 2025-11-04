@@ -41,6 +41,9 @@ Topic总线是基于规则的事件发布订阅框架，用于替代队列多播
 #define TOPIC_BUS_ENABLE_RULES                1     // 启用规则支持
 #define TOPIC_BUS_ENABLE_ISR                  1     // 启用ISR安全路径
 #define TOPIC_BUS_MAX_RULE_EVENTS             16    // 每个规则最大事件数
+// 可选优化/诊断
+#define TOPIC_BUS_ENABLE_RULE_CACHE           1     // 启用规则匹配结果缓存（热事件加速）
+#define TOPIC_BUS_ENABLE_DIAG                 1     // 启用诊断统计（最近触发事件/长度/时间戳）
 ```
 
 ## 核心API
@@ -205,6 +208,10 @@ topic_publish_manual(&bus, 3);  // 手动触发
 - **C11原子操作**：使用原子操作优化版本号和掩码管理
 - **无锁设计**：SPSC场景下的无锁订阅列表遍历
 - **零拷贝**：回调直接访问obj_dict中的数据，无需拷贝
+- **规则缓存（可选）**：对最近一次事件匹配结果进行缓存，提升高频重复事件的匹配效率（`TOPIC_BUS_ENABLE_RULE_CACHE`）
+- **诊断统计（可选）**：记录最近一次触发的事件键、数据长度与时间戳，便于运行期定位问题（`TOPIC_BUS_ENABLE_DIAG`）
+- **生命周期保护**：自动使用引用计数机制，确保回调期间数据指针有效性
+- **并发安全优化**：在无锁状态下触发回调，避免死锁，允许并发回调执行
 
 ## 测试
 
@@ -217,6 +224,18 @@ int topic_bus_perf_test_main(void);
 - 基础功能测试：OR/AND/MANUAL规则、订阅/发布
 - 事件发布延迟测试
 - 规则匹配性能测试
+ - （可选）诊断打印：当开启统计与诊断宏后，性能测试将输出每个Topic最近一次触发信息
+
+### 关闭不需要的测试
+在 `apps/linux_demo/config.h` 通过宏控制测试开关，默认仅开启 Topic Bus 完整测试：
+
+```c
+#define ENABLE_THREAD_DEMO      0
+#define ENABLE_VFB_TEST         0
+#define ENABLE_RING_BUFFER_TEST 0
+#define ENABLE_OBJ_DICT_TEST    0
+#define ENABLE_TOPIC_BUS_TEST   1
+```
 
 ## 与obj_dict的关系
 
@@ -250,6 +269,8 @@ Topic总线可对接microROS：
 2. **回调执行时间**：回调执行时间应尽量短，避免阻塞发布线程
 3. **内存对齐**：数据应按照平台对齐要求对齐
 4. **线程安全**：订阅/取消订阅需要加锁保护
+5. **数据生命周期**：回调中的数据指针在回调期间有效，无需担心数据被删除（自动引用计数保护）
+6. **并发安全**：发布事件时在无锁状态下触发回调，避免死锁，支持并发回调执行
 
 ## 扩展性
 

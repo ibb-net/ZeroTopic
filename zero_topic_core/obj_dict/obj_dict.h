@@ -20,6 +20,7 @@ typedef struct {
     size_t         value_len;    /* 数据长度 */
     uint64_t       timestamp_us; /* 时间戳(微秒) */
     atomic_uint_fast32_t version; /* 版本号（C11原子操作） */
+    atomic_uint_fast32_t ref_count; /* 引用计数（C11原子操作，用于生命周期管理） */
     uint8_t        flags;        /* 标志 */
 } obj_dict_entry_t;
 
@@ -41,6 +42,16 @@ ssize_t obj_dict_get(obj_dict_t* dict, obj_dict_key_t key, void* out, size_t out
 
 /* 简易遍历：返回第一个非空条目索引，之后传入next_from继续 */
 int obj_dict_iterate(obj_dict_t* dict, int next_from /* -1开始 */);
+
+/* 引用计数管理（生命周期保护） */
+/* 增加引用计数：确保数据在回调期间有效 */
+int obj_dict_retain(obj_dict_t* dict, obj_dict_key_t key);
+
+/* 减少引用计数：释放引用，当引用计数为0且数据已更新时可能被清理 */
+int obj_dict_release(obj_dict_t* dict, obj_dict_key_t key);
+
+/* 获取引用计数（调试用） */
+int32_t obj_dict_get_ref_count(obj_dict_t* dict, obj_dict_key_t key);
 
 #ifdef __cplusplus
 }

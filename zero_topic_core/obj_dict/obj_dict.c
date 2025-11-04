@@ -54,9 +54,10 @@ int obj_dict_init(obj_dict_t* dict, obj_dict_entry_t* entry_array, size_t max_ke
     dict->entries = entry_array;
     dict->max_keys = max_keys;
     memset(entry_array, 0, sizeof(obj_dict_entry_t) * max_keys);
-    /* 初始化所有条目的原子版本号 */
+    /* 初始化所有条目的原子版本号和引用计数 */
     for (size_t i = 0; i < max_keys; ++i) {
         atomic_init(&entry_array[i].version, 0);
+        atomic_init(&entry_array[i].ref_count, 0);
     }
     dict->lock = os_semaphore_create(1, "obj_dict_lock");
     return (dict->lock != NULL) ? 0 : -1;
@@ -84,6 +85,7 @@ int obj_dict_set(obj_dict_t* dict, obj_dict_key_t key, const void* data, size_t 
         }
         e->key = key;
         atomic_init(&e->version, 0);
+        atomic_init(&e->ref_count, 0);
     }
 
     /* 重分配缓冲 */
@@ -169,6 +171,76 @@ int obj_dict_iterate(obj_dict_t* dict, int next_from) {
         if (dict->entries[i].value != NULL) return i;
     }
     return -1;
+}
+
+/*
+ * @brief 增加引用计数（生命周期保护）
+ * @param dict 字典对象
+ * @param key  键值
+ * @return 0成功，-1失败（键不存在）
+ */
+int obj_dict_retain(obj_dict_t* dict, obj_dict_key_t key) {
+    if (!dict) return -1;
+    if (os_semaphore_take(dict->lock, 100) < 0) return -1;
+
+    obj_dict_entry_t* e = __find_entry(dict, key);
+    if (!e) {
+        os_semaphore_give(dict->lock);
+        return -1;
+    }
+
+    /* 原子递增引用计数 */
+    atomic_fetch_add_explicit(&e->ref_count, 1, memory_order_acq_rel);
+
+    os_semaphore_give(dict->lock);
+    return 0;
+}
+
+/*
+ * @brief 减少引用计数（释放引用）
+ * @param dict 字典对象
+ * @param key  键值
+ * @return 0成功，-1失败（键不存在）
+ */
+int obj_dict_release(obj_dict_t* dict, obj_dict_key_t key) {
+    if (!dict) return -1;
+    if (os_semaphore_take(dict->lock, 100) < 0) return -1;
+
+    obj_dict_entry_t* e = __find_entry(dict, key);
+    if (!e) {
+        os_semaphore_give(dict->lock);
+        return -1;
+    }
+
+    /* 原子递减引用计数 */
+    uint32_t old_count = atomic_fetch_sub_explicit(&e->ref_count, 1, memory_order_acq_rel);
+    
+    /* 如果引用计数减到0，可以考虑清理（当前版本保留数据，由外部管理清理） */
+    /* 注意：这里不自动清理，避免在回调期间数据被意外删除 */
+    (void)old_count;
+
+    os_semaphore_give(dict->lock);
+    return 0;
+}
+
+/*
+ * @brief 获取引用计数（调试用）
+ * @param dict 字典对象
+ * @param key  键值
+ * @return 引用计数值，失败返回-1
+ */
+int32_t obj_dict_get_ref_count(obj_dict_t* dict, obj_dict_key_t key) {
+    if (!dict) return -1;
+    if (os_semaphore_take(dict->lock, 100) < 0) return -1;
+
+    obj_dict_entry_t* e = __find_entry(dict, key);
+    int32_t count = -1;
+    if (e) {
+        count = (int32_t)atomic_load_explicit(&e->ref_count, memory_order_acquire);
+    }
+
+    os_semaphore_give(dict->lock);
+    return count;
 }
 
 
