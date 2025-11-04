@@ -30,6 +30,11 @@ typedef struct {
 #else
     uint32_t trigger_mask;           /* 触发掩码（AND规则用） */
 #endif
+#if TOPIC_BUS_ENABLE_RULE_CACHE
+    /* 简单规则缓存：缓存最近一次匹配的event_key及结果 */
+    obj_dict_key_t last_event_key_cached;
+    uint8_t        last_can_trigger_cached; /* 1/0，表示最近一次can_trigger的结果 */
+#endif
 } topic_rule_t;
 
 /* 检查规则是否可触发 */

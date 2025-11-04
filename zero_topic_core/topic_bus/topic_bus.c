@@ -1,6 +1,7 @@
 #include <string.h>
 #include "topic_bus.h"
 #include "../../Rte/inc/os_heap.h"
+#include "../../Rte/inc/os_timestamp.h"
 
 /* ============================================================
  * 内部函数声明 (Internal Functions Declaration)
@@ -82,6 +83,13 @@ static void __trigger_topic_callbacks(topic_entry_t* entry, obj_dict_key_t event
         }
     }
 
+    /* 诊断信息记录（可选） */
+#if TOPIC_BUS_ENABLE_STATS && TOPIC_BUS_ENABLE_DIAG
+    entry->last_event_key = event_key;
+    entry->last_data_len  = (uint32_t)data_len;
+    entry->last_ts_us     = os_monotonic_time_get_microsecond();
+#endif
+
     /* 触发所有订阅者 */
     if (entry->subscribers) {
         topic_subscription_t* sub = entry->subscribers;
@@ -127,6 +135,11 @@ int topic_bus_init(topic_bus_t* bus, topic_entry_t* topics, size_t max_topics, o
         atomic_init(&topics[i].event_count, 0);
 #else
         topics[i].event_count = 0;
+#endif
+#if TOPIC_BUS_ENABLE_DIAG
+        topics[i].last_event_key = 0;
+        topics[i].last_data_len  = 0;
+        topics[i].last_ts_us     = 0;
 #endif
 #endif
     }
@@ -195,6 +208,11 @@ int topic_rule_create(topic_bus_t* bus, uint16_t topic_id, const topic_rule_t* r
     entry->rule.trigger_mask = 0;
 #endif
     topic_rule_reset_mask(&entry->rule);
+
+#if TOPIC_BUS_ENABLE_RULE_CACHE
+    entry->rule.last_event_key_cached   = 0;
+    entry->rule.last_can_trigger_cached = 0;
+#endif
 
     /* 复制事件数组 */
     if (rule->events && rule->event_count > 0) {

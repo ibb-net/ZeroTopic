@@ -71,5 +71,15 @@
 #define TOPIC_BUS_MAX_ROUTERS_PER_TOPIC 8
 #endif
 
+/* 是否启用规则匹配结果缓存（提升热事件匹配效率） */
+#ifndef TOPIC_BUS_ENABLE_RULE_CACHE
+#define TOPIC_BUS_ENABLE_RULE_CACHE 1
+#endif
+
+/* 是否启用诊断统计（最近事件信息等） */
+#ifndef TOPIC_BUS_ENABLE_DIAG
+#define TOPIC_BUS_ENABLE_DIAG 1
+#endif
+
 #endif /* TOPIC_BUS_CONFIG_H_ */
 

@@ -33,6 +33,12 @@ typedef struct {
 #else
     uint32_t event_count;           /* 事件计数 */
 #endif
+#if TOPIC_BUS_ENABLE_DIAG
+    /* 诊断：最近一次触发信息 */
+    obj_dict_key_t last_event_key;  /* 最近触发的事件键 */
+    uint32_t       last_data_len;   /* 最近一次回调数据长度 */
+    uint64_t       last_ts_us;      /* 最近一次触发时间戳 */
+#endif
 #endif
 } topic_entry_t;
 
