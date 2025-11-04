@@ -7,6 +7,7 @@
 #include "os_thread.h"
 #include "os_semaphore.h"
 #include "os_tick.h"
+#include "os_printf.h"
 
 #define QUEUE_LENGTH 10
 #define QUEUE_ITEM_SIZE sizeof(char)
@@ -30,11 +31,11 @@
 #endif
 
 // #define VFB_I(...) elog_i(TAG, __VA_ARGS__)
-#define VFB_I printf
+#define VFB_I os_printf
 
-#define VFB_E printf
-#define VFB_W printf
-#define VFB_D(...) do { if(0) printf(__VA_ARGS__); } while(0)
+#define VFB_E os_printf
+#define VFB_W os_printf
+#define VFB_D(...) do { if(0) os_printf(__VA_ARGS__); } while(0)
 #define VFB_SUBSCRIBE(num, list) vfb_subscribe(num, list, sizeof(list) / sizeof(vfb_event_t))
 
 // TODO 改为指针偏移

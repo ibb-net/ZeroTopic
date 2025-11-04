@@ -4,7 +4,6 @@
 #define VFBLogLvl ELOG_LVL_INFO
 
 #include <inttypes.h>
-#include <stdio.h>
 #include <string.h>
 
 /* Rte抽象层接口 */
@@ -20,7 +19,7 @@
 
 #define ERR_HEAD os_printf("                                           \t\n")
 
-volatile vfb_info_struct __vfb_info;
+vfb_info_struct __vfb_info;
 
 /*
  * VFB 轻量适配层：为队列与时间提供统一封装，便于后续切换到 POSIX 实现。
@@ -137,10 +136,21 @@ static int __vfb_list_add_queue(OsList_t *queue_list, OsQueue_t* queue_handle) {
     return 0;
 }
 
-void vfb_event_register(vfb_event_t event) {}
-void vfb_event_unregister(vfb_event_t event) {}
-void vfb_event_counter(vfb_event_t event, uint16_t *counter) {}
-void vfb_event_get_queue(vfb_event_t event, uint16_t index, void *item) {}
+void vfb_event_register(vfb_event_t event) {
+    (void)event;  // 抑制未使用参数警告
+}
+void vfb_event_unregister(vfb_event_t event) {
+    (void)event;  // 抑制未使用参数警告
+}
+void vfb_event_counter(vfb_event_t event, uint16_t *counter) {
+    (void)event;  // 抑制未使用参数警告
+    (void)counter;  // 抑制未使用参数警告
+}
+void vfb_event_get_queue(vfb_event_t event, uint16_t index, void *item) {
+    (void)event;  // 抑制未使用参数警告
+    (void)index;  // 抑制未使用参数警告
+    (void)item;  // 抑制未使用参数警告
+}
 /**
  * @brief Initialize the FD server
  *
@@ -159,10 +169,10 @@ void vfb_server_init(void) {
     os_printf("[I][%s] FD server initialized successfully\r\n", TAG);
 }
 void vfg_server_info(void) {
-    printf("VFB Server Info:\n");
-    printf("  Event List Count: %u\n", __vfb_info.event_num);
-    printf("  Semaphore Handle: %p\n", (void *)__vfb_info.xFDSemaphore);
-    printf("  Event List Head: %p\n", (void *)&(__vfb_info.event_list));
+    os_printf("VFB Server Info:\n");
+    os_printf("  Event List Count: %u\n", __vfb_info.event_num);
+    os_printf("  Semaphore Handle: %p\n", (void *)__vfb_info.xFDSemaphore);
+    os_printf("  Event List Head: %p\n", (void *)&(__vfb_info.event_list));
 }
 // 注册event
 OsQueue_t* vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, uint16_t event_num) {
@@ -170,22 +180,26 @@ OsQueue_t* vfb_subscribe(uint16_t queue_num, const vfb_event_t *event_list, uint
     uint16_t invalid_counter = 0;
     /* 获取Task的信息 */
     OsThread_t* curTaskHandle = os_thread_get_current();
-    const char *taskName       = "Unknown";
+    char taskName[32] = "Unknown";
     if (curTaskHandle != NULL) {
-        // 注意：Rte层没有直接提供获取任务名称的接口，这里需要扩展
-        taskName = "VFB_Task"; // 临时使用固定名称
+        // 使用RTE接口获取任务名称
+        if (os_thread_get_name(curTaskHandle, taskName, sizeof(taskName)) < 0) {
+            // 如果获取失败，使用固定名称
+            taskName[0] = '\0';
+        }
     } else {
         ERR_HEAD;
         os_printf("[E][%s] [ERROR]Failed to get current task handle\r\n", TAG);
         return NULL;
     }
+    const char *taskName_ptr = (taskName[0] != '\0') ? taskName : "VFB_Task";
     OsQueue_t* queue_handle = vfb_queue_create(queue_num, sizeof(vfb_message_t));
     if (queue_handle == NULL) {
         ERR_HEAD;
         os_printf("[E][%s] queue_handle is NULL\r\n", TAG);
         return NULL;
     }
-    os_printf("[D][%s] Task %s Queue %p created, queue_num: %u\r\n", TAG, taskName, queue_handle, queue_num);
+    os_printf("[D][%s] Task %s Queue %p created, queue_num: %u\r\n", TAG, taskName_ptr, queue_handle, queue_num);
     if (os_semaphore_take(__vfb_info.xFDSemaphore, 300) >= 0) {
         for (uint16_t i = 0; i < event_num; i++) {
             OsList_t *queue_list = __vfb_list_get_head(event_list[i]);
