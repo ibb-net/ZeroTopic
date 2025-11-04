@@ -7,6 +7,7 @@
 
 #include "../../Rte/inc/os_semaphore.h"
 #include "../../Rte/inc/os_timestamp.h"
+#include "obj_dict_mempool.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,10 +29,17 @@ typedef struct {
     obj_dict_entry_t* entries;   /* 条目数组 */
     size_t            max_keys;  /* 最大键数量 */
     OsSemaphore_t*    lock;      /* 线程安全 */
+#if OBJ_DICT_MEMPOOL_ENABLE
+    obj_dict_mempool_t* mempool; /* 内存池（可选，用于预分配数据缓冲） */
+#endif
 } obj_dict_t;
 
 /* 初始化对象字典：由调用者提供条目数组及容量 */
 int obj_dict_init(obj_dict_t* dict, obj_dict_entry_t* entry_array, size_t max_keys);
+
+/* 初始化对象字典（带内存池）：使用内存池预分配数据缓冲 */
+int obj_dict_init_with_mempool(obj_dict_t* dict, obj_dict_entry_t* entry_array, size_t max_keys,
+                                size_t mempool_block_size, size_t mempool_block_count);
 
 /* 设置键的值(拷贝写入)：若键不存在则占用空槽；返回0成功 */
 int obj_dict_set(obj_dict_t* dict, obj_dict_key_t key, const void* data, size_t len, uint8_t flags);
@@ -52,6 +60,13 @@ int obj_dict_release(obj_dict_t* dict, obj_dict_key_t key);
 
 /* 获取引用计数（调试用） */
 int32_t obj_dict_get_ref_count(obj_dict_t* dict, obj_dict_key_t key);
+
+/* 内存泄漏检测与清理 */
+/* 清理未使用的数据（引用计数为0且超过指定时间未更新） */
+int obj_dict_cleanup_unused(obj_dict_t* dict, uint64_t timeout_us);
+
+/* 获取所有条目的引用计数统计（调试用） */
+int obj_dict_get_all_ref_counts(obj_dict_t* dict, int32_t* ref_counts, size_t max_count);
 
 #ifdef __cplusplus
 }

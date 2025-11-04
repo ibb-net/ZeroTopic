@@ -45,6 +45,7 @@ set(MIDDLEWARE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/ring_buffer/ring_buffer.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/ring_buffer/perf_test_ring_buffer.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/obj_dict/obj_dict.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/obj_dict/obj_dict_mempool.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/obj_dict/obj_dict_storage.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/obj_dict/perf_test_obj_dict.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/topic_bus/topic_bus.c
