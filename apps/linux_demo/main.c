@@ -14,9 +14,16 @@
 
 // 项目头文件
 #include "thread_common.h"
+#include "mcu_sim.h"
 
 // VFB测试函数声明
 int vfb_test_main(void);
+// 环形队列性能测试
+int ring_buffer_perf_test_main(void);
+// 对象字典性能/并发测试
+int obj_dict_perf_test_main(void);
+// Topic Bus完整测试
+int topic_bus_perf_test_main(void);
 
 // 全局变量定义
 ThreadData_t g_thread_data = {0, 0, 0};
@@ -38,6 +45,11 @@ int main(void)
         printf("Failed to initialize OpenIBBOs system\n");
         return -1;
     }
+    
+#if MCU_SIM_ENABLE_PRINT
+    // 打印MCU模拟环境配置
+    mcu_sim_print_config();
+#endif
     
 #if ENABLE_THREAD_DEMO
     os_printf("=== OpenIBBOs 线程通信演示 ===\n");
@@ -107,6 +119,36 @@ int main(void)
         os_printf("VFB测试成功完成\n");
     }
 #endif // ENABLE_VFB_TEST
+
+#if ENABLE_RING_BUFFER_TEST
+    os_printf("\n=== 开始RingBuffer性能测试 ===\n");
+    int rb_result = ring_buffer_perf_test_main();
+    if (rb_result != 0) {
+        os_printf("RingBuffer测试失败，错误码: %d\n", rb_result);
+    } else {
+        os_printf("RingBuffer测试成功完成\n");
+    }
+#endif // ENABLE_RING_BUFFER_TEST
+
+#if ENABLE_OBJ_DICT_TEST
+    os_printf("\n=== 开始ObjDict功能/性能/并发测试 ===\n");
+    int od_result = obj_dict_perf_test_main();
+    if (od_result != 0) {
+        os_printf("ObjDict测试失败，错误码: %d\n", od_result);
+    } else {
+        os_printf("ObjDict测试成功完成\n");
+    }
+#endif // ENABLE_OBJ_DICT_TEST
+
+#if ENABLE_TOPIC_BUS_TEST
+    os_printf("\n=== 开始Topic Bus完整测试 ===\n");
+    int tb_result = topic_bus_perf_test_main();
+    if (tb_result != 0) {
+        os_printf("Topic Bus测试失败，错误码: %d\n", tb_result);
+    } else {
+        os_printf("Topic Bus测试成功完成\n");
+    }
+#endif // ENABLE_TOPIC_BUS_TEST
     
     // 清理系统资源
     os_exit();
