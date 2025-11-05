@@ -10,6 +10,30 @@
 #include "../../Rte/inc/os_printf.h"
 #include "../../Rte/inc/os_thread.h"
 
+/* 诊断打印辅助（仅当启用统计与诊断时有效） */
+#if TOPIC_BUS_ENABLE_STATS && TOPIC_BUS_ENABLE_DIAG
+static void print_topic_diag(topic_bus_t* bus, uint16_t topic_id) {
+    if (!bus || !bus->topics) return;
+    for (size_t i = 0; i < bus->max_topics; ++i) {
+        topic_entry_t* e = &bus->topics[i];
+        if (e->topic_id == topic_id) {
+#if TOPIC_BUS_ENABLE_ATOMICS
+            uint32_t cnt = atomic_load_explicit(&e->event_count, memory_order_acquire);
+#else
+            uint32_t cnt = e->event_count;
+#endif
+            os_printf("[topic][DIAG] topic=%u count=%u last_event=%u last_len=%u last_ts_us=%llu\n",
+                      (unsigned)topic_id, (unsigned)cnt,
+                      (unsigned)e->last_event_key, (unsigned)e->last_data_len,
+                      (unsigned long long)e->last_ts_us);
+            break;
+        }
+    }
+}
+#else
+static void print_topic_diag(topic_bus_t* bus, uint16_t topic_id) { (void)bus; (void)topic_id; }
+#endif
+
 /* 测试配置 */
 #define PERF_TEST_MAX_TOPICS      16
 #define PERF_TEST_MAX_SUBSCRIBERS 8
@@ -148,6 +172,8 @@ static int test_functional_basic(void) {
                   atomic_load_explicit(&callback_count, memory_order_acquire));
         return -1;
     }
+    /* 打印OR Topic诊断信息 */
+    print_topic_diag(&bus, TEST_TOPIC_ID_OR_BASIC);
 
     /* 测试：创建AND规则 */
     obj_dict_key_t events_and[] = {TEST_EVENT_ID_AND_1, TEST_EVENT_ID_AND_2};
@@ -184,6 +210,8 @@ static int test_functional_basic(void) {
                   atomic_load_explicit(&callback_count, memory_order_acquire));
         return -1;
     }
+    /* 打印AND Topic诊断信息 */
+    print_topic_diag(&bus, TEST_TOPIC_ID_AND_BASIC);
 
     /* 测试：手动发布 */
     obj_dict_key_t events_manual[] = {TEST_EVENT_ID_MANUAL};
@@ -214,6 +242,8 @@ static int test_functional_basic(void) {
                   atomic_load_explicit(&callback_count, memory_order_acquire));
         return -1;
     }
+    /* 打印MANUAL Topic诊断信息 */
+    print_topic_diag(&bus, TEST_TOPIC_ID_MANUAL_BASIC);
 
     os_printf("[topic][FUNC] 基础功能测试: 通过\n");
     return 0;

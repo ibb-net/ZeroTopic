@@ -12,24 +12,47 @@
 int topic_rule_can_trigger(const topic_rule_t* rule, obj_dict_key_t event_key) {
     if (!rule || !rule->events) return 0;
 
+#if TOPIC_BUS_ENABLE_RULE_CACHE
+    /* 命中最近一次查询缓存可快速返回（高频重复事件） */
+    if (rule->last_event_key_cached == event_key) {
+        return rule->last_can_trigger_cached ? 1 : 0;
+    }
+#endif
+
     switch (rule->type) {
         case TOPIC_RULE_OR:
             /* OR规则：任意事件匹配即可触发 */
+        {
+            int matched = 0;
             for (size_t i = 0; i < rule->event_count; ++i) {
                 if (rule->events[i] == event_key) {
-                    return 1;
+                    matched = 1;
+                    break;
                 }
             }
-            return 0;
+#if TOPIC_BUS_ENABLE_RULE_CACHE
+            ((topic_rule_t*)rule)->last_event_key_cached = event_key;
+            ((topic_rule_t*)rule)->last_can_trigger_cached = (uint8_t)matched;
+#endif
+            return matched;
+        }
 
         case TOPIC_RULE_AND:
             /* AND规则：需要检查触发掩码，在publish中处理 */
+        {
+            int matched = 0;
             for (size_t i = 0; i < rule->event_count; ++i) {
                 if (rule->events[i] == event_key) {
-                    return 1;
+                    matched = 1;
+                    break;
                 }
             }
-            return 0;
+#if TOPIC_BUS_ENABLE_RULE_CACHE
+            ((topic_rule_t*)rule)->last_event_key_cached = event_key;
+            ((topic_rule_t*)rule)->last_can_trigger_cached = (uint8_t)matched;
+#endif
+            return matched;
+        }
 
         case TOPIC_RULE_MANUAL:
             /* 手动触发：不响应事件 */
@@ -165,4 +188,5 @@ int topic_rule_check_timeout(const topic_rule_t* rule, obj_dict_key_t event_key,
     
     return (elapsed_us <= timeout_us) ? 1 : 0;
 }
+
 

@@ -1,6 +1,7 @@
 #include <string.h>
 #include "topic_bus.h"
 #include "../../Rte/inc/os_heap.h"
+#include "../../Rte/inc/os_timestamp.h"
 
 /* ============================================================
  * 内部函数声明 (Internal Functions Declaration)
@@ -74,13 +75,23 @@ static void __trigger_topic_callbacks(topic_entry_t* entry, obj_dict_key_t event
     void* data = NULL;
     size_t data_len = 0;
     
+    /* 生命周期保护：在回调前增加引用计数，确保数据在回调期间有效 */
     if (bus && bus->obj_dict) {
         obj_dict_entry_t* dict_entry = __find_dict_entry(bus->obj_dict, event_key);
         if (dict_entry && dict_entry->value) {
             data = dict_entry->value;
             data_len = dict_entry->value_len;
+            /* 增加引用计数，保护数据在回调期间不被删除 */
+            obj_dict_retain(bus->obj_dict, event_key);
         }
     }
+
+    /* 诊断信息记录（可选） */
+#if TOPIC_BUS_ENABLE_STATS && TOPIC_BUS_ENABLE_DIAG
+    entry->last_event_key = event_key;
+    entry->last_data_len  = (uint32_t)data_len;
+    entry->last_ts_us     = os_monotonic_time_get_microsecond();
+#endif
 
     /* 触发所有订阅者 */
     if (entry->subscribers) {
@@ -91,6 +102,11 @@ static void __trigger_topic_callbacks(topic_entry_t* entry, obj_dict_key_t event
             }
             sub = sub->next;
         }
+    }
+
+    /* 释放引用计数：回调完成后释放引用 */
+    if (bus && bus->obj_dict && data) {
+        obj_dict_release(bus->obj_dict, event_key);
     }
 
 #if TOPIC_BUS_ENABLE_ROUTER
@@ -127,6 +143,11 @@ int topic_bus_init(topic_bus_t* bus, topic_entry_t* topics, size_t max_topics, o
         atomic_init(&topics[i].event_count, 0);
 #else
         topics[i].event_count = 0;
+#endif
+#if TOPIC_BUS_ENABLE_DIAG
+        topics[i].last_event_key = 0;
+        topics[i].last_data_len  = 0;
+        topics[i].last_ts_us     = 0;
 #endif
 #endif
     }
@@ -195,6 +216,11 @@ int topic_rule_create(topic_bus_t* bus, uint16_t topic_id, const topic_rule_t* r
     entry->rule.trigger_mask = 0;
 #endif
     topic_rule_reset_mask(&entry->rule);
+
+#if TOPIC_BUS_ENABLE_RULE_CACHE
+    entry->rule.last_event_key_cached   = 0;
+    entry->rule.last_can_trigger_cached = 0;
+#endif
 
     /* 复制事件数组 */
     if (rule->events && rule->event_count > 0) {
@@ -319,7 +345,9 @@ int topic_publish_event(topic_bus_t* bus, obj_dict_key_t event_key) {
     if (!bus) return -1;
     if (os_semaphore_take(bus->lock, 100) < 0) return -1;
 
-    int triggered_count = 0;
+    /* 收集需要触发的Topic条目（避免在持有锁时调用回调） */
+    topic_entry_t* entries_to_trigger[TOPIC_BUS_MAX_TOPICS];
+    size_t trigger_count = 0;
 
     /* 遍历所有Topic，检查是否匹配 */
     for (size_t i = 0; i < bus->max_topics; ++i) {
@@ -342,24 +370,18 @@ int topic_publish_event(topic_bus_t* bus, obj_dict_key_t event_key) {
                 if (topic_rule_matches(&entry->rule, event_key)) {
                     /* 检查所有事件的时效性 */
                     int all_timeout_ok = 1;
-                    for (size_t i = 0; i < entry->rule.event_count; ++i) {
-                        if (!topic_rule_check_timeout(&entry->rule, entry->rule.events[i], bus->obj_dict)) {
+                    for (size_t j = 0; j < entry->rule.event_count; ++j) {
+                        if (!topic_rule_check_timeout(&entry->rule, entry->rule.events[j], bus->obj_dict)) {
                             all_timeout_ok = 0;
                             break;
                         }
                     }
                     
                     if (all_timeout_ok) {
-                        /* 所有事件都在时效内，触发Topic回调 */
-                        __trigger_topic_callbacks(entry, event_key, bus);
-                        triggered_count++;
-#if TOPIC_BUS_ENABLE_STATS
-#if TOPIC_BUS_ENABLE_ATOMICS
-                        atomic_fetch_add_explicit(&entry->event_count, 1, memory_order_relaxed);
-#else
-                        entry->event_count++;
-#endif
-#endif
+                        /* 收集需要触发的条目 */
+                        if (trigger_count < TOPIC_BUS_MAX_TOPICS) {
+                            entries_to_trigger[trigger_count++] = entry;
+                        }
                         /* 重置掩码，准备下次触发 */
                         topic_rule_reset_mask(&entry->rule);
                     } else {
@@ -368,21 +390,37 @@ int topic_publish_event(topic_bus_t* bus, obj_dict_key_t event_key) {
                     }
                 }
             } else if (entry->rule.type == TOPIC_RULE_OR) {
-                /* OR规则：直接触发 */
-                __trigger_topic_callbacks(entry, event_key, bus);
-                triggered_count++;
-#if TOPIC_BUS_ENABLE_STATS
-#if TOPIC_BUS_ENABLE_ATOMICS
-                atomic_fetch_add_explicit(&entry->event_count, 1, memory_order_relaxed);
-#else
-                entry->event_count++;
-#endif
-#endif
+                /* OR规则：收集需要触发的条目 */
+                if (trigger_count < TOPIC_BUS_MAX_TOPICS) {
+                    entries_to_trigger[trigger_count++] = entry;
+                }
             }
         }
     }
 
+    /* 释放锁，避免在回调期间持有锁导致死锁 */
     os_semaphore_give(bus->lock);
+
+    /* 在无锁状态下触发回调（避免死锁，同时允许并发回调） */
+    for (size_t i = 0; i < trigger_count; ++i) {
+        topic_entry_t* entry = entries_to_trigger[i];
+        __trigger_topic_callbacks(entry, event_key, bus);
+        
+        /* 更新统计信息 */
+#if TOPIC_BUS_ENABLE_STATS
+#if TOPIC_BUS_ENABLE_ATOMICS
+        /* 原子操作，无需锁 */
+        atomic_fetch_add_explicit(&entry->event_count, 1, memory_order_relaxed);
+#else
+        /* 非原子模式：需要重新获取锁以更新计数器 */
+        if (os_semaphore_take(bus->lock, 100) >= 0) {
+            entry->event_count++;
+            os_semaphore_give(bus->lock);
+        }
+#endif
+#endif
+    }
+
     return 0;
 }
 

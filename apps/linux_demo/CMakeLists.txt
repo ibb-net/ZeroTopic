@@ -19,9 +19,9 @@ set(RTE_SRC_DIR ${RTE_ROOT}/Rte/src)
 include_directories(${RTE_INC_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/common)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/vfb)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/ring_buffer)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/obj_dict)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/topic_bus)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/ring_buffer)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/obj_dict)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/topic_bus)
 
 # RTE源文件
 set(RTE_SOURCES
@@ -42,16 +42,17 @@ set(MIDDLEWARE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/common/os_list.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/common/ringbuf.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/vfb/vfb.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/ring_buffer/ring_buffer.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/ring_buffer/perf_test_ring_buffer.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/obj_dict/obj_dict.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/obj_dict/obj_dict_storage.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/obj_dict/perf_test_obj_dict.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/topic_bus/topic_bus.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/topic_bus/topic_rule.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/topic_bus/topic_server.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/topic_bus/topic_router.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/topic_bus/perf_test_topic_bus.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/ring_buffer/ring_buffer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/ring_buffer/perf_test_ring_buffer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/obj_dict/obj_dict.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/obj_dict/obj_dict_mempool.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/obj_dict/obj_dict_storage.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/obj_dict/perf_test_obj_dict.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/topic_bus/topic_bus.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/topic_bus/topic_rule.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/topic_bus/topic_server.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/topic_bus/topic_router.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../zero_topic_core/topic_bus/perf_test_topic_bus.c
 )
 
 # 主程序源文件
