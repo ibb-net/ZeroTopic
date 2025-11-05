@@ -5,10 +5,12 @@ on:
     branches:
       - main
       - master
+      - 'feather/**'  # 支持 feather 分支用于测试
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
       - '.github/workflows/docs.yml'
+      - 'zero_topic_core/**/*.md'  # 包括源文档
   pull_request:
     branches:
       - main
@@ -16,6 +18,7 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - 'zero_topic_core/**/*.md'
 
 permissions:
   contents: write
@@ -44,7 +47,15 @@ jobs:
         run: mkdocs build --strict
 
       - name: Deploy to GitHub Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: mkdocs gh-deploy --force
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Upload build artifacts
+        if: always() && github.event_name == 'push'
+        uses: actions/upload-artifact@v3
+        with:
+          name: docs-site
+          path: site/
+          retention-days: 7
