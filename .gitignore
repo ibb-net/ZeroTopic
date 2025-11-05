@@ -8,3 +8,4 @@ tool/arm-none-eabi-gcc/Linux/*
 *.d
 
 apps/linux_demo/build/
+site/
