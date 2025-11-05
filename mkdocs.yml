@@ -1,0 +1,90 @@
+site_name: OpenIBBOs Wiki
+site_description: OpenIBBOs 零拷贝通信框架文档
+site_author: OpenIBBOs Team
+site_url: https://yourusername.github.io/OpenIBBOs
+
+# 使用中文
+theme:
+  name: material
+  language: zh
+  palette:
+    # 浅色主题
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    # 深色主题
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: 切换到浅色模式
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+    - content.code.copy
+
+# 插件配置
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+  - minify:
+      minify_html: true
+
+# Markdown扩展
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+# 导航结构
+nav:
+  - 首页: index.md
+  - 快速开始:
+    - 快速开始: getting-started.md
+    - 安装指南: installation.md
+  - 核心概念:
+    - Topic 总线: zero_topic_core/topic_bus/topic_bus.md
+    - 对象字典: zero_topic_core/obj_dict/obj_dict.md
+    - 环形缓冲区: zero_topic_core/ring_buffer/ring_buffer.md
+  - 架构设计:
+    - 硬件线程 vs 直接API: zero_topic_core/topic_bus/hardware_thread_vs_direct_api_analysis.md
+    - MCU硬件优化: zero_topic_core/topic_bus/mcu_hardware_optimization_analysis.md
+    - 多MCU microROS通信: zero_topic_core/topic_bus/multi_mcu_microros_communication.md
+  - 中间件:
+    - Shell组件: Middlewares/shell/README.md
+  - 开发指南:
+    - 贡献指南: CONTRIBUTING.md
+    - WSL/CMake/GCC: Doc/wsl_cmake_gcc.md
+    - TODO列表: Doc/todo_list.md
+  - 更新日志: CHANGELOG.md
+
+# 排除文件
+exclude_docs: |
+  /(.*\.py[cod]|.*\.pyo|.*\.pyd|__pycache__|.*\.so)$
+  /(.git|.github|.idea|.vscode|.DS_Store)/
+
+# 版权信息
+copyright: Copyright &copy; 2024 OpenIBBOs Team
