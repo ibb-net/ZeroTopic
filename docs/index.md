@@ -49,7 +49,7 @@ OpenIBBOs 是一个专为嵌入式实时系统设计的**零拷贝通信框架**
 
 ## 📄 许可证
 
-本项目采用 [MIT License](LICENSE)。
+本项目采用 [MIT License](https://github.com/yourusername/OpenIBBOs/blob/main/LICENSE)。
 
 ---
 

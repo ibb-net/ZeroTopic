@@ -1,0 +1,1 @@
+../../zero_topic_core/obj_dict/obj_dict.md

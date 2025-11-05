@@ -1,0 +1,1 @@
+../../zero_topic_core/topic_bus/mcu_hardware_optimization_analysis.md

@@ -100,4 +100,4 @@ topic_bus_publish_event(sensor_topic, 0x1000);
 ## 获取帮助
 
 - 查看 [问题反馈](https://github.com/yourusername/OpenIBBOs/issues)
-- 阅读 [开发文档](../README.md)
+- 阅读 [项目 README](https://github.com/yourusername/OpenIBBOs/blob/main/README.md)

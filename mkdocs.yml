@@ -85,6 +85,6 @@ nav:
 exclude_docs: |
   /(.*\.py[cod]|.*\.pyo|.*\.pyd|__pycache__|.*\.so)$
   /(.git|.github|.idea|.vscode|.DS_Store)/
-
+  ^README\.md$
 # 版权信息
 copyright: Copyright &copy; 2024 OpenIBBOs Team
