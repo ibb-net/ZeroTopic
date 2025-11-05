@@ -37,6 +37,7 @@ plugins:
   - search
   - git-revision-date-localized:
       enable_creation_date: true
+      enable_parallel_processing: false  # 禁用并行处理以避免符号链接问题
   - minify:
       minify_html: true
 
