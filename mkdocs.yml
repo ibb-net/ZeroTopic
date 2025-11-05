@@ -1,7 +1,7 @@
 site_name: OpenIBBOs Wiki
 site_description: OpenIBBOs 零拷贝通信框架文档
 site_author: OpenIBBOs Team
-site_url: https://yourusername.github.io/OpenIBBOs
+site_url: https://ibb-net.github.io/ZeroTopic
 
 # 使用中文
 theme:
