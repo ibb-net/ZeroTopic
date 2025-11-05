@@ -81,6 +81,8 @@ nav:
     - WSL/CMake/GCC: Doc/wsl_cmake_gcc.md
     - TODO列表: Doc/todo_list.md
   - 更新日志: CHANGELOG.md
+  - 其他文档:
+    - 文档使用说明: DOCS_README.md
 
 # 排除文件
 exclude_docs: |
